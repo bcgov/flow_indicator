@@ -10,24 +10,47 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
+### Load in data that was accessed in the '01_load.R' script.
+rm(list = ls())
+if(!exists("mean_annual_flow_per_station")){load('./tmp/station_data.Rdata')}
 
+### Filter out some stations
+# 1. (NOT CURRENTLY IMPLEMENTED) Remove stations that do not have significant alteration (include some “regulated” stations);
+# 2. (NOT CURRENTLY IMPLEMENTED) Remove stations that are upstream of another station without significant inputs (duplication of results);
+# 3. (NOT CURRENTLY IMPLEMENTED) 80% decadal data completeness (so large missing gaps);
+# 4. must have end year of data within past 5 years (likely all active stations).
 
-# Preliminary plot
-library(plotly)
-plot1 <- station.mean %>% plot_ly(type="scatter", x=~Year, y=~Value, showlegend=FALSE) %>%
-  add_lines( showlegend=FALSE) %>%
-  layout( title=paste0("Station ", station_number),
-          yaxis=list(title="Mean daily flow"))
-plot1
+stations_to_exclude = number_daily_records_per_station %>%
+  group_by(STATION_NUMBER) %>%
+  # Get most recent years of data for each station
+  arrange(desc(Year)) %>%
+  slice(1) %>%
+  # Get the station IDs of stations whose most recent data is 2017 or older (we'll drop these stations)
+  filter(Year <= 2017) %>%
+  ungroup() %>%
+  dplyr::select(STATION_NUMBER) %>%
+  distinct() %>%
+  pull(STATION_NUMBER)
+#1914 stations to exclude (their most recent year of data is 2017 or earlier)
 
+stations_to_keep = number_daily_records_per_station %>%
+  filter(!STATION_NUMBER %in% all_of(stations_to_exclude)) %>%
+  dplyr::select(STATION_NUMBER) %>%
+  distinct() %>%
+  pull(STATION_NUMBER)
+
+# Apply station filter to data.
+mean_annual_flow_per_station = mean_annual_flow_per_station %>%
+  filter(!STATION_NUMBER %in% stations_to_exclude) %>%
+  as_tibble()
+number_daily_records_per_station = number_daily_records_per_station %>%
+  filter(!STATION_NUMBER %in% stations_to_exclude) %>%
+  as_tibble()
 
 # restrict the data to 1967 onward
-station.mean.restrict <- station.mean[ station.mean$Year >= 1967,]
+mean_annual_flow_per_station = mean_annual_flow_per_station %>%
+  filter(Year >= 1967)
+number_daily_records_per_station = number_daily_records_per_station %>%
+  filter(Year >= 1967)
 
-# the revised plot
-plot2 <- station.mean.restrict %>% plot_ly(type="scatter", x=~Year, y=~Value, showlegend=FALSE) %>%
-  add_lines( showlegend=FALSE) %>%
-  layout( title=paste0("Station ", station_number, " excluding early years with missing data"),
-          yaxis=list(title="Mean daily flow "))
-plot2
-
+save(stations_to_keep, stations_to_exclude, mean_annual_flow_per_station, number_daily_records_per_station, file = './tmp/station_data_cleaned.Rdata')
