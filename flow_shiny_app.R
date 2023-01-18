@@ -15,14 +15,16 @@ rm(list = ls())
 library(shiny)
 library(bslib)
 library(leaflet)
+library(leaflet.providers)
 library(envreportutils)
 library(sf)
 library(modifiedmk)
 library(tidyverse)
-library(plotly)
+# library(plotly)
+library(ggtext)
 
 # Trend selection options
-trend_select_options = wellPanel(
+trend_select_options_tab = wellPanel(
   selectizeInput(inputId = 'user_var_choice',
                  label = 'Trend to Display',
                  choices = c("Mean Annual Flow",
@@ -36,17 +38,22 @@ trend_select_options = wellPanel(
                label = 'Date Cutoff',
                choices = c('1990+','1967+','1912+'),
                selected = '1912+',
-               inline = T)
+               inline = F)
 )
 
+station_plot_tab = wellPanel(
+  plotOutput('myplot',height=225)
+)
 # Absolute Panel with trend selection.
-trend_select_abs_panel = bs4Dash::bs4Card(
-  absolutePanel(
-    bottom = 10, left = 10, width = 200,
-    draggable = TRUE,
-    trend_select_options
-  ),
-  collapsible = T
+trend_select_abs_panel = absolutePanel(
+  id = 'trend_selector',
+  top = 240, left = 10, width = 400, height = 350,
+  draggable = T,
+  tabsetPanel(
+    id = 'tabset',
+    tabPanel('Trend Options',trend_select_options_tab),
+    tabPanel('Station Plot',station_plot_tab)
+  )
 )
 
 # Absolute panel with map as background.
@@ -58,18 +65,20 @@ map_abs_panel = absolutePanel(
     fluidRow(
       leafletOutput('leafmap',
                     height = '550px')
-      # DT::DTOutput('test')
     )
   )
 )
 #
-# # UI with moveable trend selector absolute panel
-# # on top of map background.
-# ui = shiny::fluidPage(
-#   titlePanel("Flow Indicator"),
-#   map_abs_panel,
-#   trend_select_abs_panel
-# )
+# UI with moveable trend selector absolute panel
+# on top of map background.
+ui = shiny::fluidPage(
+  tags$head(tags$style(
+    HTML('#trend_selector {opacity:0.5;}
+         #trend_selector:hover{opacity:0.9;}'))),
+  titlePanel("Flow Indicator"),
+  map_abs_panel,
+  card(trend_select_abs_panel)
+)
 
 ## Option 2.
 
@@ -87,27 +96,27 @@ map_abs_panel = absolutePanel(
 #   )
 # )
 
-ui = fluidPage(
-  fluidRow(
-    column(width = 7,
-           bslib::card(
-             card_body(
-               leafletOutput('leafmap',
-                             height = '500px')
-             )
-           )
-    ),
-    column(width = 5,
-           bslib::card(
-             trend_select_options
-             ),
-           bslib::card(
-             title = textOutput('selected_station'),
-             plotlyOutput('myplotly')
-           )
-    )
-  )
-)
+# ui = fluidPage(
+#   fluidRow(
+#     column(width = 7,
+#            bslib::card(
+#              card_body(
+#                leafletOutput('leafmap',
+#                              height = '500px')
+#              )
+#            )
+#     ),
+#     column(width = 5,
+#            bslib::card(
+#              trend_select_options
+#              ),
+#            bslib::card(
+#              title = textOutput('selected_station'),
+#              plotlyOutput('myplotly')
+#            )
+#     )
+#   )
+# )
 # Define server logic required to draw a histogram
 server <- function(input, output) {
 
@@ -195,6 +204,9 @@ server <- function(input, output) {
       ))
   })
 
+  # Join the Mann-Kendall test result to the spatial table of stations.
+  # If the user has chosen a variable based on day-of-year measurements,
+  # use the terms 'later and earlier' rather than 'up and down'.
   stations_sf_with_trend = reactive({
     if(chosen_var_type() == "Date"){
       stations_sf %>%
@@ -211,15 +223,36 @@ server <- function(input, output) {
     }
   })
 
-  output$test = DT::renderDT({stations_sf_with_trend() %>%
-      st_drop_geometry()})
+  # Make a dataframe for whichever station the user has selected
+  # that we can use to add a Sen slope trend line (plus MK test p-value)
+  # to a ggplot figure.
+  senslope_dat = reactive({
+    flow_dat_filtered() %>%
+      filter(STATION_NUMBER == click_station()) %>%
+      slice(1,nrow(.)) %>%
+      mutate(start_year = .[1,]$Year,
+             end_year = .[2,]$Year) %>%
+      slice(1) %>%
+      left_join(MK_table() %>%
+                  st_drop_geometry()) %>%
+      summarise(STATION_NUMBER,
+                y = values,
+                start_year,
+                end_year,
+                slope = `Sen's Slope`,
+                p_value = `New p-value`,
+                trend_sig) %>%
+      mutate(yend = y + (slope*(end_year-start_year)))
+  })
+
+  # output$test = DT::renderDT({senslope_dat()})
 
   # Set up a reactive value that stores a district's name upon user's click
-  click_station <- reactiveVal('09AA013')
+  click_station <- reactiveVal('no_selection')
 
   # Watch for a click on the leaflet map. Once clicked...
 
-  # 1. Update Leaflet map.
+  # 1. Update selection.
   observeEvent(input$leafmap_marker_click, {
     # Capture the info of the clicked polygon. We use this for filtering.
     click_station(input$leafmap_marker_click$id)
@@ -227,16 +260,45 @@ server <- function(input, output) {
 
   output$selected_station = renderText({paste0("Station: ",click_station())})
 
-  output$myplotly = renderPlotly({
-    ggplotly(
+  output$myplot = renderPlot({
+    if(click_station() == 'no_selection'){
+      ggplot() +
+        geom_text(aes(x=1,y=1,label='Click a station on the map to see its plot.')) +
+        ggthemes::theme_map()
+    } else {
+
+      plot_units = case_when(
+        input$user_var_choice %in% c('Mean Annual Flow','Median Annual Flow','Total Annual Flow','Minimum Flow (7day)') ~ '(m<sup>3</sup>/second)',
+        input$user_var_choice == 'Date of 50% Annual Flow' ~ ""
+        )
+
       flow_dat_filtered() %>%
         filter(STATION_NUMBER == click_station()) %>%
-        ggplot() +
-        geom_point(aes(y = values, x = Year)) +
-        geom_line(aes(y = values, x = Year)) +
-        labs(y = input$user_var_selection) +
-        scale_x_continuous(breaks = scales::pretty_breaks())
-    )
+        left_join(stations_sf %>% st_drop_geometry() %>% dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
+        #Start of ggplot code block. This allows us to assign a variable
+        # to the plot title.
+        {ggplot(.) +
+            geom_point(aes(y = values, x = Year)) +
+            geom_line(aes(y = values, x = Year)) +
+            geom_segment(colour = 'darkblue',
+                         linetype = 1,
+                         linewidth = 2,
+                         alpha = 0.75,
+                         aes(x = start_year, y = y,
+                             xend = end_year, yend = yend),
+                         data = senslope_dat()) +
+            labs(title = paste0(unique(.$STATION_NAME)," (",unique(.$STATION_NUMBER),")"),
+                 subtitle = paste0(unique(senslope_dat()$trend_sig),
+                                   " (Sen slope:",round(senslope_dat()$slope,3),
+                                   ", p-value ~ ",round(unique(senslope_dat()$p_value),2),")")) +
+            labs(y = paste(input$user_var_choice,plot_units,sep = " ")) +
+            scale_x_continuous(breaks = scales::pretty_breaks()) +
+            theme_minimal() +
+            theme(axis.title.y = element_markdown(size = 14),
+                  axis.title.x = element_text(size = 14),
+                  axis.text = element_text(size = 11))
+        } #End of ggplot code block.
+    }
   })
 
   mypal = reactive({
@@ -257,13 +319,16 @@ server <- function(input, output) {
 
   output$leafmap <- renderLeaflet({
 
-    leaflet(stations_sf_with_trend()) %>%
-      addTiles() %>%
-      # addCircleMarkers(layerId = ~STATION_NUMBER,
-      #                  color = ~mypal()(trend_sig),
-      #                  label = ~paste0(STATION_NAME, " (",STATION_NUMBER,") - ",HYD_STATUS)) %>%
+    m = leaflet(stations_sf_with_trend()) %>%
+      addTiles(group = 'Streets') %>%
+      addProviderTiles(providers$Stamen.Terrain, group = "Terrain") %>%
+      addProviderTiles(providers$CartoDB,group = "CartoDB") %>%
+      addProviderTiles("Esri.WorldImagery",group = "Sat") %>%
       add_bc_home_button() %>%
-      set_bc_view()
+      set_bc_view() %>%
+      addLayersControl(baseGroups = c("Streets","Terrain","CartoDB","Satellite"),
+                       options = layersControlOptions(collapsed = F),
+                       position = 'bottomright')
   })
 
   observe({
