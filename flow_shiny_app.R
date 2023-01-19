@@ -223,26 +223,48 @@ server <- function(input, output) {
     }
   })
 
-  # Make a dataframe for whichever station the user has selected
-  # that we can use to add a Sen slope trend line (plus MK test p-value)
-  # to a ggplot figure.
+  # # Make a dataframe for whichever station the user has selected
+  # # that we can use to add a Sen slope trend line (plus MK test p-value)
+  # # to a ggplot figure.
+  # senslope_dat = reactive({
+  #   flow_dat_filtered() %>%
+  #     filter(STATION_NUMBER == click_station()) %>%
+  #     slice(1,nrow(.)) %>%
+  #     mutate(start_year = .[1,]$Year,
+  #            end_year = .[2,]$Year) %>%
+  #     mutate(mid_year = start_year + (end_year-start_year)/2) %>%
+  #     slice(1) %>%
+  #     left_join(MK_table() %>%
+  #                 st_drop_geometry()) %>%
+  #     summarise(STATION_NUMBER,
+  #               y = values,
+  #               start_year,
+  #               end_year,
+  #               slope = `Sen's Slope`,
+  #               p_value = `New p-value`,
+  #               trend_sig) %>%
+  #     mutate(yend = y + (slope*(end_year-start_year))) %>%
+  #     mutate(ymid = y + (yend-y)/2)
+  # })
+
   senslope_dat = reactive({
     flow_dat_filtered() %>%
       filter(STATION_NUMBER == click_station()) %>%
-      slice(1,nrow(.)) %>%
-      mutate(start_year = .[1,]$Year,
-             end_year = .[2,]$Year) %>%
-      slice(1) %>%
+      mutate(start_year = first(Year),
+             end_year = last(Year)) %>%
+      slice((nrow(.)/2) %/% 1) %>%
       left_join(MK_table() %>%
                   st_drop_geometry()) %>%
       summarise(STATION_NUMBER,
-                y = values,
+                y_mid = values,
                 start_year,
+                mid_year = Year,
                 end_year,
                 slope = `Sen's Slope`,
                 p_value = `New p-value`,
                 trend_sig) %>%
-      mutate(yend = y + (slope*(end_year-start_year)))
+      mutate(y = y_mid - slope*(end_year - mid_year),
+             y_end = y_mid + slope*(end_year - mid_year))
   })
 
   # output$test = DT::renderDT({senslope_dat()})
@@ -285,7 +307,7 @@ server <- function(input, output) {
                          linewidth = 2,
                          alpha = 0.75,
                          aes(x = start_year, y = y,
-                             xend = end_year, yend = yend),
+                             xend = end_year, yend = y_end),
                          data = senslope_dat()) +
             labs(title = paste0(unique(.$STATION_NAME)," (",unique(.$STATION_NUMBER),")"),
                  subtitle = paste0(unique(senslope_dat()$trend_sig),
