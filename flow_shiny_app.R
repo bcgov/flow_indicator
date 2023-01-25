@@ -18,6 +18,7 @@ library(leaflet)
 library(leaflet.providers)
 library(envreportutils)
 library(sf)
+library(EnvStats)
 library(modifiedmk)
 library(tidyverse)
 # library(plotly)
@@ -47,12 +48,13 @@ station_plot_tab = wellPanel(
 # Absolute Panel with trend selection.
 trend_select_abs_panel = absolutePanel(
   id = 'trend_selector',
-  top = 240, left = 10, width = 400, height = 350,
+  top = 240, left = 10, width = 600, height = 550,
   draggable = T,
   tabsetPanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab)
+    tabPanel('Station Plot',station_plot_tab),
+    tabPanel('DT of test',DT::DTOutput('test'))
   )
 )
 
@@ -154,7 +156,7 @@ server <- function(input, output) {
   # If the user chooses to restrict the years included in the analysis, implement here.
   flow_dat_filtered = reactive({
     if(input$user_period_choice == '1990+'){flow_dat_focused() %>% filter(Year >= 1990)}
-    if(input$user_period_choice == '1990+'){flow_dat_focused() %>% filter(Year >= 1967)}
+    if(input$user_period_choice == '1967+'){flow_dat_focused() %>% filter(Year >= 1967)}
     else{flow_dat_focused()}
   })
 
@@ -175,32 +177,60 @@ server <- function(input, output) {
   # Get a list of which stations have too few data points for an MK test.
   flow_dat_too_little_data = flow_dat %>%
     dplyr::count(STATION_NUMBER) %>%
-    filter(n <= 3) %>%
+    filter(n <= 6) %>%
     pull(STATION_NUMBER)
+
+  # MK_table = reactive({
+  #   flow_dat_filtered() %>%
+  #     # Remove stations with too few data points for MK test
+  #     filter(!STATION_NUMBER %in% flow_dat_too_little_data) %>%
+  #     group_by(STATION_NUMBER) %>%
+  #     summarise(MK_results = list(mmky1lag(values))) %>%
+  #     unnest(MK_results) %>%
+  #     cbind(MK_vars) %>%
+  #     as_tibble() %>%
+  #     pivot_wider(names_from = MK_vars, values_from = MK_results) %>%
+  #     bind_rows(
+  #       data.frame(STATION_NUMBER = flow_dat_too_little_data)
+  #     ) %>%
+  #     mutate(trend_sig = case_when(
+  #       abs(Tau) <= 0.05 ~ "No Trend",
+  #       Tau < -0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Date' ~ "Significant Trend Earlier",
+  #       Tau < -0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Earlier",
+  #       Tau > 0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Later",
+  #       Tau > 0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Date'  ~ "Significant Trend Later",
+  #       Tau < -0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Down",
+  #       Tau < -0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Down",
+  #       Tau > 0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Up",
+  #       Tau > 0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Up"
+  #     ))
+  # })
 
   MK_table = reactive({
     flow_dat_filtered() %>%
       # Remove stations with too few data points for MK test
       filter(!STATION_NUMBER %in% flow_dat_too_little_data) %>%
       group_by(STATION_NUMBER) %>%
-      summarise(MK_results = list(modifiedmk::mmky1lag(values))) %>%
+      summarise(MK_results = kendallTrendTest(values ~ Year)[c('statistic','p.value','estimate')]) %>%
       unnest(MK_results) %>%
-      cbind(MK_vars) %>%
-      as_tibble() %>%
-      pivot_wider(names_from = MK_vars, values_from = MK_results) %>%
+      unnest_longer(col = MK_results) %>%
+      group_by(STATION_NUMBER) %>%
+      mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
+      pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
+      #Add in the stations that had too few points to plot.
       bind_rows(
         data.frame(STATION_NUMBER = flow_dat_too_little_data)
       ) %>%
       mutate(trend_sig = case_when(
         abs(Tau) <= 0.05 ~ "No Trend",
-        Tau < -0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Date' ~ "Significant Trend Earlier",
-        Tau < -0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Earlier",
-        Tau > 0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Later",
-        Tau > 0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Date'  ~ "Significant Trend Later",
-        Tau < -0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Down",
-        Tau < -0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Down",
-        Tau > 0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Up",
-        Tau > 0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Up"
+        Tau < -0.05 & P_value < 0.05 & chosen_var_type() == 'Date' ~ "Significant Trend Earlier",
+        Tau < -0.05 & P_value >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Earlier",
+        Tau > 0.05 & P_value >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Later",
+        Tau > 0.05 & P_value < 0.05 & chosen_var_type() == 'Date'  ~ "Significant Trend Later",
+        Tau < -0.05 & P_value < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Down",
+        Tau < -0.05 & P_value >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Down",
+        Tau > 0.05 & P_value >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Up",
+        Tau > 0.05 & P_value < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Up"
       ))
   })
 
@@ -252,22 +282,31 @@ server <- function(input, output) {
       filter(STATION_NUMBER == click_station()) %>%
       mutate(start_year = first(Year),
              end_year = last(Year)) %>%
-      slice((nrow(.)/2) %/% 1) %>%
+      slice(1) %>%
       left_join(MK_table() %>%
                   st_drop_geometry()) %>%
       summarise(STATION_NUMBER,
-                y_mid = values,
+                Intercept,
                 start_year,
-                mid_year = Year,
                 end_year,
-                slope = `Sen's Slope`,
-                p_value = `New p-value`,
-                trend_sig) %>%
-      mutate(y = y_mid - slope*(end_year - mid_year),
-             y_end = y_mid + slope*(end_year - mid_year))
+                Slope,
+                trend_sig,
+                P_value) %>%
+      mutate(y = Intercept,
+             y_end = as.numeric(y) + (as.numeric(Slope)*as.numeric(end_year)))
+      # summarise(STATION_NUMBER,
+      #           y_mid = values,
+      #           start_year,
+      #           mid_year = Year,
+      #           end_year,
+      #           slope = `Sen's Slope`,
+      #           p_value = `New p-value`,
+      #           trend_sig) %>%
+      # mutate(y = y_mid - slope*(end_year - mid_year),
+      #        y_end = y_mid + slope*(end_year - mid_year))
   })
 
-  # output$test = DT::renderDT({senslope_dat()})
+  output$test = DT::renderDT({senslope_dat()})
 
   # Set up a reactive value that stores a district's name upon user's click
   click_station <- reactiveVal('no_selection')
@@ -292,7 +331,7 @@ server <- function(input, output) {
       plot_units = case_when(
         input$user_var_choice %in% c('Mean Annual Flow','Median Annual Flow','Total Annual Flow','Minimum Flow (7day)') ~ '(m<sup>3</sup>/second)',
         input$user_var_choice == 'Date of 50% Annual Flow' ~ ""
-        )
+      )
 
       flow_dat_filtered() %>%
         filter(STATION_NUMBER == click_station()) %>%
@@ -311,8 +350,8 @@ server <- function(input, output) {
                          data = senslope_dat()) +
             labs(title = paste0(unique(.$STATION_NAME)," (",unique(.$STATION_NUMBER),")"),
                  subtitle = paste0(unique(senslope_dat()$trend_sig),
-                                   " (Sen slope:",round(senslope_dat()$slope,3),
-                                   ", p-value ~ ",round(unique(senslope_dat()$p_value),2),")")) +
+                                   " (Sen slope:",round(senslope_dat()$Slope,3),
+                                   ", p-value ~ ",round(unique(senslope_dat()$P_value),2),")")) +
             labs(y = paste(input$user_var_choice,plot_units,sep = " ")) +
             scale_x_continuous(breaks = scales::pretty_breaks()) +
             theme_minimal() +
