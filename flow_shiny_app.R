@@ -21,7 +21,6 @@ library(sf)
 library(EnvStats)
 library(modifiedmk)
 library(tidyverse)
-# library(plotly)
 library(ggtext)
 
 # Trend selection options
@@ -53,8 +52,7 @@ trend_select_abs_panel = absolutePanel(
   tabsetPanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab),
-    tabPanel('DT of test',DT::DTOutput('test'))
+    tabPanel('Station Plot',station_plot_tab)
   )
 )
 
@@ -82,48 +80,10 @@ ui = shiny::fluidPage(
   card(trend_select_abs_panel)
 )
 
-## Option 2.
-
-# ui = fluidPage(
-#   sidebarLayout(
-#     sidebarPanel(
-#       trend_select_options,
-#       # textOutput('selected_station'),
-#       plotlyOutput('myplotly')
-#     ),
-#     mainPanel(
-#       leafletOutput('leafmap',
-#                     height = '500px')
-#     )
-#   )
-# )
-
-# ui = fluidPage(
-#   fluidRow(
-#     column(width = 7,
-#            bslib::card(
-#              card_body(
-#                leafletOutput('leafmap',
-#                              height = '500px')
-#              )
-#            )
-#     ),
-#     column(width = 5,
-#            bslib::card(
-#              trend_select_options
-#              ),
-#            bslib::card(
-#              title = textOutput('selected_station'),
-#              plotlyOutput('myplotly')
-#            )
-#     )
-#   )
-# )
 # Define server logic required to draw a histogram
 server <- function(input, output) {
 
   # Load in data
-  # flow_dat = read.csv('./flow_dat.csv')
   flow_dat = read.csv('www/flow_dat.csv')
 
   # Filter the full dataset so that it only lists the parameter the user has chosen with the dropdown.
@@ -180,32 +140,6 @@ server <- function(input, output) {
     filter(n <= 6) %>%
     pull(STATION_NUMBER)
 
-  # MK_table = reactive({
-  #   flow_dat_filtered() %>%
-  #     # Remove stations with too few data points for MK test
-  #     filter(!STATION_NUMBER %in% flow_dat_too_little_data) %>%
-  #     group_by(STATION_NUMBER) %>%
-  #     summarise(MK_results = list(mmky1lag(values))) %>%
-  #     unnest(MK_results) %>%
-  #     cbind(MK_vars) %>%
-  #     as_tibble() %>%
-  #     pivot_wider(names_from = MK_vars, values_from = MK_results) %>%
-  #     bind_rows(
-  #       data.frame(STATION_NUMBER = flow_dat_too_little_data)
-  #     ) %>%
-  #     mutate(trend_sig = case_when(
-  #       abs(Tau) <= 0.05 ~ "No Trend",
-  #       Tau < -0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Date' ~ "Significant Trend Earlier",
-  #       Tau < -0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Earlier",
-  #       Tau > 0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Later",
-  #       Tau > 0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Date'  ~ "Significant Trend Later",
-  #       Tau < -0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Down",
-  #       Tau < -0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Down",
-  #       Tau > 0.05 & `New p-value` >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Up",
-  #       Tau > 0.05 & `New p-value` < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Up"
-  #     ))
-  # })
-
   MK_table = reactive({
     flow_dat_filtered() %>%
       # Remove stations with too few data points for MK test
@@ -253,60 +187,21 @@ server <- function(input, output) {
     }
   })
 
-  # # Make a dataframe for whichever station the user has selected
-  # # that we can use to add a Sen slope trend line (plus MK test p-value)
-  # # to a ggplot figure.
-  # senslope_dat = reactive({
-  #   flow_dat_filtered() %>%
-  #     filter(STATION_NUMBER == click_station()) %>%
-  #     slice(1,nrow(.)) %>%
-  #     mutate(start_year = .[1,]$Year,
-  #            end_year = .[2,]$Year) %>%
-  #     mutate(mid_year = start_year + (end_year-start_year)/2) %>%
-  #     slice(1) %>%
-  #     left_join(MK_table() %>%
-  #                 st_drop_geometry()) %>%
-  #     summarise(STATION_NUMBER,
-  #               y = values,
-  #               start_year,
-  #               end_year,
-  #               slope = `Sen's Slope`,
-  #               p_value = `New p-value`,
-  #               trend_sig) %>%
-  #     mutate(yend = y + (slope*(end_year-start_year))) %>%
-  #     mutate(ymid = y + (yend-y)/2)
-  # })
-
   senslope_dat = reactive({
     flow_dat_filtered() %>%
       filter(STATION_NUMBER == click_station()) %>%
-      mutate(start_year = first(Year),
-             end_year = last(Year)) %>%
-      slice(1) %>%
       left_join(MK_table() %>%
                   st_drop_geometry()) %>%
-      summarise(STATION_NUMBER,
-                Intercept,
-                start_year,
-                end_year,
+      mutate(SlopePreds = Intercept+Slope*Year) %>%
+      dplyr::select(STATION_NUMBER,
+                SlopePreds,
                 Slope,
                 trend_sig,
-                P_value) %>%
-      mutate(y = Intercept,
-             y_end = as.numeric(y) + (as.numeric(Slope)*as.numeric(end_year)))
-      # summarise(STATION_NUMBER,
-      #           y_mid = values,
-      #           start_year,
-      #           mid_year = Year,
-      #           end_year,
-      #           slope = `Sen's Slope`,
-      #           p_value = `New p-value`,
-      #           trend_sig) %>%
-      # mutate(y = y_mid - slope*(end_year - mid_year),
-      #        y_end = y_mid + slope*(end_year - mid_year))
+                P_value,
+                Year)
   })
 
-  output$test = DT::renderDT({senslope_dat()})
+  # output$test = DT::renderDT({senslope_dat()})
 
   # Set up a reactive value that stores a district's name upon user's click
   click_station <- reactiveVal('no_selection')
@@ -341,13 +236,12 @@ server <- function(input, output) {
         {ggplot(.) +
             geom_point(aes(y = values, x = Year)) +
             geom_line(aes(y = values, x = Year)) +
-            geom_segment(colour = 'darkblue',
-                         linetype = 1,
-                         linewidth = 2,
-                         alpha = 0.75,
-                         aes(x = start_year, y = y,
-                             xend = end_year, yend = y_end),
-                         data = senslope_dat()) +
+            geom_line(aes(y = SlopePreds, x = Year),
+                      colour = 'darkblue',
+                      linetype = 1,
+                      linewidth = 2,
+                      alpha = 0.75,
+                      senslope_dat()) +
             labs(title = paste0(unique(.$STATION_NAME)," (",unique(.$STATION_NUMBER),")"),
                  subtitle = paste0(unique(senslope_dat()$trend_sig),
                                    " (Sen slope:",round(senslope_dat()$Slope,3),
