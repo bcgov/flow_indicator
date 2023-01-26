@@ -47,10 +47,17 @@ library(tidyverse)
 # 2. Timing of low flow (7-day period)
 # 3. Total annual volume.
 rm(list = ls())
-if(!exists("mean_annual_flow_per_station")){load('./tmp/station_data_cleaned.Rdata')}
+if(!exists("number_daily_records_per_station")){load('./tmp/station_data_cleaned.Rdata')}
 
 # If no /www folder (used for the shiny app, and also for static results PDF)
 if(!dir.exists('./www')) dir.create('./www')
+
+# The below code chunk looks for a flow_dat.csv summary file in the /www folder.
+# If this file cannot be found, the {fasstr} functions are used to generate
+# fields for each station and year of variables like mean/median flow per year,
+# day of year by which 50% of flow has passed, 7-day flow minimum, day of year
+# of 7-day flow minimum, and total annual flow. This code chunk takes about 12:00 to
+# to run.
 
 if(!file.exists('./www/flow_dat.csv')){
 # Calculate annual mean flow, Date of 50% annual flow, 7-day low flow date, and total volume in cubic meters.
@@ -77,111 +84,4 @@ flow_dat = annual_mean_dat %>%
   left_join(totalvolume_dat)
 
 write.csv(flow_dat, './www/flow_dat.csv', row.names = F)
-} else if(file.exists('www/flow_dat.csv')) {flow_dat = read.csv('www/flow_dat.csv')}
-
-# To run MK test, stations must have at least 3 values.
-flow_dat_too_little_data = flow_dat %>%
-  count(STATION_NUMBER) %>%
-  filter(n <= 3) %>%
-  pull(STATION_NUMBER)
-
-flow_dat %>%
-  filter(!STATION_NUMBER %in% flow_dat_too_little_data) %>%
-  summarise(STATION_NUMBER,Year,values = Mean) %>%
-  group_by(STATION_NUMBER) %>%
-  group_split() %>%
-  map(STATION_NUMBER, ~ {
-  modifiedmk::mmky1lag(.[.$STATION_NUMBER == .x,]$values)
-    })
-
-  ungroup() %>%
-  as.data.frame(.) %>%
-  data.frame(parameter = row.names(.), .) %>%
-  as_tibble() %>%
-  pivot_wider(names_from = parameter, values_from = values)
-#
-#
-# gstation_dat = tibble(station_id = stations_to_keep,
-#                      half_flow_dat = list(NA),
-#                      min7day_flow_dat = list(NA),
-#                      totalvolume_dat = list(NA),
-#                      results_shortperiod = list(NA),
-#                      results_longperiod = list(NA))
-#
-# for(i in length(stations_to_keep)){
-#
-#   station_id = stations_to_keep[i]
-#
-#   print(paste0('working on station ',i,' of ',length(stations_to_keep)))
-#
-#   for(time_period in c('1990 - present','1967 - present')){
-#     flow_timing_dat = calc_annual_flow_timing(station_number = station_id, percent_total = 50) %>%
-#       filter(!is.na(Date_50pct_TotalQ))
-#     if(time_period == '1990 - present'){flow_timing_dat = flow_timing_dat %>% filter(Year >= 1990)}
-#     mmky.test <- mmky1lag(flow_timing_dat$DoY_50pct_TotalQ)
-#     HalfFlowMK = data.frame(statistic = row.names(as.data.frame(mmky.test)),
-#                             value = as.numeric(mmky.test)) %>%
-#       mutate(station_id = station_id,
-#              parameter = 'Date_50pct_TotalQ',
-#              period = time_period)
-#
-#     lowflow_dat = calc_annual_lowflows(station_number = station_id, roll_days = 7) %>%
-#       filter(!is.na(Min_7_Day_Date))
-#     if(time_period == '1990 - present'){lowflow_dat = lowflow_dat %>% filter(Year >= 1990)}
-#     mmky.test <- mmky1lag(lowflow_dat$Min_7_Day_DoY)
-#     Min7DayMK = data.frame(statistic = row.names(as.data.frame(mmky.test)),
-#                            value = as.numeric(mmky.test)) %>%
-#       mutate(station_id = station_id,
-#              parameter = 'Min_7_Day_DoY',
-#              period = time_period)
-#
-#     totalvolume_dat = calc_annual_cumulative_stats(station_number = station_id) %>%
-#       filter(!is.na(Total_Volume_m3))
-#     if(time_period == '1990 - present'){totalvolume_dat = totalvolume_dat %>% filter(Year >= 1990)}
-#     mmky.test <- mmky1lag(totalvolume_dat$Total_Volume_m3)
-#     TotalVolMK = data.frame(statistic = row.names(as.data.frame(mmky.test)),
-#                             value = as.numeric(mmky.test)) %>%
-#       mutate(station_id = station_id,
-#              parameter = 'Total_Volume_m3',
-#              period = time_period)
-#
-#     if(time_period == '1967 - present') {
-#       station_dat[i,]$results_longperiod = list(bind_rows(HalfFlowMK, Min7DayMK, TotalVolMK))
-#     }
-#     if(time_period == '1990 - present') station_dat[i,]$results_shortperiod = list(bind_rows(HalfFlowMK, Min7DayMK, TotalVolMK))
-#   }
-# }
-
-# Above code 9:19 AM ->
-# # Least Squares trend line.
-# lm.fit <- lm(Value ~ Year, data=station.mean)
-# summary(lm.fit)$coefficients
-#
-# # Mann-Kendall trend test.
-# mk.test <- kendallTrendTest(Value~Year, data=station.mean)
-# mk.test
-# cat("Confidence interval for the slope \n")
-# mk.test$interval$limits
-#
-# # Tau is the MK correlation between the year and value variables.
-# cor.test(station.mean$Value, station.mean$Year, method="kendall")
-#
-# # "Linear" trend line of Senn slope.
-# station.mean$mk.pred <- mk.test$estimate["intercept"]+
-#   mk.test$estimate["slope"]*station.mean$Year
-#
-# plot1 %>% add_trace(data=station.mean, x=~Year, y=~mk.pred, mode="lines")
-#
-# # Note: we may prefer to use a version of the MK test that accounts for
-# # serial autocorrelation. This function shows the old and new p values and
-# # other parameters of the model fit.
-# mmky.test <- modifiedmk::mmky1lag(station.mean$Value)
-# mmky.test
-#
-# # We could also use a 'robust' linear regression model.
-# lmrob.fit <- robustbase::lmrob(Value ~ Year, data=station.mean)
-# summary(lmrob.fit)$coefficients
-#
-# station.mean$lmrob.pred <- predict(lmrob.fit, newdata=station.mean)
-#
-# plot1 %>% add_trace(data=station.mean, x=~Year, y=~lmrob.pred, mode="lines")
+}

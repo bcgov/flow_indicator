@@ -12,7 +12,7 @@
 
 ### Load in data that was accessed in the '01_load.R' script.
 rm(list = ls())
-if(!exists("mean_annual_flow_per_station")){load('./tmp/station_data.Rdata')}
+if(!exists("number_daily_records_per_station")){load('./tmp/station_data.Rdata')}
 
 ### Filter out some stations
 # 1. (NOT CURRENTLY IMPLEMENTED) Remove stations that do not have significant alteration (include some “regulated” stations);
@@ -34,23 +34,18 @@ stations_to_exclude = number_daily_records_per_station %>%
 #1914 stations to exclude (their most recent year of data is 2017 or earlier)
 
 stations_to_keep = number_daily_records_per_station %>%
-  filter(!STATION_NUMBER %in% all_of(stations_to_exclude)) %>%
+  filter(!STATION_NUMBER %in% stations_to_exclude) %>%
   dplyr::select(STATION_NUMBER) %>%
   distinct() %>%
   pull(STATION_NUMBER)
 
 # Apply station filter to data.
-mean_annual_flow_per_station = mean_annual_flow_per_station %>%
-  filter(!STATION_NUMBER %in% stations_to_exclude) %>%
-  as_tibble()
 number_daily_records_per_station = number_daily_records_per_station %>%
   filter(!STATION_NUMBER %in% stations_to_exclude) %>%
   as_tibble()
 
 # restrict the data to 1967 onward
-mean_annual_flow_per_station = mean_annual_flow_per_station %>%
-  filter(Year >= 1967)
 number_daily_records_per_station = number_daily_records_per_station %>%
   filter(Year >= 1967)
 
-save(stations_to_keep, stations_to_exclude, mean_annual_flow_per_station, number_daily_records_per_station, file = './tmp/station_data_cleaned.Rdata')
+save(stations_to_keep, stations_to_exclude, number_daily_records_per_station, file = './tmp/station_data_cleaned.Rdata')

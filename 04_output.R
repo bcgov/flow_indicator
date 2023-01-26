@@ -9,21 +9,3 @@
 # Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
-
-# Preliminary plot
-library(plotly)
-
-plot1 <- station.mean %>% plot_ly(type="scatter", x=~Year, y=~Value, showlegend=FALSE) %>%
-  add_lines( showlegend=FALSE) %>%
-  layout( title=paste0("Station ", station_number),
-          yaxis=list(title="Mean daily flow"))
-plot1
-
-
-
-# the revised plot
-plot2 <- station.mean.restrict %>% plot_ly(type="scatter", x=~Year, y=~Value, showlegend=FALSE) %>%
-  add_lines( showlegend=FALSE) %>%
-  layout( title=paste0("Station ", station_number, " excluding early years with missing data"),
-          yaxis=list(title="Mean daily flow "))
-plot2
