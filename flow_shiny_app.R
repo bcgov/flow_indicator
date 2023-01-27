@@ -36,8 +36,10 @@ trend_select_options_tab = wellPanel(
                  width = '100%'),
   radioButtons(inputId = 'user_period_choice',
                label = 'Date Cutoff',
-               choices = c('1990+','1967+','1912+'),
-               selected = '1912+',
+               choices = c('One decade (2010 - present)' = '2010+',
+                           'Three decades (1990 - present)' = '1990+',
+                           'All available data' = 'all'),
+               selected = 'all',
                inline = F)
 )
 
@@ -52,7 +54,8 @@ trend_select_abs_panel = absolutePanel(
   tabsetPanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab)
+    tabPanel('Station Plot',station_plot_tab),
+    tabPanel('Dat view',DT::DTOutput('test'))
   )
 )
 
@@ -115,9 +118,15 @@ server <- function(input, output) {
 
   # If the user chooses to restrict the years included in the analysis, implement here.
   flow_dat_filtered = reactive({
-    if(input$user_period_choice == '1990+'){flow_dat_focused() %>% filter(Year >= 1990)}
-    if(input$user_period_choice == '1967+'){flow_dat_focused() %>% filter(Year >= 1967)}
-    else{flow_dat_focused()}
+    if(input$user_period_choice == '2010+'){
+      return(flow_dat_focused() %>% filter(Year >= 2010))
+      }
+    if(input$user_period_choice == '1990+'){
+      return(flow_dat_focused() %>% filter(Year >= 1990))
+      }
+    if(input$user_period_choice == 'all'){
+      return(flow_dat_focused())
+      }
   })
 
   # Get list of (included) stations and their coordinates for map.
@@ -201,7 +210,7 @@ server <- function(input, output) {
                 Year)
   })
 
-  # output$test = DT::renderDT({senslope_dat()})
+  output$test = DT::renderDT({flow_dat_filtered()})
 
   # Set up a reactive value that stores a district's name upon user's click
   click_station <- reactiveVal('no_selection')
