@@ -11,7 +11,6 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 rm(list = ls())
-
 library(shiny)
 library(bslib)
 library(leaflet)
@@ -19,7 +18,7 @@ library(leaflet.providers)
 library(envreportutils)
 library(sf)
 library(EnvStats)
-library(modifiedmk)
+library(data.table)
 library(tidyverse)
 library(ggtext)
 
@@ -49,13 +48,13 @@ station_plot_tab = wellPanel(
 # Absolute Panel with trend selection.
 trend_select_abs_panel = absolutePanel(
   id = 'trend_selector',
-  top = 240, left = 10, width = 600, height = 550,
+  top = 240, left = 10, width = 450, height = 550,
   draggable = T,
   tabsetPanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab),
-    tabPanel('Dat view',DT::DTOutput('test'))
+    tabPanel('Station Plot',station_plot_tab)#,
+    # tabPanel('Dat view',DT::DTOutput('test'))
   )
 )
 
@@ -67,7 +66,7 @@ map_abs_panel = absolutePanel(
     style="padding: 8px; border-bottom: 1px solid #CCC; background: #FFFFEE;",
     fluidRow(
       leafletOutput('leafmap',
-                    height = '550px')
+                    height = '600px')
     )
   )
 )
@@ -154,7 +153,7 @@ server <- function(input, output) {
       # Remove stations with too few data points for MK test
       filter(!STATION_NUMBER %in% flow_dat_too_little_data) %>%
       group_by(STATION_NUMBER) %>%
-      summarise(MK_results = kendallTrendTest(values ~ Year)[c('statistic','p.value','estimate')]) %>%
+      reframe(MK_results = kendallTrendTest(values ~ Year)[c('statistic','p.value','estimate')]) %>%
       unnest(MK_results) %>%
       unnest_longer(col = MK_results) %>%
       group_by(STATION_NUMBER) %>%
@@ -164,16 +163,16 @@ server <- function(input, output) {
       bind_rows(
         data.frame(STATION_NUMBER = flow_dat_too_little_data)
       ) %>%
-      mutate(trend_sig = case_when(
-        abs(Tau) <= 0.05 ~ "No Trend",
-        Tau < -0.05 & P_value < 0.05 & chosen_var_type() == 'Date' ~ "Significant Trend Earlier",
-        Tau < -0.05 & P_value >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Earlier",
-        Tau > 0.05 & P_value >= 0.05 & chosen_var_type() == 'Date' ~ "Non-Significant Trend Later",
-        Tau > 0.05 & P_value < 0.05 & chosen_var_type() == 'Date'  ~ "Significant Trend Later",
-        Tau < -0.05 & P_value < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Down",
-        Tau < -0.05 & P_value >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Down",
-        Tau > 0.05 & P_value >= 0.05 & chosen_var_type() == 'Value' ~ "Non-Significant Trend Up",
-        Tau > 0.05 & P_value < 0.05 & chosen_var_type() == 'Value' ~ "Significant Trend Up"
+      mutate(trend_sig = fcase(
+        abs(Tau) <= 0.05 , "No Trend",
+        Tau < -0.05 & P_value < 0.05 & chosen_var_type() == 'Date' , "Significant Trend Earlier",
+        Tau < -0.05 & P_value >= 0.05 & chosen_var_type() == 'Date' , "Non-Significant Trend Earlier",
+        Tau > 0.05 & P_value >= 0.05 & chosen_var_type() == 'Date' , "Non-Significant Trend Later",
+        Tau > 0.05 & P_value < 0.05 & chosen_var_type() == 'Date'  , "Significant Trend Later",
+        Tau < -0.05 & P_value < 0.05 & chosen_var_type() == 'Value' , "Significant Trend Down",
+        Tau < -0.05 & P_value >= 0.05 & chosen_var_type() == 'Value' , "Non-Significant Trend Down",
+        Tau > 0.05 & P_value >= 0.05 & chosen_var_type() == 'Value' , "Non-Significant Trend Up",
+        Tau > 0.05 & P_value < 0.05 & chosen_var_type() == 'Value' , "Significant Trend Up"
       ))
   })
 
@@ -221,6 +220,9 @@ server <- function(input, output) {
   observeEvent(input$leafmap_marker_click, {
     # Capture the info of the clicked polygon. We use this for filtering.
     click_station(input$leafmap_marker_click$id)
+    shiny::updateTabsetPanel(
+      inputId = 'tabset',
+      selected = 'Station Plot')
   })
 
   output$selected_station = renderText({paste0("Station: ",click_station())})
@@ -232,9 +234,9 @@ server <- function(input, output) {
         ggthemes::theme_map()
     } else {
 
-      plot_units = case_when(
-        input$user_var_choice %in% c('Mean Annual Flow','Median Annual Flow','Total Annual Flow','Minimum Flow (7day)') ~ '(m<sup>3</sup>/second)',
-        input$user_var_choice == 'Date of 50% Annual Flow' ~ ""
+      plot_units = fcase(
+        input$user_var_choice %in% c('Mean Annual Flow','Median Annual Flow','Total Annual Flow','Minimum Flow (7day)') , '(m<sup>3</sup>/second)',
+        input$user_var_choice == 'Date of 50% Annual Flow' , ""
       )
 
       flow_dat_filtered() %>%
@@ -283,14 +285,14 @@ server <- function(input, output) {
 
   output$leafmap <- renderLeaflet({
 
-    m = leaflet(stations_sf_with_trend()) %>%
+    m = leaflet() %>% #stations_sf_with_trend()) %>%
       addTiles(group = 'Streets') %>%
       addProviderTiles(providers$Stamen.Terrain, group = "Terrain") %>%
-      addProviderTiles(providers$CartoDB,group = "CartoDB") %>%
       addProviderTiles("Esri.WorldImagery",group = "Sat") %>%
+      addProviderTiles(providers$CartoDB,group = "CartoDB") %>%
       add_bc_home_button() %>%
       set_bc_view() %>%
-      addLayersControl(baseGroups = c("Streets","Terrain","CartoDB","Satellite"),
+      addLayersControl(baseGroups = c("Streets","Terrain","Satellite",'CartoDB'),
                        options = layersControlOptions(collapsed = F),
                        position = 'bottomright')
   })
@@ -299,11 +301,15 @@ server <- function(input, output) {
     leafletProxy("leafmap") %>%
       addCircleMarkers(layerId = ~STATION_NUMBER,
                        color = ~mypal()(trend_sig),
+                       radius = 3,
+                       weight = 10,
                        label = ~paste0(STATION_NAME, " (",STATION_NUMBER,") - ",HYD_STATUS),
                        data = stations_sf_with_trend()) %>%
+      removeControl("legend") %>%
       addLegend(pal = mypal(), values = ~trend_sig,
                 title = 'Mann-Kendall Trend Result',
-                data = stations_sf_with_trend())
+                data = stations_sf_with_trend(),
+                layerId = 'legend')
   })
 }
 

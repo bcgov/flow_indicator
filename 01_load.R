@@ -29,6 +29,18 @@ tidyhydat::download_hydat()
 # Get list of BC stations
 bc_stations <- hy_stations( prov_terr_state_loc="BC")
 
+# Remove stations that are 'regulated', i.e., rivers that are highly
+# modified and thus their flow readings don't make sense in this analysis.
+bc_stations = bc_stations %>%
+  filter(!STATION_NUMBER %in% (hy_stn_regulation(
+    bc_stations$STATION_NUMBER) %>%
+      filter(REGULATED == T) %>%
+      pull(STATION_NUMBER)
+  )
+  )
+
+# Potential filtering step: only include stations that are within X KM (e.g. 50)
+# from base stations.
 # Create station list. It is possible to exclude stations at this point.
 station_list = bc_stations
 
