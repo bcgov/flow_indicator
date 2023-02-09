@@ -7,5 +7,5 @@
 /out
 /tmp
 /data
-/www
+/app/www
 SingleStationAnalysis.*

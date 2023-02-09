@@ -22,39 +22,50 @@ if(!exists("number_daily_records_per_station")){load('./tmp/station_data.Rdata')
 # ii. 80% decadal data completeness (i.e. for each 10-year chunk of data, it should
 #     have at least 80% of years with data?);
 
+# stations_to_exclude = number_daily_records_per_station %>%
+#   group_by(STATION_NUMBER) %>%
+#   # Get most recent years of data for each station
+#   arrange(desc(Year)) %>%
+#   slice(1) %>%
+#   # Get the station IDs of stations whose most recent data is 2017 or older (we'll drop these stations)
+#   filter(Year <= 2017) %>%
+#   ungroup() %>%
+#   dplyr::select(STATION_NUMBER) %>%
+#   distinct() %>%
+#   pull(STATION_NUMBER)
+# #1280 stations to exclude (their most recent year of data is 2017 or earlier)
+#
+# # Stations with fewer than 10 years of data.
+# stats_fewer_10_years = number_daily_records_per_station %>%
+#   count(STATION_NUMBER) %>%
+#   filter(n < 10) %>%
+#   pull(STATION_NUMBER)
+#
+# stations_to_exclude = unique(c(stations_to_exclude, stats_fewer_10_years))
+#
+# # # Stations with data gaps of 20% or more within decades of data
+# # # (note: the start year of each 10-year chunk depends on the station,
+# # #  rather than it just being fixed, e.g. 1980-1990, 1990-2000, etc.)
+# # number_daily_records_per_station %>%
+# #   mutate(decade = 10*(Year-1900) %/% 10) %>%
+# #   group_by(STATION_NUMBER,decade) %>%
+# #   mutate(prop_with_data = sum(DaysWithData)/())
+#
+# ## UNFINISHED ABOVE ##
+#
+# stations_to_keep = number_daily_records_per_station %>%
+#   filter(!STATION_NUMBER %in% stations_to_exclude) %>%
+#   dplyr::select(STATION_NUMBER) %>%
+#   distinct() %>%
+#   pull(STATION_NUMBER)
+
+#Pulling in list of filtered stations from Jon Goetz work (see 'trending_station_selection.R' script)
+station_list_filtered = read.csv('data/finalstns.csv') %>% as_tibble()
+
+stations_to_keep = station_list_filtered$STATION_NUMBER
+
 stations_to_exclude = number_daily_records_per_station %>%
-  group_by(STATION_NUMBER) %>%
-  # Get most recent years of data for each station
-  arrange(desc(Year)) %>%
-  slice(1) %>%
-  # Get the station IDs of stations whose most recent data is 2017 or older (we'll drop these stations)
-  filter(Year <= 2017) %>%
-  ungroup() %>%
-  dplyr::select(STATION_NUMBER) %>%
-  distinct() %>%
-  pull(STATION_NUMBER)
-#1280 stations to exclude (their most recent year of data is 2017 or earlier)
-
-# Stations with fewer than 10 years of data.
-stats_fewer_10_years = number_daily_records_per_station %>%
-  count(STATION_NUMBER) %>%
-  filter(n < 10) %>%
-  pull(STATION_NUMBER)
-
-stations_to_exclude = unique(c(stations_to_exclude, stats_fewer_10_years))
-
-# # Stations with data gaps of 20% or more within decades of data
-# # (note: the start year of each 10-year chunk depends on the station,
-# #  rather than it just being fixed, e.g. 1980-1990, 1990-2000, etc.)
-# number_daily_records_per_station %>%
-#   mutate(decade = 10*(Year-1900) %/% 10) %>%
-#   group_by(STATION_NUMBER,decade) %>%
-#   mutate(prop_with_data = sum(DaysWithData)/())
-
-## UNFINISHED ABOVE ##
-
-stations_to_keep = number_daily_records_per_station %>%
-  filter(!STATION_NUMBER %in% stations_to_exclude) %>%
+  filter(!STATION_NUMBER %in% stations_to_keep) %>%
   dplyr::select(STATION_NUMBER) %>%
   distinct() %>%
   pull(STATION_NUMBER)
@@ -64,8 +75,5 @@ number_daily_records_per_station = number_daily_records_per_station %>%
   filter(!STATION_NUMBER %in% stations_to_exclude) %>%
   as_tibble()
 
-# # restrict the data to 1967 onward
-# number_daily_records_per_station = number_daily_records_per_station %>%
-#   filter(Year >= 1967)
-
+# save(stations_to_keep, stations_to_exclude, number_daily_records_per_station, file = './tmp/station_data_cleaned.Rdata')
 save(stations_to_keep, stations_to_exclude, number_daily_records_per_station, file = './tmp/station_data_cleaned.Rdata')
