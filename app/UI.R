@@ -25,7 +25,6 @@ trend_select_options_tab = wellPanel(
                           multiple = F,
                           choices = 'All',
                           selected = 'All')
-           # uiOutput('month_selector_UI')
     )
   ),
   selectizeInput(inputId = 'user_var_choice',
@@ -36,7 +35,7 @@ trend_select_options_tab = wellPanel(
                              'Minimum Flow (7day)' = 'Min_7_Day',
                              'Date of Minimum Flow (7day)' = 'Min_7_Day_DoY',
                              'Total Flow' = 'Total_Volume_m3'),
-                 selected = 'Mean Flow',
+                 selected = 'Mean',
                  width = '100%'),
   radioButtons(inputId = 'user_period_choice',
                label = 'Date Cutoff',
@@ -58,7 +57,8 @@ trend_select_abs_panel = absolutePanel(
   tabsetPanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab)
+    tabPanel('Station Plot',station_plot_tab),
+    tabPanel('Datview',DT::DTOutput('test'))
   )
 )
 

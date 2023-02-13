@@ -27,12 +27,21 @@ server <- function(input, output) {
   source(file.path('Load_Filter_Data.R'), local = T)$value
   source(file.path('Render_UI_elements.R'), local = T)$value
 
+  date_vars = c("Min_7_Day_DoY","DoY_50pct_TotalQ")
+
   # Update month selector to show months, if user picks month time-scale
   observeEvent(input$time_scale, {
     if(input$time_scale == 'Monthly'){
       updateSelectizeInput(inputId = 'month_selector',
                            choices = month.abb,
                            selected = month.abb[1])
+      updateSelectizeInput(inputId = 'user_var_choice',
+                           choices = c('Mean Flow' = 'Mean',
+                                       'Median Flow' = 'Median',
+                                       'Minimum Flow (7day)' = 'Min_7_Day',
+                                       'Date of Minimum Flow (7day)' = 'Min_7_Day_DoY',
+                                       'Total Flow' = 'Total_Volume_m3')
+                           )
     }
     if(input$time_scale == 'Annual'){
       updateSelectizeInput(inputId = 'month_selector',
@@ -53,13 +62,24 @@ server <- function(input, output) {
   output$testytest = DT::renderDT({flow_dat_focused()})
 
   stations_sf_with_trend = reactive({
-    stations_sf %>%
-      left_join(mk_results()) %>%
-      mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
-                                                      'Non-Significant Trend Down',
-                                                      'No Trend',
-                                                      'Non-Significant Trend Up',
-                                                      'Significant Trend Up')))
+    dat = stations_sf %>%
+      left_join(mk_results())
+
+    if(input$user_var_choice %in% date_vars){
+      dat %>%
+        mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Earlier",
+                                                        'Non-Significant Trend Earlier',
+                                                        'No Trend',
+                                                        'Non-Significant Trend Later',
+                                                        'Significant Trend Later')))
+    } else {
+      dat %>%
+        mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
+                                                        'Non-Significant Trend Down',
+                                                        'No Trend',
+                                                        'Non-Significant Trend Up',
+                                                        'Significant Trend Up')))
+    }
   })
 
   # Set up a reactive value that stores a district's name upon user's click
@@ -100,7 +120,19 @@ server <- function(input, output) {
                       slopes = senslope_dat())
   })
 
+  # output$test = DT::renderDT(mk_results())
+  output$test = DT::renderDT(stations_sf_with_trend())
   mypal = reactive({
+    if(input$user_var_choice %in% date_vars){
+      colorFactor(palette = 'RdBu',
+                  domain = mk_results()$trend_sig,
+                  levels = c("Significant Trend Earlier",
+                             'Non-Significant Trend Earlier',
+                             'No Trend',
+                             'Non-Significant Trend Later',
+                             'Significant Trend Later'),
+                  ordered = T)
+      } else {
     colorFactor(palette = 'RdBu',
                 domain = mk_results()$trend_sig,
                 levels = c("Significant Trend Down",
@@ -108,8 +140,8 @@ server <- function(input, output) {
                            'No Trend',
                            'Non-Significant Trend Up',
                            'Significant Trend Up'),
-                # reverse = F,
                 ordered = T)
+      }
   })
 
   output$leafmap <- renderLeaflet({
