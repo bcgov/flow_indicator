@@ -1,0 +1,5 @@
+*.html
+*.md
+*.log
+SingleStationAnalysis_files/
+MultipleStationAnalysis_files/
