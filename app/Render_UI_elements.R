@@ -20,17 +20,27 @@ flow_variables = reactive({
   }
 })
 
-output$month_selector_UI = renderUI({
-  if(!input$time_scale == 'Monthly') return(NULL)
-  selectizeInput(inputId = 'month_selector',
-                 label = 'Month',
-                 multiple = F,
-                 choices = month.abb,
-                 selected = month.abb[1])
-})
+# output$month_selector_UI = renderUI({
+#   if(!input$time_scale == 'Monthly') return(NULL)
+#   selectizeInput(inputId = 'month_selector',
+#                  label = 'Month',
+#                  multiple = F,
+#                  choices = month.abb,
+#                  selected = month.abb[1])
+# })
+
+# output$time_selector_ui = renderUI({
+#   if(input$custom_daterange) return(NULL)
+#   selectizeInput(inputId = 'time_selector',
+#                label = 'Time Selector',
+#                multiple = F,
+#                choices = c('Annual' = 'All',
+#                            month.abb),
+#                selected = 'Annual')
+# })
 
 output$custom_daterange_selectors = renderUI({
-  if(!input$time_scale == 'Custom Timeframe') return(NULL)
+  if(!input$custom_daterange) return(NULL)
   tagList(
     fluidRow(
       column(width = 6,
@@ -61,8 +71,6 @@ output$custom_daterange_selectors = renderUI({
                           max = 31,
                           value = 31)
       )
-    ),
-    actionButton(inputId = 'calc_custom_range_dat',
-                 label = 'Apply Custom Timeframe')
+    )
   )
 })

@@ -15,11 +15,18 @@ library(feather)
 trend_select_options_tab = wellPanel(
   fluidRow(
     column(width = 6,
-           radioButtons(inputId = 'time_scale',
-                        label = 'Time Scale',
-                        choices = c('Annual','Monthly','Custom Timeframe'),
-                        selected = 'Annual'
-           )
+           # radioButtons(inputId = 'time_scale',
+           #              label = 'Time Scale',
+           #              choices = c('Annual','Monthly','Custom Timeframe'),
+           #              selected = 'Annual'
+           # )
+           selectizeInput(inputId = 'time_selector',
+                          label = 'Time Selector',
+                          multiple = F,
+                          choices = c('Annual' = 'All',
+                                      month.abb),
+                          selected = 'Annual')
+           # uiOutput('time_selector_ui')
     ),
     column(width = 6,
            # selectizeInput(inputId = 'month_selector',
@@ -27,7 +34,9 @@ trend_select_options_tab = wellPanel(
            #                multiple = F,
            #                choices = 'All',
            #                selected = 'All'),
-          uiOutput('month_selector_UI'),
+           checkboxInput(inputId = 'custom_daterange',
+                         label = 'Custom Date Range'),
+          # uiOutput('month_selector_UI'),
           uiOutput('custom_daterange_selectors')
     )
   ),

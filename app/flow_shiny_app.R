@@ -29,43 +29,43 @@ server <- function(input, output) {
 
   date_vars = c("Min_7_Day_DoY","DoY_50pct_TotalQ")
 
-  # Update month selector to show months, if user picks month time-scale
-  observeEvent(input$time_scale, {
-    if(input$time_scale == 'Monthly'){
-      updateSelectizeInput(inputId = 'month_selector',
-                           choices = month.abb,
-                           selected = month.abb[1])
-      updateSelectizeInput(inputId = 'user_var_choice',
-                           choices = c('Mean Flow' = 'Mean',
-                                       'Median Flow' = 'Median',
-                                       'Total Flow' = 'Total_Volume_m3')
-                           )
-    }
-    if(input$time_scale == 'Annual'){
-      updateSelectizeInput(inputId = 'month_selector',
-                           choices = 'All',
-                           selected = 'All')
-      updateSelectizeInput(inputId = 'user_var_choice',
-                           choices = c('Mean Flow' = 'Mean',
-                                       'Median Flow' = 'Median',
-                                       'Date of 50% Annual Flow' = 'DoY_50pct_TotalQ',
-                                       'Minimum Flow (7day)' = 'Min_7_Day',
-                                       'Date of Minimum Flow (7day)' = 'Min_7_Day_DoY',
-                                       'Total Flow' = 'Total_Volume_m3'))
-    }
-  })
+  # # Update month selector to show months, if user picks month time-scale
+  # observeEvent(input$time_scale, {
+  #   if(input$time_scale == 'Monthly'){
+  #     updateSelectizeInput(inputId = 'month_selector',
+  #                          choices = month.abb,
+  #                          selected = month.abb[1])
+  #     updateSelectizeInput(inputId = 'user_var_choice',
+  #                          choices = c('Mean Flow' = 'Mean',
+  #                                      'Median Flow' = 'Median',
+  #                                      'Total Flow' = 'Total_Volume_m3')
+  #                          )
+  #   }
+  #   if(input$time_scale == 'Annual'){
+  #     updateSelectizeInput(inputId = 'month_selector',
+  #                          choices = 'All',
+  #                          selected = 'All')
+  #     updateSelectizeInput(inputId = 'user_var_choice',
+  #                          choices = c('Mean Flow' = 'Mean',
+  #                                      'Median Flow' = 'Median',
+  #                                      'Date of 50% Annual Flow' = 'DoY_50pct_TotalQ',
+  #                                      'Minimum Flow (7day)' = 'Min_7_Day',
+  #                                      'Date of Minimum Flow (7day)' = 'Min_7_Day_DoY',
+  #                                      'Total Flow' = 'Total_Volume_m3'))
+  #   }
+  # })
 
   mk_results = reactive({
-    calculate_MK_results(data = dat_filteredTwo(),
+    calculate_MK_results(data = flow_dat_focused(),
                          chosen_variable = input$user_var_choice)
   })
 
   flow_dat_with_mk = reactive({
-    dat_filteredTwo() %>%
+    flow_dat_focused() %>%
       left_join(mk_results())
   })
 
-  output$testytest = DT::renderDT({dat_filteredTwo()})
+  output$testytest = DT::renderDT({flow_dat_focused()})
 
   stations_sf_with_trend = reactive({
     dat = stations_sf %>%
@@ -119,7 +119,7 @@ server <- function(input, output) {
   output$selected_station = renderText({paste0("Station: ",click_station())})
 
   output$myplot = renderPlot({
-    station_flow_plot(data = dat_filteredTwo(),
+    station_flow_plot(data = flow_dat_focused(),
                       variable_choice = input$user_var_choice,
                       clicked_station = click_station(),
                       stations_shapefile = stations_sf,
