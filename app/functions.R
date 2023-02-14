@@ -42,7 +42,7 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
 
       plot_units = fcase(
         variable_choice %in% c('Mean','Median','Total_Volume_m3','Min_7_Day') , '(m<sup>3</sup>/second)',
-        variable_choice == 'Date of 50% Annual Flow' , ""
+        variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), " "
       )
 
       data %>%

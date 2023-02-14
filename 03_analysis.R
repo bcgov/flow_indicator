@@ -54,7 +54,7 @@ if(!exists("number_daily_records_per_station")){load('./tmp/station_data_cleaned
 # If no /www folder (used for the shiny app, and also for static results PDF)
 if(!dir.exists('./www')) dir.create('./www')
 
-# The below code calculates the follow flow variables:
+# The below code calculates the following flow variables:
 # 1. Mean/median flow per year,
 # 2. Day of year by which 50% of flow has passed,
 # 3. 7-day flow minimum / day of year of 7-day flow minimum
@@ -141,29 +141,12 @@ write.csv(annual_flow_dat, './www/flow_dat.csv', row.names = F)
 
 # Calculate monthly mean flow, Date of 50% monthly flow, 7-day low flow date,
 # and total monthly volume in cubic meters.
-# annual_mean_dat = calc_annual_stats(station_number = stations_to_keep) %>%
-#   filter(!is.na(Mean)) %>%
-#   dplyr::select(Year,STATION_NUMBER,Mean,Median)
+
 monthly_mean_dat = flow_dat %>%
   group_by(Year,Month,STATION_NUMBER) %>%
   summarise(Mean = mean(Value),
             Median = median(Value)) %>%
   ungroup()
-
-# flow_timing_dat = flow_dat %>%
-#   group_by(STATION_NUMBER,Year) %>%
-#   mutate(RowNumber = row_number(),
-#          TotalFlow = sum(Value),
-#          FlowToDate = cumsum(Value)) %>%
-#   filter(FlowToDate > TotalFlow/2) %>%
-#   slice(1) %>%
-#   mutate(DoY_50pct_TotalQ = lubridate::yday(Date)) %>%
-#   rename('Date_50pct_TotalQ' = Date) %>%
-#   ungroup() %>%
-#   dplyr::select(STATION_NUMBER,Year,DoY_50pct_TotalQ,Date_50pct_TotalQ)
-
-# lowflow_dat = calc_annual_lowflows(station_number = stations_to_keep, roll_days = 7) %>%
-#   filter(!is.na(Min_7_Day_Date))
 
 # 7-day rolling averages for Low flow
 stations_list = as.list(stations_to_keep)
@@ -234,52 +217,79 @@ dat_combo_num = dat_combo_num %>%
 # Write out dataset at this point - data wide, unsummarised.
 write.csv(dat_combo_num,'app/www/all_dat.csv',row.names = F)
 
-# # Pivot data longer to facilitate Mann-Kendall trend test.
-# dat_combo_num = dat_combo_num %>%
-#   pivot_longer(cols = -c(STATION_NUMBER,Year,Month)) %>%
-#   filter(!is.na(value))
-#
-# # Add MK test at this point.
-# dat_combo_num_with_MK = dat_combo_num %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   reframe(MK_results = kendallTrendTest(value ~ Year)[c('statistic','p.value','estimate')]) %>%
-#   unnest(MK_results) %>%
-#   unnest_longer(col = MK_results) %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
-#   pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
-#   mutate(trend_sig = fcase(
-#     abs(Tau) <= 0.05 , "No Trend",
-#     Tau < -0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
-#     Tau < -0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
-#     Tau > 0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
-#     Tau > 0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
-#     Tau < -0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
-#     Tau < -0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
-#     Tau > 0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
-#     Tau > 0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
-#   ))
+# Daily Values ------------------------------------------------
 
-# dat_combo_date %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   reframe(MK_results = kendallTrendTest(value ~ Year)[c('statistic','p.value','estimate')]) %>%
-#   unnest(MK_results) %>%
-#   unnest_longer(col = MK_results) %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
-#   pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
-#   mutate(trend_sig = fcase(
-#     abs(Tau) <= 0.05 , "No Trend",
-#     Tau < -0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
-#     Tau < -0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
-#     Tau > 0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
-#     Tau > 0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
-#     Tau < -0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
-#     Tau < -0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
-#     Tau > 0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
-#     Tau > 0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
-#   ))
-# write.csv(dat_combo_num_with_MK,'app/www/all_dat_with_MK.csv',row.names = F)
+flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
+  filter(Parameter == 'Flow') %>%
+  filter(!is.na(Value))
+
+# Daily Values #
+# Calculate Daily mean flow, median flow, and total volume in cubic meters.
+daily_mean_dat = flow_dat %>%
+  group_by(STATION_NUMBER,Date) %>%
+  summarise(Mean = mean(Value),
+            Median = median(Value))
+
+# flow_timing_dat = calc_Daily_flow_timing(station_number = stations_to_keep, percent_total = 50) %>%
+#   filter(!is.na(Date_50pct_TotalQ))
+flow_timing_dat = flow_dat %>%
+  group_by(STATION_NUMBER,Year) %>%
+  mutate(RowNumber = row_number(),
+         TotalFlow = sum(Value),
+         FlowToDate = cumsum(Value)) %>%
+  filter(FlowToDate > TotalFlow/2) %>%
+  slice(1) %>%
+  mutate(DoY_50pct_TotalQ = lubridate::yday(Date)) %>%
+  rename('Date_50pct_TotalQ' = Date) %>%
+  ungroup() %>%
+  dplyr::select(STATION_NUMBER,Year,DoY_50pct_TotalQ,Date_50pct_TotalQ)
+
+# lowflow_dat = calc_Daily_lowflows(station_number = stations_to_keep, roll_days = 7) %>%
+#   filter(!is.na(Min_7_Day_Date))
+
+# 7-day rolling averages for Low flow
+stations_list = as.list(stations_to_keep)
+
+lowflow_dat = stations_list %>% map( ~ {
+  daily_flows = hy_daily_flows(station_number = c(.x)) %>%
+    filter(!is.na(Value)) %>%
+    mutate(Year = lubridate::year(Date)) %>%
+    group_by(STATION_NUMBER,Year) %>%
+    mutate(my_row = row_number()) %>%
+    ungroup()
+
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
+
+  daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
+
+  as_tibble(daily_flows_dt) %>%
+    group_by(STATION_NUMBER,Year) %>%
+    slice_min(Min_7_Day) %>%
+    group_by(STATION_NUMBER,Year,Min_7_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+}) %>%
+  bind_rows()
+
+# Total volume
+
+# totalvolume_dat = calc_Daily_cumulative_stats(station_number = stations_to_keep) %>%
+#   filter(!is.na(Total_Volume_m3))
+totalvolume_dat = flow_dat %>%
+  # The flow parameter here is a flow rate, i.e. m^3/second.
+  # Multiply by number of seconds in a day to get volume.
+  mutate(Volume = Value*86400) %>%
+  group_by(STATION_NUMBER,Year) %>%
+  summarise(Total_Volume_m3 = sum(Volume))
+
+Daily_flow_dat = Daily_mean_dat %>%
+  left_join(flow_timing_dat) %>%
+  left_join(lowflow_dat) %>%
+  left_join(totalvolume_dat)
+
+write.csv(daily_flow_dat, './www/daily_flow_dat.csv', row.names = F)
+
 
 # Get station locations
 stations_sf = tidyhydat::hy_stations(station_number = unique(dat_combo$STATION_NUMBER)) %>%

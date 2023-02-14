@@ -7,7 +7,9 @@ library(sf)
 library(EnvStats)
 library(data.table)
 library(tidyverse)
+library(lubridate)
 library(ggtext)
+library(feather)
 
 # Trend selection options
 trend_select_options_tab = wellPanel(
@@ -15,16 +17,18 @@ trend_select_options_tab = wellPanel(
     column(width = 6,
            radioButtons(inputId = 'time_scale',
                         label = 'Time Scale',
-                        choices = c('Annual','Monthly'),
+                        choices = c('Annual','Monthly','Custom Timeframe'),
                         selected = 'Annual'
            )
     ),
     column(width = 6,
-           selectizeInput(inputId = 'month_selector',
-                          label = 'Month',
-                          multiple = F,
-                          choices = 'All',
-                          selected = 'All')
+           # selectizeInput(inputId = 'month_selector',
+           #                label = 'Month',
+           #                multiple = F,
+           #                choices = 'All',
+           #                selected = 'All'),
+          uiOutput('month_selector_UI'),
+          uiOutput('custom_daterange_selectors')
     )
   ),
   selectizeInput(inputId = 'user_var_choice',
@@ -58,7 +62,8 @@ trend_select_abs_panel = absolutePanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
     tabPanel('Station Plot',station_plot_tab),
-    tabPanel('Datview',DT::DTOutput('test'))
+    tabPanel('Datview',DT::DTOutput('test')),
+    tabPanel('Test Text', textOutput('test_text'))
   )
 )
 

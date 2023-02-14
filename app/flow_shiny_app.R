@@ -38,8 +38,6 @@ server <- function(input, output) {
       updateSelectizeInput(inputId = 'user_var_choice',
                            choices = c('Mean Flow' = 'Mean',
                                        'Median Flow' = 'Median',
-                                       'Minimum Flow (7day)' = 'Min_7_Day',
-                                       'Date of Minimum Flow (7day)' = 'Min_7_Day_DoY',
                                        'Total Flow' = 'Total_Volume_m3')
                            )
     }
@@ -47,19 +45,27 @@ server <- function(input, output) {
       updateSelectizeInput(inputId = 'month_selector',
                            choices = 'All',
                            selected = 'All')
+      updateSelectizeInput(inputId = 'user_var_choice',
+                           choices = c('Mean Flow' = 'Mean',
+                                       'Median Flow' = 'Median',
+                                       'Date of 50% Annual Flow' = 'DoY_50pct_TotalQ',
+                                       'Minimum Flow (7day)' = 'Min_7_Day',
+                                       'Date of Minimum Flow (7day)' = 'Min_7_Day_DoY',
+                                       'Total Flow' = 'Total_Volume_m3'))
     }
   })
+
   mk_results = reactive({
-    calculate_MK_results(data = flow_dat_focused(),
+    calculate_MK_results(data = dat_filteredTwo(),
                          chosen_variable = input$user_var_choice)
   })
 
   flow_dat_with_mk = reactive({
-    flow_dat() %>%
+    dat_filteredTwo() %>%
       left_join(mk_results())
   })
 
-  output$testytest = DT::renderDT({flow_dat_focused()})
+  output$testytest = DT::renderDT({dat_filteredTwo()})
 
   stations_sf_with_trend = reactive({
     dat = stations_sf %>%
@@ -113,7 +119,7 @@ server <- function(input, output) {
   output$selected_station = renderText({paste0("Station: ",click_station())})
 
   output$myplot = renderPlot({
-    station_flow_plot(data = flow_dat_focused(),
+    station_flow_plot(data = dat_filteredTwo(),
                       variable_choice = input$user_var_choice,
                       clicked_station = click_station(),
                       stations_shapefile = stations_sf,
@@ -121,7 +127,9 @@ server <- function(input, output) {
   })
 
   # output$test = DT::renderDT(mk_results())
-  output$test = DT::renderDT(stations_sf_with_trend())
+  output$test = DT::renderDT(dat_filteredTwo())
+  output$test_text = renderText(input$filter_interval)
+
   mypal = reactive({
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
@@ -162,9 +170,11 @@ server <- function(input, output) {
                    leafletProxy("leafmap") %>%
                      clearMarkers() %>%
                      addCircleMarkers(layerId = ~STATION_NUMBER,
-                                      color = ~mypal()(trend_sig),
-                                      radius = 3,
-                                      weight = 10,
+                                      color = 'black',
+                                      fillColor = ~mypal()(trend_sig),
+                                      radius = 8,
+                                      weight = 1,
+                                      fillOpacity = 0.75,
                                       label = ~paste0(STATION_NAME, " (",STATION_NUMBER,") - ",HYD_STATUS),
                                       data = stations_sf_with_trend()) %>%
                      removeControl("legend") %>%
