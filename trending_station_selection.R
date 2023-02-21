@@ -10,8 +10,6 @@
 # - for regulated streams, start year of regulation start (in HYDAT or interpreted)
 # - filter out years with very large data gaps before continuous data (interpreted)
 
-
-
 library(tidyverse)
 library(lubridate)
 library(tidyhydat)

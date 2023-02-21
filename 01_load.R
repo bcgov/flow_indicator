@@ -18,7 +18,7 @@ library(magrittr)
 
 # If this is the first time this script is being run, create a 'tmp' folder to place
 # intermediate results and data.
-if(!dir.exists('tmp')){dir.create('tmp')}
+if(!dir.exists('out')){dir.create('out')}
 
 # If you have not downloaded the hydrological database using the {tidyhydat} package,
 # do this now. It is ~260 MB large.
@@ -67,4 +67,4 @@ number_daily_records_per_station = station_list %>%
     })
   )
 
-save(station_list, number_daily_records_per_station, file = './tmp/station_data.Rdata')
+save(station_list, number_daily_records_per_station, file = './out/station_data.Rdata')

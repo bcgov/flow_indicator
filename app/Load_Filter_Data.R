@@ -7,8 +7,7 @@
 
 
 # Load in data
-flow_dat_all = read_csv('www/all_dat.csv')
-# mk_results = read_csv('www/all_dat_with_MK.csv')
+flow_dat_all = vroom::vroom('www/combined_flow_dat.csv')
 stations_sf = read_sf('www/stations.gpkg')
 
 flow_dat = reactive({
@@ -16,6 +15,7 @@ flow_dat = reactive({
     dat = flow_dat_all %>% filter(Month == 'All')
   }
   if(input$time_scale == 'Monthly'){
+    req(input$month_selector)
     dat = flow_dat_all %>%
              filter(Month == input$month_selector)
   }
@@ -37,7 +37,7 @@ flow_dat = reactive({
 #     dplyr::select(-name)
 # })
 
-flow_dat_focused = reactive({
+flow_dat_chosen_var = reactive({
   flow_dat() %>%
     dplyr::select(STATION_NUMBER,Year,Month, values = !!sym(input$user_var_choice))
 })

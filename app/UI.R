@@ -14,26 +14,24 @@ trend_select_options_tab = wellPanel(
   fluidRow(
     column(width = 6,
            radioButtons(inputId = 'time_scale',
-                        label = 'Time Scale',
+                        label = 'Yearly or Monthly Data',
                         choices = c('Annual','Monthly'),
                         selected = 'Annual'
            )
     ),
     column(width = 6,
-           selectizeInput(inputId = 'month_selector',
-                          label = 'Month',
-                          multiple = F,
-                          choices = 'All',
-                          selected = 'All')
+           uiOutput('month_selector_UI')
     )
   ),
   selectizeInput(inputId = 'user_var_choice',
                  label = 'Trend to Display',
                  choices = c('Mean Flow' = 'Mean',
                              'Median Flow' = 'Median',
-                             'Date of 50% Annual Flow' = 'DoY_50pct_TotalQ',
-                             'Minimum Flow (7day)' = 'Min_7_Day',
-                             'Date of Minimum Flow (7day)' = 'Min_7_Day_DoY',
+                             'Date of 50% Flow' = 'DoY_50pct_TotalQ',
+                             'Minimum Flow (7-day)' = 'Min_7_Day',
+                             'Date of Minimum Flow (7-day)' = 'Min_7_Day_DoY',
+                             'Minimum Flow (30-day)' = 'Min_30_Day',
+                             'Date of Minimum Flow (30-day)' = 'Min_30_Day_DoY',
                              'Total Flow' = 'Total_Volume_m3'),
                  selected = 'Mean',
                  width = '100%'),

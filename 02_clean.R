@@ -12,7 +12,7 @@
 
 ### Load in data that was accessed in the '01_load.R' script.
 
-if(!exists("number_daily_records_per_station")){load('./tmp/station_data.Rdata')}
+if(!exists("number_daily_records_per_station")){load('./out/station_data.Rdata')}
 
 ### Filter out some more stations
 # 1. Must have end year of data within past 5 years (likely all active stations).

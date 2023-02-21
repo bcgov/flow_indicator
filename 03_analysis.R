@@ -10,44 +10,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
-# Work plan:
-# 1. Do the autocorrelation-correcting MK test on stations for 2 time periods: 25-30 years, and 50+ years.
-# 2. Calculate metrics:
-
-# USGS has:
-# lowQ one day
-# lowQ three days
-# lowQ seven days
-# scaled deficit
-# Q2 ndays
-# last Julian date <= Q2 threshold
-# first Julian date <= Q2 threshold
-# JD Difference Q2
-# ZeroQ nDays
-# Instantaneous Annual Peak Flows
-
-# Carl's App currently has:
-
-#    a. annual average flows (change in volume over years)
-#    b. summer 7-day low flow (change in lowest summer drought flows)
-#    c. spring freshet timing start and/or timing of half flows (shift in timing of spring melt)
-#    d. spring freshet 3-day peak for freshet stations;
-#    e. winter peak flows for PPT-driven stations (changes in peak flows)
-
-# If I just use the fasstr app (which is what Carl did), I get access immediately
-# to a large number of variables.
-
-# library(StreamFlowTrend)
-# library(fasstr)
 library(EnvStats)
 library(tidyverse)
 library(data.table)
 library(tidyhydat)
 
 # Use the list of stations that match our filtering requirements to access variables of interest.
-# 1. Timing of 50% annual flow.
-# 2. Timing of low flow (7-day period)
-# 3. Total annual volume.
 
 if(!exists("number_daily_records_per_station")){load('./tmp/station_data_cleaned.Rdata')}
 
@@ -58,6 +26,7 @@ if(!dir.exists('./www')) dir.create('./www')
 # 1. Mean/median flow per year,
 # 2. Day of year by which 50% of flow has passed,
 # 3. 7-day flow minimum / day of year of 7-day flow minimum
+# 4. 30-day flow minimum / day of year of 30-day flow minimum
 # 4. Total annual flow (in m^3).
 
 flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
@@ -66,19 +35,13 @@ flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
   mutate(Year = lubridate::year(Date)) %>%
   mutate(Month = lubridate::month(Date))
 
-# Annual Values #
-# Calculate annual mean flow, Date of 50% annual flow, 7-day low flow date, and total volume in cubic meters.
-# annual_mean_dat = calc_annual_stats(station_number = stations_to_keep) %>%
-#   filter(!is.na(Mean)) %>%
-#   dplyr::select(Year,STATION_NUMBER,Mean,Median)
+# Annual Values =========================================================
 annual_mean_dat = flow_dat %>%
   group_by(Year,STATION_NUMBER) %>%
   summarise(Mean = mean(Value),
             Median = median(Value)) %>%
   ungroup()
 
-# flow_timing_dat = calc_annual_flow_timing(station_number = stations_to_keep, percent_total = 50) %>%
-#   filter(!is.na(Date_50pct_TotalQ))
 flow_timing_dat = flow_dat %>%
   group_by(STATION_NUMBER,Year) %>%
   mutate(RowNumber = row_number(),
@@ -89,15 +52,18 @@ flow_timing_dat = flow_dat %>%
   mutate(DoY_50pct_TotalQ = lubridate::yday(Date)) %>%
   rename('Date_50pct_TotalQ' = Date) %>%
   ungroup() %>%
-  dplyr::select(STATION_NUMBER,Year,DoY_50pct_TotalQ,Date_50pct_TotalQ)
+  dplyr::select(STATION_NUMBER,
+                Year,DoY_50pct_TotalQ#,
+                #Date_50pct_TotalQ
+                )
 
-# lowflow_dat = calc_annual_lowflows(station_number = stations_to_keep, roll_days = 7) %>%
-#   filter(!is.na(Min_7_Day_Date))
-
-# 7-day rolling averages for Low flow
+# 7-day and 30-day rolling averages for Low flow (flow value, day of year, Date)
 stations_list = as.list(stations_to_keep)
 
 lowflow_dat = stations_list %>% map( ~ {
+
+  print(paste0('Working on station ',.x,'!'))
+
   daily_flows = hy_daily_flows(station_number = c(.x)) %>%
     filter(!is.na(Value)) %>%
     mutate(Year = lubridate::year(Date)) %>%
@@ -109,20 +75,33 @@ lowflow_dat = stations_list %>% map( ~ {
 
   daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
 
-  as_tibble(daily_flows_dt) %>%
+  daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
+
+  min_7_day_dat = daily_flows_dt %>%
     group_by(STATION_NUMBER,Year) %>%
     slice_min(Min_7_Day) %>%
     group_by(STATION_NUMBER,Year,Min_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+
+  min_30_day_dat = daily_flows_dt %>%
+    group_by(STATION_NUMBER,Year) %>%
+    slice_min(Min_30_Day) %>%
+    group_by(STATION_NUMBER,Year,Min_30_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
+
+  min_7_day_dat %>%
+    left_join(min_30_day_dat,
+              by = join_by(STATION_NUMBER, Year)
+              )
 }) %>%
   bind_rows()
 
 # Total volume
 
-# totalvolume_dat = calc_annual_cumulative_stats(station_number = stations_to_keep) %>%
-#   filter(!is.na(Total_Volume_m3))
 totalvolume_dat = flow_dat %>%
   # The flow parameter here is a flow rate, i.e. m^3/second.
   # Multiply by number of seconds in a day to get volume.
@@ -135,40 +114,21 @@ annual_flow_dat = annual_mean_dat %>%
   left_join(lowflow_dat) %>%
   left_join(totalvolume_dat)
 
-write.csv(annual_flow_dat, './www/flow_dat.csv', row.names = F)
+write.csv(annual_flow_dat, './app/www/annual_flow_dat.csv', row.names = F)
 
 # Do the same but by month!
 
-# Calculate monthly mean flow, Date of 50% monthly flow, 7-day low flow date,
-# and total monthly volume in cubic meters.
-# annual_mean_dat = calc_annual_stats(station_number = stations_to_keep) %>%
-#   filter(!is.na(Mean)) %>%
-#   dplyr::select(Year,STATION_NUMBER,Mean,Median)
 monthly_mean_dat = flow_dat %>%
   group_by(Year,Month,STATION_NUMBER) %>%
   summarise(Mean = mean(Value),
             Median = median(Value)) %>%
   ungroup()
 
-# flow_timing_dat = flow_dat %>%
-#   group_by(STATION_NUMBER,Year) %>%
-#   mutate(RowNumber = row_number(),
-#          TotalFlow = sum(Value),
-#          FlowToDate = cumsum(Value)) %>%
-#   filter(FlowToDate > TotalFlow/2) %>%
-#   slice(1) %>%
-#   mutate(DoY_50pct_TotalQ = lubridate::yday(Date)) %>%
-#   rename('Date_50pct_TotalQ' = Date) %>%
-#   ungroup() %>%
-#   dplyr::select(STATION_NUMBER,Year,DoY_50pct_TotalQ,Date_50pct_TotalQ)
-
-# lowflow_dat = calc_annual_lowflows(station_number = stations_to_keep, roll_days = 7) %>%
-#   filter(!is.na(Min_7_Day_Date))
-
-# 7-day rolling averages for Low flow
-stations_list = as.list(stations_to_keep)
-
+# 7-day and 30-day rolling averages for Low flow
 monthly_lowflow_dat = stations_list %>% map( ~ {
+
+  print(paste0('Working on station ',.x,'!'))
+
   daily_flows = flow_dat %>%
     filter(STATION_NUMBER == .x) %>%
     group_by(STATION_NUMBER,Year) %>%
@@ -179,13 +139,28 @@ monthly_lowflow_dat = stations_list %>% map( ~ {
 
   daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
 
-  as_tibble(daily_flows_dt) %>%
+  daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
+
+  min_7_day_dat = daily_flows_dt %>%
     group_by(STATION_NUMBER,Year,Month) %>%
     slice_min(Min_7_Day) %>%
     group_by(STATION_NUMBER,Year,Month,Min_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+
+  min_30_day_dat = daily_flows_dt %>%
+    group_by(STATION_NUMBER,Year,Month) %>%
+    slice_min(Min_30_Day) %>%
+    group_by(STATION_NUMBER,Year,Month,Min_30_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
+
+  min_7_day_dat %>%
+    left_join(min_30_day_dat,
+              by = join_by(STATION_NUMBER, Year, Month)
+    )
 }) %>%
   bind_rows()
 
@@ -204,7 +179,7 @@ monthly_flow_dat = monthly_mean_dat %>%
   left_join(monthly_lowflow_dat) %>%
   left_join(monthly_totalvolume_dat)
 
-write.csv(monthly_flow_dat, './www/monthly_flow_dat.csv', row.names = F)
+write.csv(monthly_flow_dat, './app/www/monthly_flow_dat.csv', row.names = F)
 
 # =====================================
 # Combine annual and monthly data, let's see if that works better.
@@ -232,7 +207,7 @@ dat_combo_num = dat_combo_num %>%
   pivot_wider(names_from = 'name', values_from = 'value')
 
 # Write out dataset at this point - data wide, unsummarised.
-write.csv(dat_combo_num,'app/www/all_dat.csv',row.names = F)
+write.csv(dat_combo_num,'app/www/combined_flow_dat.csv',row.names = F)
 
 # # Pivot data longer to facilitate Mann-Kendall trend test.
 # dat_combo_num = dat_combo_num %>%
