@@ -1,0 +1,147 @@
+---
+topic: "water"
+title: "Trends in Stream and River Flow"
+output: 
+  pdf_document: envreportutils.internal::print_ver
+  html_document:
+    self_contained: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{=html}
+<!--
+Copyright 2022 Province of British Columbia
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and limitations under the License.
+-->
+```
+
+```{r packages and options, echo=F, warning=F, results=F, message=F}
+library(envreportutils)
+library(tidyhydat)
+library(sf)
+library(leaflet)
+library(EnvStats)
+library(data.table)
+library(tidyverse)
+library(ggthemes)
+library(ggtext)
+library(ggrepel)
+library(patchwork)
+library(ggpubr)
+library(knitr)
+
+knitr::opts_chunk$set(echo=FALSE, cache=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r load_data}
+# knitr::opts_chunk$set(echo=FALSE, cache=FALSE, warning=FALSE, message=FALSE, error=FALSE, fig.height=3.5, fig.width = 8, fig.align = 'center')
+
+
+# theme_print <-   theme(axis.text.y = element_text(size = 8),
+#                        axis.text.x = element_text(size = 8),
+#                        axis.title.y = element_text(size = 10,
+#                                                    margin = margin(t = 0, r = 10,
+#                                                                    b = 0, l = 0,
+#                                                                    unit = "pt")),
+#                        plot.title = element_text(size = 10, hjust = 0.5),
+#                        plot.margin = unit(c(6,6,6,2),"mm"))
+# 
+# #theme for plots with integrated labels
+# theme_summary <- theme(axis.text.y = element_text(size = 8),
+#                        axis.text.x = element_text(size = 8),
+#                        axis.title.y = element_text(size = 10,
+#                                                    margin = margin(t = 0, r = 10,
+#                                                                    b = 0, l = 0,
+#                                                                    unit = "pt")),
+#                        plot.title = element_text(size = 10, hjust = 0.5),
+#                        plot.margin = unit(c(0.5,3.5,0.5,0.5), "cm"))
+# 
+# is_html <- knitr::is_html_output()
+# is_pdf <- knitr::is_latex_output()
+# 
+# # if (!id_pdf) opts_knit$set(base.dir = str_remove(here(),"print_ver"))
+# if (is_pdf) opts_chunk$set(fig.width = 6.5)
+# if (is_pdf) opts_chunk$set(fig.height = 3.5)
+
+mypal = 'Dark2'
+
+# Load in data.
+flow_dat = read.csv(here::here('app','www/combined_flow_dat.csv')) %>% 
+  as_tibble()
+stations = read_sf(here::here('app','www/stations.gpkg'))
+```
+
+```{r patchwork_layout}
+layout <- "
+AAAAAB
+AAAAAC
+AAAAAC
+DDDEEE
+DDDEEE
+DDDEEE
+"
+```
+
+```{r make_main_plot}
+i = 1
+
+stations_highlight = stations %>% 
+  filter(row_number() == i)
+
+station_coords = st_coordinates(stations_highlight) %>% as.data.frame()
+
+main_leaf = leaflet() %>% 
+  addTiles() %>% 
+  addCircleMarkers(color = ~'blue',
+                   fillColor = 'blue',
+                   fillOpacity = 0.5,
+                   data = stations) %>% 
+  addCircleMarkers(color = 'red',
+                   fillColor = 'red',
+                   fillOpacity = 0.5,
+                   label = ~paste0(STATION_NAME, ', ',STATION_NUMBER),
+                   labelOptions = labelOptions(noHide = T,
+                                               offset = c(-10,0)),
+                   data = stations_highlight) %>% 
+  setView(lng = station_coords$X, 
+          lat = station_coords$Y, 
+          zoom = 8) %>% 
+  addScaleBar('bottomright') %>% 
+  addLegend(colors = c('red','blue'),
+            labels = c('This Station','Other Stations'))
+
+main_leaf
+```
+
+```{r, putting_it_all_together, fig.height=9}
+main_plot = ggplot() + 
+  geom_text(aes(x=1,y=1,label = "MAIN PLOT")) + theme_map()
+inset = ggplot() + geom_text(aes(x=1,y=1,label = "INSET")) + theme_map()
+legend = ggplot() + geom_text(aes(x=1,y=1,label = "LEGEND")) + theme_map()
+table = ggplot() + geom_text(aes(x=1,y=1,label = "TABLE")) + theme_map()
+chart = ggplot() + geom_text(aes(x=1,y=1,label = "CHART")) + theme_map()
+
+main_plot + inset + legend + table + chart + plot_layout(design = layout)
+# wrap_elements(grid::textGrob("This is a description of the station"))
+```
+
+
+## Data
+
+\*By accessing these datasets, you agree to the licence associated with each file, as indicated below.
+
+
+------------------------------------------------------------------------
+
+\newpage
+
