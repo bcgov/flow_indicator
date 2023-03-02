@@ -30,18 +30,17 @@ library(envreportutils)
 library(tidyhydat)
 library(sf)
 library(leaflet)
-library(EnvStats)
-library(data.table)
+library(EnvStats) # Necessary for Mann-Kendall test
+library(data.table) # Necessary for use of fcase().
 library(gridExtra) # For making table Grob.
 library(ggimage) # For making ggplot obj out of PNG file.
 library(tidyverse)
 library(ggthemes)
 library(ggtext)
 library(ggrepel)
-library(patchwork)
 library(ggpubr)
 library(knitr)
-library(leaflegend)
+library(knitrProgressBar)
 
 knitr::opts_chunk$set(echo=FALSE, cache=FALSE, warning=FALSE, message=FALSE)
 
@@ -51,6 +50,11 @@ print_page_width = 8.27
 print_page_height = 11.69
 
 station_search_dist = 150000
+
+variable_label_df = data.frame(
+  varname = c('Mean','Median','Min_7_Day','Min_30_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
+  labelname = c('Mean Flow','Median Flow','7-Day Low Flow','30-Day Low Flow','7-Day Low Flow Day-of-year','50% Annual Flow Day-of-year')
+)
 ```
 
 ```{r MK_test_as_function}
@@ -272,10 +276,6 @@ make_summary_table = function(dat, station){
 
 ```{r make_linegraph_function}
 ## Line graph of flow variable over time
-variable_label_df = data.frame(
-  varname = c('Mean','Median','Min_7_Day','Min_30_Day'),
-  labelname = c('Mean Flow','Median Flow','7-Day Low Flow','30-Day Low Flow')
-)
 
 make_linegraph = function(dat, variable_to_plot) {
   
@@ -349,10 +349,16 @@ make_data_histogram = function(dat){
 }
 ```
 
-```{r make_printout_elements, fig.height=10, fig.width=8}
+```{r compose_factsheet_pages, fig.height=10, fig.width=8}
 
-for(i in 1:nrow(stations[c(1:1),])){
+my_progress_bar = knitrProgressBar::progress_estimated(n = nrow(stations))
 
+for(i in 1:nrow(stations)){
+
+  # Update progress bar (helps us know how far we've gotten!)
+  my_progress_bar$tick()
+  my_progress_bar$print()
+  
   # Subset all data for this station ===========================================
   
   this_station = stations %>% 
@@ -373,24 +379,31 @@ for(i in 1:nrow(stations[c(1:1),])){
   
   dat_year_histogram = make_data_histogram(this_dat)
   
-  # Put it all together ========================================================
+  min_flow_plot = make_linegraph(this_dat, variable_to_plot = 'Min_7_Day_DoY')
   
+  half_flow_plot = make_linegraph(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
+   
+  # Compose elements===================================
+  
+  row_two = ggarrange(
+    summary_table_plot,
+    mean_flow_linegraph,
+    ncol = 2
+  )
+  
+  row_three = ggarrange(
+    dat_year_histogram,
+    lowflow_sevenday_linegraph,
+    ncol = 2
+  )
+  # Put it all together ========================================================
+
   this_arranged_plot = ggarrange(
     main_plot,
-    ggarrange(
-      ggarrange(
-        summary_table_plot,
-        dat_year_histogram,
-        nrow = 2
-      ),
-      ggarrange(
-        mean_flow_linegraph,
-        lowflow_sevenday_linegraph,
-        nrow = 2
-      ),
-      nrow = 1
-    ),
-    nrow = 2
+    row_two,
+    row_three,
+    nrow = 3,
+    heights = c(2,1,1)
   )
   
   plot(this_arranged_plot)
