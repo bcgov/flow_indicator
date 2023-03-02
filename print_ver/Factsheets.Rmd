@@ -1,0 +1,425 @@
+---
+topic: "water"
+title: "Trends in Stream and River Flow"
+output: 
+  pdf_document: envreportutils.internal::print_ver
+  html_document:
+    self_contained: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{=html}
+<!--
+Copyright 2022 Province of British Columbia
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and limitations under the License.
+-->
+```
+
+```{r packages and options, echo=F, warning=F, results=F, message=F}
+library(envreportutils)
+library(tidyhydat)
+library(sf)
+library(leaflet)
+library(EnvStats) # Necessary for Mann-Kendall test
+library(data.table) # Necessary for use of fcase().
+library(gridExtra) # For making table Grob.
+library(ggimage) # For making ggplot obj out of PNG file.
+library(tidyverse)
+library(ggthemes)
+library(ggtext)
+library(ggrepel)
+library(ggpubr)
+library(knitr)
+library(knitrProgressBar)
+
+knitr::opts_chunk$set(echo=FALSE, cache=FALSE, warning=FALSE, message=FALSE)
+
+if(!dir.exists('factsheet_figures')) dir.create('factsheet_figures')
+
+print_page_width = 8.27
+print_page_height = 11.69
+
+station_search_dist = 150000
+
+variable_label_df = data.frame(
+  varname = c('Mean','Median','Min_7_Day','Min_30_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
+  labelname = c('Mean Flow','Median Flow','7-Day Low Flow','30-Day Low Flow','7-Day Low Flow Day-of-year','50% Annual Flow Day-of-year')
+)
+```
+
+```{r MK_test_as_function}
+mk_test = function(dat){
+  dat %>% 
+    reframe(MK_results = kendallTrendTest(value ~ Year)[c('statistic','p.value','estimate')]) %>%
+    unnest(MK_results) %>%
+    unnest_longer(col = MK_results) %>%
+    group_by(name) %>%
+    mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
+    pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
+    mutate(trend_sig = fcase(
+      abs(Tau) <= 0.05 , "No Trend",
+      Tau < -0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
+      Tau < -0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
+      Tau > 0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
+      Tau > 0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
+      Tau < -0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
+      Tau < -0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
+      Tau > 0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
+      Tau > 0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
+    )) %>% 
+    ungroup()
+}
+```
+
+```{r load_data}
+
+leaflet_provider_choice = providers$Stamen.Terrain
+
+# Load in data.
+flow_dat = read.csv(here::here('app','www/combined_flow_dat.csv')) %>% 
+  as_tibble()
+
+stations = read_sf(here::here('app','www/stations.gpkg'))
+
+districts = bcmaps::nr_districts() %>% st_transform(crs = 4326)
+
+bc = bcmaps::bc_bound() %>% st_transform(crs = 4326)
+
+```
+
+```{r add_most_recent_mean_flow_to_stations}
+stations = stations %>% 
+  left_join(flow_dat %>% 
+              filter(!is.na(Mean),
+                     Month == 'All') %>% 
+              group_by(STATION_NUMBER) %>% 
+              slice_max(Year) %>% 
+              ungroup() %>% 
+              dplyr::select(STATION_NUMBER,Mean,Year_of_Mean_Flow = Year)) %>% 
+  mutate(FlowGroup = case_when(
+    Mean < 10 ~ 1,
+    Mean >= 10 & Mean < 25 ~ 2,
+    Mean >= 25 & Mean < 100 ~ 3,
+    Mean >= 100 & Mean < 1500 ~ 4,
+    Mean >= 1500 ~ 5
+  )) #%>%
+  # mutate(FlowGroup = case_when(
+  #   Mean < 10 ~ 'Very Low',
+  #   Mean >= 10 & Mean < 25 ~ 'Low',
+  #   Mean >= 25 & Mean < 100 ~ 'Moderate',
+  #   Mean >= 100 & Mean < 1500 ~ 'High',
+  #   Mean >= 1500 ~ 'Very High'
+  # )) %>% 
+  # mutate(FlowGroup = factor(FlowGroup, levels = c('Very Low','Low','Moderate','High','Very High')))
+```
+
+```{r make_leaflet_function}
+# Create leaflet map ===========================================================
+
+make_leaflet = function(station, stations){
+  
+  # Add a column indicating if each station is the station of focus of this loop.
+  stations_marked = stations %>% 
+    mutate(focus_station = STATION_NUMBER == station$STATION_NUMBER) %>% 
+    mutate(focus_station = ifelse(focus_station == T, "Station of Interest", "Other Station")) %>% 
+    mutate(focus_station = factor(focus_station, levels = c("Station of Interest",
+                                                            "Other Station"))) %>%
+    # Find other stations within 100 km. Use these for labelling.
+    st_join(., st_buffer(station,station_search_dist) %>% summarise(within_100km = TRUE)) %>% 
+    mutate(leaflet_label = ifelse(within_100km == T, paste0(STATION_NAME, ", (",STATION_NUMBER,")")))
+  
+  # Create a colour palette to indicate the station of focus.
+  mypal = colorFactor(palette = c("darkred", "darkblue"),
+                   domain = stations_marked$focus_station,
+                   ordered = F)
+  
+  # Find the station coordinates. Used in setting the map view.
+  station_coords = st_coordinates(stations_marked %>% 
+                                    filter(focus_station=='Station of Interest')) %>% as.data.frame
+
+  main_leaf = leaflet() %>% 
+  addProviderTiles(leaflet_provider_choice) %>%
+  # Add other stations that are not our chosen station.
+  addCircleMarkers(
+    radius = ~Mean^(3/4),
+    color = ~mypal(focus_station),
+    fillColor = ~mypal(focus_station),
+    fillOpacity = .5,
+    label = ~leaflet_label,
+    labelOptions = labelOptions(noHide = T,
+                                direction = 'left'),
+    data = stations_marked) %>% 
+  addMiniMap(
+    tiles = providers$Wikimedia,
+    position = 'topright',
+    width = 200, 
+    height = 200,
+    toggleDisplay = FALSE
+  ) %>% 
+  setView(lng = station_coords$X, 
+          lat = station_coords$Y, 
+          zoom = 8) %>% 
+  addScaleBar('bottomright') %>% 
+  addLegend(
+    title = 'Focal Station',
+    pal = mypal,
+    values = ~focus_station,
+    position = 'topleft',
+    data = stations_marked)
+  
+  # Find station region. Used in creating alt text.
+  station_region = st_join(station,districts) %>% pull(DISTRICT_NAME)
+
+  # Establish the name and filepath to leaflet plot.
+  name_of_main_leaf = paste0('mainleaf_station_',this_station$STATION_NAME,'_',this_station$STATION_NUMBER,'.png')
+  path_of_main_leaf = paste0(here::here(), "/print_ver/factsheet_figures/",name_of_main_leaf)
+  
+  #Save leaflet plot to disk. We load this back in with geom_bgimage.
+  mapview::mapshot(x = main_leaf,
+                   file = path_of_main_leaf,
+                   vwidth = 1050, vheight = 600)
+  
+  ## 2. Leaflet map as a static shot.
+
+  image_paths = data.frame(image = path_of_main_leaf)
+  
+  main_plot = ggplot(image_paths,aes(x=0.5,y=0.5)) +
+    geom_bgimage(image = image_paths$image) +
+    labs(title = paste0(
+      this_station$STATION_NAME,
+      " (",
+      this_station$STATION_NUMBER,
+      ")"
+    )) +
+    labs(x = "", y = "",
+         alt = paste0("This station is located in the ",station_region,
+                      " and there are ",
+                      nrow(stations_marked[stations_marked$within_100km==T,]),
+                      " stations within ",
+                      station_search_dist/1000," kilometers.")) +
+    theme(
+      plot.title = element_markdown(face ='bold'),
+      axis.ticks = element_blank(),
+      axis.line = element_blank(),
+      axis.text = element_blank()
+    )
+  
+  return(main_plot)
+}
+```
+
+```{r make_summary_table_function}
+# Create Summary Table =============
+
+make_summary_table = function(dat, station){
+
+  summary_most_recent_year = dat %>% 
+    mutate(`Years of Data` = paste0(min(Year),' to ',max(Year))) %>% 
+    filter(Month == 'All') %>% 
+    slice_max(Year) %>% 
+    # Spatial join with natural resource districts.
+    mutate(`Station Name` = station$STATION_NAME,
+           `Station ID Number` = station$STATION_NUMBER,
+           `Flow Group` = station$FlowGroup) %>% 
+    mutate(Coordinates = paste0(round(st_coordinates(station),3),collapse = ', ')) %>% 
+    mutate(Region = st_join(station,districts) %>% pull(DISTRICT_NAME)) %>% 
+    # Count number of other stations within X km
+    mutate(`Other Stations in 150km` = as.character( 
+      nrow(
+        st_join(
+          st_buffer(
+            station,dist= station_search_dist
+            ), 
+          stations,
+          st_intersects)
+        )-1 #The stations layer includes the focal station, so - 1.
+      )
+    ) %>% 
+    mutate(across(c(Mean,Median,Min_7_Day,Min_30_Day), ~ paste0(round(.x,1),' m^3/s'))) %>% 
+    dplyr::select(`Station Name`,`Station ID Number`,
+                  `Years of Data`,Coordinates,Region,
+                  `Other Stations in 150km`,
+                  Mean,Median,Min_7_Day,Min_30_Day) %>% 
+    pivot_longer(cols = everything(), names_to = 'Parameter', values_to = 'Mean Value') %>% 
+    mutate(Parameter = case_when(
+      Parameter == 'Mean' ~ 'Mean Flow',
+      Parameter == 'Median' ~ 'Median Flow',
+      Parameter == 'Min_7_Day' ~ '7-Day Low Flow',
+      Parameter == 'Min_30_Day' ~ '30-Day Low Flow',
+      T ~ Parameter
+    )) %>% 
+    setNames(c('Station Information',paste0('(',max(this_dat$Year),')'), ' '))
+  
+  summary_mry_raster = summary_most_recent_year %>% 
+    flextable::flextable(cwidth = 2) %>%
+    flextable::as_raster()
+  
+  summary_table_plot = ggplot() + 
+    theme_void() + 
+    annotation_custom(grid::rasterGrob(summary_mry_raster),
+                      xmin = -Inf, xmax = Inf,
+                      ymin = -Inf, ymax= Inf)
+  
+  return(summary_table_plot)
+}
+```
+
+```{r make_linegraph_function}
+## Line graph of flow variable over time
+
+make_linegraph = function(dat, variable_to_plot) {
+  
+  label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname 
+  
+  dat_annual = dat %>% 
+    filter(Month == 'All')
+  
+  # Perform Mann-Kendall trend analysis on 2010 - present data.
+  mk_results = dat_annual %>%
+    pivot_longer(-c(Year,STATION_NUMBER,Month)) %>% 
+    filter(name == variable_to_plot) %>% 
+    group_by(STATION_NUMBER,name) %>%
+    mk_test()
+  
+  # Join MK test results to the 2010-present day dataset.
+  mk_line = dat_annual %>%
+    dplyr::select(Year,STATION_NUMBER,all_of(variable_to_plot)) %>% 
+    cbind(mk_results %>% 
+            dplyr::select(-STATION_NUMBER)) %>% 
+    group_by(Year,STATION_NUMBER) %>% 
+    summarise(SlopePreds = Intercept+Slope*Year)
+  
+  p = ggplot() + 
+    geom_line(aes(y = SlopePreds,
+                  x = Year),
+              linewidth = 2,
+              col = 'darkblue',
+              alpha = 0.4,
+              data = mk_line) +
+    geom_line(aes(y = .data[[variable_to_plot]], 
+                  x = Year),
+              linewidth = 1,
+              col = 'skyblue',
+              data = dat_annual) +
+    geom_point(aes(y = .data[[variable_to_plot]], 
+                  x = Year),
+              col = 'black',
+              data = dat_annual) +
+    labs(y = paste0(label," (m<sup>3</sup>/s)"),
+         caption = paste0(mk_results$trend_sig, " (P-value ~ ",round(mk_results$P_value,2),")")) +
+    theme_minimal() +
+    theme(axis.title.y = element_markdown(),
+          legend.position = 'none')
+  
+  return(p)
+}
+```
+
+```{r make_data_availability_histogram}
+  ## Data Availability Histogram
+
+make_data_histogram = function(dat){
+  
+  data_histogram = dat %>% 
+    filter(Month != 'All') %>%
+    count(Year, name = 'number_months') %>% 
+    mutate(number_months = 12 - number_months) %>% 
+    ggplot() + 
+    geom_col(aes(x = Year, y = number_months),
+           fill = '#BE3131', col = 'transparent') + 
+    geom_label_repel(aes(x = Year, y = number_months,
+                         label = Year),
+                     data = . %>% filter(number_months > 0),
+                     nudge_y = 1) + 
+    scale_y_continuous(breaks = c(0,4,8,12), limits = c(0,12)) +
+    labs(y = "Months Without Data") +
+    theme_minimal()
+
+  return(data_histogram)
+}
+```
+
+```{r compose_factsheet_pages, fig.height=10, fig.width=8}
+
+my_progress_bar = knitrProgressBar::progress_estimated(n = nrow(stations))
+
+for(i in 1:nrow(stations)){
+
+  # Update progress bar (helps us know how far we've gotten!)
+  my_progress_bar$tick()
+  my_progress_bar$print()
+  
+  # Subset all data for this station ===========================================
+  
+  this_station = stations %>% 
+    filter(row_number() == i)
+  
+  this_dat = flow_dat %>% 
+    filter(STATION_NUMBER == this_station$STATION_NUMBER)
+
+  # Create page elements =======================================================
+  
+  main_plot = make_leaflet(station = this_station, stations = stations)
+
+  summary_table_plot = make_summary_table(dat = this_dat, station = this_station)
+
+  mean_flow_linegraph = make_linegraph(dat = this_dat, variable_to_plot = 'Mean')
+  
+  lowflow_sevenday_linegraph = make_linegraph(dat = this_dat, variable_to_plot = 'Min_7_Day')
+  
+  dat_year_histogram = make_data_histogram(this_dat)
+  
+  min_flow_plot = make_linegraph(this_dat, variable_to_plot = 'Min_7_Day_DoY')
+  
+  half_flow_plot = make_linegraph(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
+   
+  # Compose elements===================================
+  
+  row_two = ggarrange(
+    summary_table_plot,
+    mean_flow_linegraph,
+    ncol = 2
+  )
+  
+  row_three = ggarrange(
+    dat_year_histogram,
+    lowflow_sevenday_linegraph,
+    ncol = 2
+  )
+  # Put it all together ========================================================
+
+  this_arranged_plot = ggarrange(
+    main_plot,
+    row_two,
+    row_three,
+    nrow = 3,
+    heights = c(2,1,1)
+  )
+  
+  plot(this_arranged_plot)
+
+}
+```
+
+
+\newpage
+
+## Data
+
+\*By accessing these datasets, you agree to the licence associated with each file, as indicated below.
+
+
+------------------------------------------------------------------------
+
+\newpage
+
