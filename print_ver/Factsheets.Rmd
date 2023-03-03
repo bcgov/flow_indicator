@@ -49,7 +49,7 @@ if(!dir.exists('factsheet_figures')) dir.create('factsheet_figures')
 print_page_width = 8.27
 print_page_height = 11.69
 
-station_search_dist = 150000
+station_search_dist = 100000
 
 variable_label_df = data.frame(
   varname = c('Mean','Median','Min_7_Day','Min_30_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
@@ -128,15 +128,71 @@ stations = stations %>%
 
 make_leaflet = function(station, stations){
   
-  # Add a column indicating if each station is the station of focus of this loop.
+  # Add a column identifying the station of focus of this loop.
   stations_marked = stations %>% 
     mutate(focus_station = STATION_NUMBER == station$STATION_NUMBER) %>% 
     mutate(focus_station = ifelse(focus_station == T, "Station of Interest", "Other Station")) %>% 
     mutate(focus_station = factor(focus_station, levels = c("Station of Interest",
                                                             "Other Station"))) %>%
     # Find other stations within 100 km. Use these for labelling.
-    st_join(., st_buffer(station,station_search_dist) %>% summarise(within_100km = TRUE)) %>% 
-    mutate(leaflet_label = ifelse(within_100km == T, paste0(STATION_NAME, ", (",STATION_NUMBER,")")))
+    st_join(., st_buffer(station,station_search_dist) %>% summarise(within_search_radius = TRUE)) %>% 
+    mutate(leaflet_label = ifelse(within_search_radius == T, paste0(STATION_NAME, ", (",STATION_NUMBER,")")))
+  
+  # For nearby stations that will be labelled, only include the largest station in
+  # cases where 2+ stations are quite close (according to the zoom factor of 9 that
+  # is currently being used, this might be stations that are within 20 kilometers)
+  stations_with_labels = stations_marked %>% 
+    filter(!is.na(leaflet_label))
+    
+  # Add a nested distance matrix for each station.
+  stations_with_labels = stations_with_labels %>% 
+    left_join(
+      st_distance(stations_with_labels, stations_with_labels) %>% 
+        as.data.frame() %>% 
+        setNames(stations_with_labels$STATION_NUMBER) %>% 
+        pivot_longer(cols = everything(), names_to = "STATION_NUMBER", values_to = 'dist_mat') %>% 
+        mutate(dist_mat = as.numeric(dist_mat)) %>% 
+        group_by(STATION_NUMBER) %>% 
+        nest() %>% 
+        ungroup(),
+      by = join_by(STATION_NUMBER)
+    )
+    
+  
+  # Find which stations are close to which other stations... if within 20 km,
+    # just keep label for station with largest mean flow. The below map function
+  # uses the distance matrix from above to order 'clumped' (<= 20km) stations
+  # by their most recent year of mean flow rate to produce a list of stations
+  # to NOT label.
+  stations_to_not_label = map(stations_with_labels$data, ~ {
+    .x %>%
+    # stations_with_labels$data[1] %>% 
+    #   as.data.frame() %>% 
+      #Add column identifying 'other' station for each distance measurement.
+      mutate(other_station = stations_with_labels$STATION_NUMBER) %>% 
+      #Add column identifying 'focal' station.
+      mutate(this_station = .[.$dist_mat == 0,]$other_station) %>% 
+      # Just keep stations within 20km
+      filter(dist_mat <= 20000) %>% 
+      # Add mean flow of last year for focal station
+      mutate(focal_st_flow = stations_with_labels[stations_with_labels$STATION_NUMBER == .[.$dist_mat == 0,]$other_station,]$Mean) %>% 
+      # Add mean flow of last year for each nearby 'other station'
+      left_join(stations_with_labels %>% st_drop_geometry() %>% dplyr::select(other_station = STATION_NUMBER, other_flow = Mean),
+                by = join_by(other_station)) %>% 
+      # arrange (descending) by mean annual flow. Use this to find the largest 
+      # station out of any 2+ stations within 20 km of each other.
+      arrange(desc(other_flow)) %>% 
+      # Drop the first row (the biggest station)
+      slice(-1) %>% 
+      dplyr::select(other_station) %>% 
+      distinct()
+  }) %>% 
+    bind_rows() %>% 
+    distinct(other_station)
+  
+  # Use the list of 'not-to-labels' to update our stations_marked table.
+  stations_marked = stations_marked %>% 
+    mutate(leaflet_label = ifelse(STATION_NUMBER %in% stations_to_not_label$other_station, NA, leaflet_label))
   
   # Create a colour palette to indicate the station of focus.
   mypal = colorFactor(palette = c("darkred", "darkblue"),
@@ -151,13 +207,13 @@ make_leaflet = function(station, stations){
   addProviderTiles(leaflet_provider_choice) %>%
   # Add other stations that are not our chosen station.
   addCircleMarkers(
-    radius = ~Mean^(3/4),
+    radius = ~sqrt(Mean),
     color = ~mypal(focus_station),
     fillColor = ~mypal(focus_station),
     fillOpacity = .5,
     label = ~leaflet_label,
     labelOptions = labelOptions(noHide = T,
-                                direction = 'left'),
+                                direction = 'auto'),
     data = stations_marked) %>% 
   addMiniMap(
     tiles = providers$Wikimedia,
@@ -168,7 +224,7 @@ make_leaflet = function(station, stations){
   ) %>% 
   setView(lng = station_coords$X, 
           lat = station_coords$Y, 
-          zoom = 8) %>% 
+          zoom = 9) %>% 
   addScaleBar('bottomright') %>% 
   addLegend(
     title = 'Focal Station',
@@ -204,7 +260,7 @@ make_leaflet = function(station, stations){
     labs(x = "", y = "",
          alt = paste0("This station is located in the ",station_region,
                       " and there are ",
-                      nrow(stations_marked[stations_marked$within_100km==T,]),
+                      nrow(stations_marked[stations_marked$within_search_radius==T,]),
                       " stations within ",
                       station_search_dist/1000," kilometers.")) +
     theme(
@@ -234,7 +290,7 @@ make_summary_table = function(dat, station){
     mutate(Coordinates = paste0(round(st_coordinates(station),3),collapse = ', ')) %>% 
     mutate(Region = st_join(station,districts) %>% pull(DISTRICT_NAME)) %>% 
     # Count number of other stations within X km
-    mutate(`Other Stations in 150km` = as.character( 
+    mutate(`Other Stations within x` = as.character( 
       nrow(
         st_join(
           st_buffer(
@@ -248,7 +304,7 @@ make_summary_table = function(dat, station){
     mutate(across(c(Mean,Median,Min_7_Day,Min_30_Day), ~ paste0(round(.x,1),' m^3/s'))) %>% 
     dplyr::select(`Station Name`,`Station ID Number`,
                   `Years of Data`,Coordinates,Region,
-                  `Other Stations in 150km`,
+                  `Other Stations within x`,
                   Mean,Median,Min_7_Day,Min_30_Day) %>% 
     pivot_longer(cols = everything(), names_to = 'Parameter', values_to = 'Mean Value') %>% 
     mutate(Parameter = case_when(
@@ -256,6 +312,7 @@ make_summary_table = function(dat, station){
       Parameter == 'Median' ~ 'Median Flow',
       Parameter == 'Min_7_Day' ~ '7-Day Low Flow',
       Parameter == 'Min_30_Day' ~ '30-Day Low Flow',
+      Parameter == 'Other Stations within x' ~ paste0('Other Stations within ',station_search_dist/1000,' km'),
       T ~ Parameter
     )) %>% 
     setNames(c('Station Information',paste0('(',max(this_dat$Year),')'), ' '))
@@ -349,11 +406,90 @@ make_data_histogram = function(dat){
 }
 ```
 
-```{r compose_factsheet_pages, fig.height=10, fig.width=8}
+```{r}
+make_circle_plot = function(dat,station,variable_to_plot){
+  
+  label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname 
+
+  # monthly_values = tidyhydat::hy_monthly_flows(station_number = station) %>% 
+  #   filter(Sum_stat == str_to_upper(variable_to_plot)) %>% 
+  #   dplyr::select(STATION_NUMBER,Year,Month,Full_Month,Value) %>% 
+  #   mutate(Date = lubridate::ymd(paste0(Year,'-',Month,'-01')))
+  
+  plot_dat = dat %>% 
+    filter(Month != 'All') %>% 
+    rowwise() %>% 
+    mutate(Month = which(month.abb == Month)) %>% 
+    as_tibble() %>%
+    mutate(Date = lubridate::ymd(paste0(Year,'-',Month,'-01'))) %>% 
+    rename(Value = variable_to_plot)
+  
+  log10_floor <- function(x) {
+    10^(floor(log10(x)))
+  }
+  
+  log10_ceiling <- function(x) {
+    10^(ceiling(log10(x)))
+  }
+  
+  flow_var_minimum = min(plot_dat$Value)
+  flow_var_min_mag = log10_floor(flow_var_minimum)
+  flow_var_maximum = max(plot_dat$Value)
+  flow_var_max_mag = log10_ceiling(flow_var_maximum)
+  
+  y_axis_text_labels = data.frame(
+    y_values = log10(flow_var_min_mag):log10(flow_var_max_mag)
+  ) %>% 
+    mutate(
+      labels = 10^y_values) %>% 
+    mutate(Month = 11)
+  
+  x_axis_text_labels = data.frame(
+    x_values = c(3,6,9,12),
+    y_values = rep(log10(flow_var_max_mag),4),
+    labels = c("Spring",
+               "Summer",
+               "Autumn",
+               "Winter")
+  )
+
+  plot_dat %>% 
+    mutate(Date = as.factor(Date)) %>% 
+    mutate(Date = forcats::fct_inorder(Date)) %>% 
+    ggplot(aes(x = Month, y = log10(Value))) + 
+    geom_line(aes(colour = Year, group = Year),
+              linewidth = 1.5,
+              alpha = 0.8
+    ) +
+    geom_label(aes(x = Month, y = y_values, label = labels),
+               alpha = 0.6,
+               data = y_axis_text_labels) +
+    geom_label(aes(x = x_values, y = y_values, label = labels),
+               alpha = 0.6,
+               data = x_axis_text_labels) +
+    labs(caption = paste0(label," (m<sup>3</sup>/s) by Month of Year")) +
+    coord_polar() +
+    scale_colour_distiller(palette = 'Spectral') +
+    scale_y_continuous(limits = c(1,5)) +
+    theme(
+      plot.background = element_rect(fill = '#302e27'),
+      panel.background = element_rect(fill = '#302e27'),
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      plot.caption = element_markdown(colour = 'white', 
+                                      size = 12,
+                                      face = 'bold',
+                                      # halign = 0.5,
+                                      hjust = 0.5)
+      )
+}
+```
+
+```{r compose_factsheet_pages, fig.height=12, fig.width=8}
 
 my_progress_bar = knitrProgressBar::progress_estimated(n = nrow(stations))
 
-for(i in 1:nrow(stations)){
+for(i in 1:nrow(stations[c(1:5),])){
 
   # Update progress bar (helps us know how far we've gotten!)
   my_progress_bar$tick()
@@ -383,6 +519,10 @@ for(i in 1:nrow(stations)){
   
   half_flow_plot = make_linegraph(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
    
+  mean_flow_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Mean")
+  
+  min_7day_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Min_7_Day")
+  
   # Compose elements===================================
   
   row_two = ggarrange(
@@ -396,18 +536,23 @@ for(i in 1:nrow(stations)){
     lowflow_sevenday_linegraph,
     ncol = 2
   )
+  
+  # row_four = ggarrange(
+  #   mean_flow_circle_plot,
+  #   min_7day_circle_plot,
+  #   ncol = 2
+  # )
   # Put it all together ========================================================
 
   this_arranged_plot = ggarrange(
     main_plot,
     row_two,
     row_three,
-    nrow = 3,
-    heights = c(2,1,1)
+    nrow = 4,
+    heights = c(2,1,1,1)
   )
   
   plot(this_arranged_plot)
-
 }
 ```
 
