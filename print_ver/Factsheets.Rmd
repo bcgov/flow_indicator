@@ -407,89 +407,89 @@ make_data_histogram = function(dat){
 ```
 
 ```{r}
-make_circle_plot = function(dat,station,variable_to_plot){
-  
-  label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname 
-
-  # monthly_values = tidyhydat::hy_monthly_flows(station_number = station) %>% 
-  #   filter(Sum_stat == str_to_upper(variable_to_plot)) %>% 
-  #   dplyr::select(STATION_NUMBER,Year,Month,Full_Month,Value) %>% 
-  #   mutate(Date = lubridate::ymd(paste0(Year,'-',Month,'-01')))
-  
-  plot_dat = dat %>% 
-    filter(Month != 'All') %>% 
-    rowwise() %>% 
-    mutate(Month = which(month.abb == Month)) %>% 
-    as_tibble() %>%
-    mutate(Date = lubridate::ymd(paste0(Year,'-',Month,'-01'))) %>% 
-    rename(Value = variable_to_plot)
-  
-  log10_floor <- function(x) {
-    10^(floor(log10(x)))
-  }
-  
-  log10_ceiling <- function(x) {
-    10^(ceiling(log10(x)))
-  }
-  
-  flow_var_minimum = min(plot_dat$Value)
-  flow_var_min_mag = log10_floor(flow_var_minimum)
-  flow_var_maximum = max(plot_dat$Value)
-  flow_var_max_mag = log10_ceiling(flow_var_maximum)
-  
-  y_axis_text_labels = data.frame(
-    y_values = log10(flow_var_min_mag):log10(flow_var_max_mag)
-  ) %>% 
-    mutate(
-      labels = 10^y_values) %>% 
-    mutate(Month = 11)
-  
-  x_axis_text_labels = data.frame(
-    x_values = c(3,6,9,12),
-    y_values = rep(log10(flow_var_max_mag),4),
-    labels = c("Spring",
-               "Summer",
-               "Autumn",
-               "Winter")
-  )
-
-  plot_dat %>% 
-    mutate(Date = as.factor(Date)) %>% 
-    mutate(Date = forcats::fct_inorder(Date)) %>% 
-    ggplot(aes(x = Month, y = log10(Value))) + 
-    geom_line(aes(colour = Year, group = Year),
-              linewidth = 1.5,
-              alpha = 0.8
-    ) +
-    geom_label(aes(x = Month, y = y_values, label = labels),
-               alpha = 0.6,
-               data = y_axis_text_labels) +
-    geom_label(aes(x = x_values, y = y_values, label = labels),
-               alpha = 0.6,
-               data = x_axis_text_labels) +
-    labs(caption = paste0(label," (m<sup>3</sup>/s) by Month of Year")) +
-    coord_polar() +
-    scale_colour_distiller(palette = 'Spectral') +
-    scale_y_continuous(limits = c(1,5)) +
-    theme(
-      plot.background = element_rect(fill = '#302e27'),
-      panel.background = element_rect(fill = '#302e27'),
-      axis.title = element_blank(),
-      axis.text = element_blank(),
-      plot.caption = element_markdown(colour = 'white', 
-                                      size = 12,
-                                      face = 'bold',
-                                      # halign = 0.5,
-                                      hjust = 0.5)
-      )
-}
+# make_circle_plot = function(dat,station,variable_to_plot){
+#   
+#   label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname 
+# 
+#   # monthly_values = tidyhydat::hy_monthly_flows(station_number = station) %>% 
+#   #   filter(Sum_stat == str_to_upper(variable_to_plot)) %>% 
+#   #   dplyr::select(STATION_NUMBER,Year,Month,Full_Month,Value) %>% 
+#   #   mutate(Date = lubridate::ymd(paste0(Year,'-',Month,'-01')))
+#   
+#   plot_dat = dat %>% 
+#     filter(Month != 'All') %>% 
+#     rowwise() %>% 
+#     mutate(Month = which(month.abb == Month)) %>% 
+#     as_tibble() %>%
+#     mutate(Date = lubridate::ymd(paste0(Year,'-',Month,'-01'))) %>% 
+#     rename(Value = variable_to_plot)
+#   
+#   log10_floor <- function(x) {
+#     10^(floor(log10(x)))
+#   }
+#   
+#   log10_ceiling <- function(x) {
+#     10^(ceiling(log10(x)))
+#   }
+#   
+#   flow_var_minimum = min(plot_dat$Value)
+#   flow_var_min_mag = log10_floor(flow_var_minimum)
+#   flow_var_maximum = max(plot_dat$Value)
+#   flow_var_max_mag = log10_ceiling(flow_var_maximum)
+#   
+#   y_axis_text_labels = data.frame(
+#     y_values = log10(flow_var_min_mag):log10(flow_var_max_mag)
+#   ) %>% 
+#     mutate(
+#       labels = 10^y_values) %>% 
+#     mutate(Month = 11)
+#   
+#   x_axis_text_labels = data.frame(
+#     x_values = c(3,6,9,12),
+#     y_values = rep(log10(flow_var_max_mag),4),
+#     labels = c("Spring",
+#                "Summer",
+#                "Autumn",
+#                "Winter")
+#   )
+# 
+#   plot_dat %>% 
+#     mutate(Date = as.factor(Date)) %>% 
+#     mutate(Date = forcats::fct_inorder(Date)) %>% 
+#     ggplot(aes(x = Month, y = log10(Value))) + 
+#     geom_line(aes(colour = Year, group = Year),
+#               linewidth = 1.5,
+#               alpha = 0.8
+#     ) +
+#     geom_label(aes(x = Month, y = y_values, label = labels),
+#                alpha = 0.6,
+#                data = y_axis_text_labels) +
+#     geom_label(aes(x = x_values, y = y_values, label = labels),
+#                alpha = 0.6,
+#                data = x_axis_text_labels) +
+#     labs(caption = paste0(label," (m<sup>3</sup>/s) by Month of Year")) +
+#     coord_polar() +
+#     scale_colour_distiller(palette = 'Spectral') +
+#     scale_y_continuous(limits = c(1,5)) +
+#     theme(
+#       plot.background = element_rect(fill = '#302e27'),
+#       panel.background = element_rect(fill = '#302e27'),
+#       axis.title = element_blank(),
+#       axis.text = element_blank(),
+#       plot.caption = element_markdown(colour = 'white', 
+#                                       size = 12,
+#                                       face = 'bold',
+#                                       # halign = 0.5,
+#                                       hjust = 0.5)
+#       )
+# }
 ```
 
-```{r compose_factsheet_pages, fig.height=12, fig.width=8}
+```{r compose_factsheet_pages, fig.height=10, fig.width=8}
 
 my_progress_bar = knitrProgressBar::progress_estimated(n = nrow(stations))
 
-for(i in 1:nrow(stations[c(1:5),])){
+for(i in 1:nrow(stations)){
 
   # Update progress bar (helps us know how far we've gotten!)
   my_progress_bar$tick()
@@ -519,9 +519,9 @@ for(i in 1:nrow(stations[c(1:5),])){
   
   half_flow_plot = make_linegraph(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
    
-  mean_flow_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Mean")
-  
-  min_7day_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Min_7_Day")
+  # mean_flow_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Mean")
+  # 
+  # min_7day_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Min_7_Day")
   
   # Compose elements===================================
   
@@ -548,8 +548,8 @@ for(i in 1:nrow(stations[c(1:5),])){
     main_plot,
     row_two,
     row_three,
-    nrow = 4,
-    heights = c(2,1,1,1)
+    nrow = 3,
+    heights = c(2,1,1)
   )
   
   plot(this_arranged_plot)
