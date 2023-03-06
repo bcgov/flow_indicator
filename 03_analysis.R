@@ -200,61 +200,11 @@ dat_combo_num = dat_combo %>%
 # absolute value is taken of the results, such that these 2 dates are
 # very close to each other.
 dat_combo_num = dat_combo_num %>%
-  mutate(DoY_50pct_TotalQ = abs(DoY_50pct_TotalQ - 182),
-         Min_7_Day_DoY = abs(Min_7_Day_DoY - 182))
-
-dat_combo_num = dat_combo_num %>%
-  pivot_wider(names_from = 'name', values_from = 'value')
+  mutate(DoY_50pct_TotalQ_halfyear_max = abs(DoY_50pct_TotalQ - 182),
+         Min_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
 
 # Write out dataset at this point - data wide, unsummarised.
 write.csv(dat_combo_num,'app/www/combined_flow_dat.csv',row.names = F)
-
-# # Pivot data longer to facilitate Mann-Kendall trend test.
-# dat_combo_num = dat_combo_num %>%
-#   pivot_longer(cols = -c(STATION_NUMBER,Year,Month)) %>%
-#   filter(!is.na(value))
-#
-# # Add MK test at this point.
-# dat_combo_num_with_MK = dat_combo_num %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   reframe(MK_results = kendallTrendTest(value ~ Year)[c('statistic','p.value','estimate')]) %>%
-#   unnest(MK_results) %>%
-#   unnest_longer(col = MK_results) %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
-#   pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
-#   mutate(trend_sig = fcase(
-#     abs(Tau) <= 0.05 , "No Trend",
-#     Tau < -0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
-#     Tau < -0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
-#     Tau > 0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
-#     Tau > 0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
-#     Tau < -0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
-#     Tau < -0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
-#     Tau > 0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
-#     Tau > 0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
-#   ))
-
-# dat_combo_date %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   reframe(MK_results = kendallTrendTest(value ~ Year)[c('statistic','p.value','estimate')]) %>%
-#   unnest(MK_results) %>%
-#   unnest_longer(col = MK_results) %>%
-#   group_by(STATION_NUMBER,Month,name) %>%
-#   mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
-#   pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
-#   mutate(trend_sig = fcase(
-#     abs(Tau) <= 0.05 , "No Trend",
-#     Tau < -0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
-#     Tau < -0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
-#     Tau > 0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
-#     Tau > 0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
-#     Tau < -0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
-#     Tau < -0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
-#     Tau > 0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
-#     Tau > 0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
-#   ))
-# write.csv(dat_combo_num_with_MK,'app/www/all_dat_with_MK.csv',row.names = F)
 
 # Get station locations
 stations_sf = tidyhydat::hy_stations(station_number = unique(dat_combo$STATION_NUMBER)) %>%
