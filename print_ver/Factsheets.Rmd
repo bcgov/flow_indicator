@@ -46,14 +46,28 @@ knitr::opts_chunk$set(echo=FALSE, cache=FALSE, warning=FALSE, message=FALSE)
 
 if(!dir.exists('factsheet_figures')) dir.create('factsheet_figures')
 
+# Set options (e.g. page size, how far to look for nearby stations, etc.)
+
 print_page_width = 8.27
+
 print_page_height = 11.69
 
 station_search_dist = 100000
 
+leaflet_provider_choice = providers$Stamen.Terrain
+```
+
+```{r calculate_constants_and_labels}
+# Pretty labels that replace the variable names in the data.
 variable_label_df = data.frame(
   varname = c('Mean','Median','Min_7_Day','Min_30_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
   labelname = c('Mean Flow','Median Flow','7-Day Low Flow','30-Day Low Flow','7-Day Low Flow Day-of-year','50% Annual Flow Day-of-year')
+)
+
+# Most recent data.
+most_recent_data = paste(
+    flow_dat %>% filter(Year == max(flow_dat$Year)) %>% select(Month) %>% distinct() %>% tail(1),
+  max(flow_dat$Year)
 )
 ```
 
@@ -82,9 +96,6 @@ mk_test = function(dat){
 ```
 
 ```{r load_data}
-
-leaflet_provider_choice = providers$Stamen.Terrain
-
 # Load in data.
 flow_dat = read.csv(here::here('app','www/combined_flow_dat.csv')) %>% 
   as_tibble()
@@ -134,7 +145,7 @@ make_leaflet = function(station, stations){
     mutate(focus_station = ifelse(focus_station == T, "Station of Interest", "Other Station")) %>% 
     mutate(focus_station = factor(focus_station, levels = c("Station of Interest",
                                                             "Other Station"))) %>%
-    # Find other stations within 100 km. Use these for labelling.
+    # Find other stations within search radius. Use these for labelling.
     st_join(., st_buffer(station,station_search_dist) %>% summarise(within_search_radius = TRUE)) %>% 
     mutate(leaflet_label = ifelse(within_search_radius == T, paste0(STATION_NAME, ", (",STATION_NUMBER,")")))
   
@@ -158,7 +169,6 @@ make_leaflet = function(station, stations){
       by = join_by(STATION_NUMBER)
     )
     
-  
   # Find which stations are close to which other stations... if within 20 km,
     # just keep label for station with largest mean flow. The below map function
   # uses the distance matrix from above to order 'clumped' (<= 20km) stations
