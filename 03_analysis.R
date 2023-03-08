@@ -200,11 +200,8 @@ dat_combo_num = dat_combo %>%
 # absolute value is taken of the results, such that these 2 dates are
 # very close to each other.
 dat_combo_num = dat_combo_num %>%
-  mutate(DoY_50pct_TotalQ = abs(DoY_50pct_TotalQ - 182),
-         Min_7_Day_DoY = abs(Min_7_Day_DoY - 182))
-
-dat_combo_num = dat_combo_num %>%
-  pivot_wider(names_from = 'name', values_from = 'value')
+  mutate(DoY_50pct_TotalQ_halfyear_max = abs(DoY_50pct_TotalQ - 182),
+         Min_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
 
 # Write out dataset at this point - data wide, unsummarised.
 write.csv(dat_combo_num,'app/www/combined_flow_dat.csv',row.names = F)
