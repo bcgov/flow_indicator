@@ -12,68 +12,209 @@
 
 ### Load in data that was accessed in the '01_load.R' script.
 
-if(!exists("number_daily_records_per_station")){load('./out/station_data.Rdata')}
+if(!exists("final_stations_summary")){final_stations_summary = read.csv('data/finalstns.csv')}
 
-### Filter out some more stations
-# 1. Must have end year of data within past 5 years (likely all active stations).
-# 2. Exclude any stations with fewer than 10 years of data.
+library(EnvStats)
+library(tidyverse)
+library(data.table)
+library(tidyhydat)
+library(sf)
 
-# i. (NOT CURRENTLY IMPLEMENTED) Remove stations that are upstream of another station without significant inputs (duplication of results);
-# ii. 80% decadal data completeness (i.e. for each 10-year chunk of data, it should
-#     have at least 80% of years with data?);
+# If no /www folder (used for the shiny app, and also for static results PDF)
+if(!dir.exists('app/www')) dir.create('app/www')
 
-# stations_to_exclude = number_daily_records_per_station %>%
-#   group_by(STATION_NUMBER) %>%
-#   # Get most recent years of data for each station
-#   arrange(desc(Year)) %>%
-#   slice(1) %>%
-#   # Get the station IDs of stations whose most recent data is 2017 or older (we'll drop these stations)
-#   filter(Year <= 2017) %>%
-#   ungroup() %>%
-#   dplyr::select(STATION_NUMBER) %>%
-#   distinct() %>%
-#   pull(STATION_NUMBER)
-# #1280 stations to exclude (their most recent year of data is 2017 or earlier)
-#
-# # Stations with fewer than 10 years of data.
-# stats_fewer_10_years = number_daily_records_per_station %>%
-#   count(STATION_NUMBER) %>%
-#   filter(n < 10) %>%
-#   pull(STATION_NUMBER)
-#
-# stations_to_exclude = unique(c(stations_to_exclude, stats_fewer_10_years))
-#
-# # # Stations with data gaps of 20% or more within decades of data
-# # # (note: the start year of each 10-year chunk depends on the station,
-# # #  rather than it just being fixed, e.g. 1980-1990, 1990-2000, etc.)
-# # number_daily_records_per_station %>%
-# #   mutate(decade = 10*(Year-1900) %/% 10) %>%
-# #   group_by(STATION_NUMBER,decade) %>%
-# #   mutate(prop_with_data = sum(DaysWithData)/())
-#
-# ## UNFINISHED ABOVE ##
-#
-# stations_to_keep = number_daily_records_per_station %>%
-#   filter(!STATION_NUMBER %in% stations_to_exclude) %>%
-#   dplyr::select(STATION_NUMBER) %>%
-#   distinct() %>%
-#   pull(STATION_NUMBER)
+# Pull out the stations to keep from the loading script.
+stations_to_keep = final_stations_summary$STATION_NUMBER
 
-#Pulling in list of filtered stations from Jon Goetz work (see 'trending_station_selection.R' script)
-station_list_filtered = read.csv('data/finalstns.csv') %>% as_tibble()
+# The below code calculates the following flow variables:
+# 1. Mean/median flow per year,
+# 2. Day of year by which 50% of flow has passed,
+# 3. 7-day flow minimum / day of year of 7-day flow minimum
+# 4. 30-day flow minimum / day of year of 30-day flow minimum
+# 4. Total annual flow (in m^3).
 
-stations_to_keep = station_list_filtered$STATION_NUMBER
+flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
+  filter(Parameter == 'Flow') %>%
+  filter(!is.na(Value)) %>%
+  mutate(Year = lubridate::year(Date)) %>%
+  mutate(Month = lubridate::month(Date))
 
-stations_to_exclude = number_daily_records_per_station %>%
-  filter(!STATION_NUMBER %in% stations_to_keep) %>%
-  dplyr::select(STATION_NUMBER) %>%
-  distinct() %>%
-  pull(STATION_NUMBER)
+# Annual Values =========================================================
+annual_mean_dat = flow_dat %>%
+  group_by(Year,STATION_NUMBER) %>%
+  summarise(Mean = mean(Value),
+            Median = median(Value)) %>%
+  ungroup()
 
-# Apply station filter to data.
-number_daily_records_per_station = number_daily_records_per_station %>%
-  filter(!STATION_NUMBER %in% stations_to_exclude) %>%
-  as_tibble()
+flow_timing_dat = flow_dat %>%
+  group_by(STATION_NUMBER,Year) %>%
+  mutate(RowNumber = row_number(),
+         TotalFlow = sum(Value),
+         FlowToDate = cumsum(Value)) %>%
+  filter(FlowToDate > TotalFlow/2) %>%
+  slice(1) %>%
+  mutate(DoY_50pct_TotalQ = lubridate::yday(Date)) %>%
+  rename('Date_50pct_TotalQ' = Date) %>%
+  ungroup() %>%
+  dplyr::select(STATION_NUMBER,
+                Year,DoY_50pct_TotalQ#,
+                #Date_50pct_TotalQ
+  )
 
-# save(stations_to_keep, stations_to_exclude, number_daily_records_per_station, file = './tmp/station_data_cleaned.Rdata')
-save(stations_to_keep, stations_to_exclude, number_daily_records_per_station, file = './tmp/station_data_cleaned.Rdata')
+# 7-day and 30-day rolling averages for Low flow (flow value, day of year, Date)
+stations_list = as.list(stations_to_keep)
+
+lowflow_dat = stations_list %>% map( ~ {
+
+  print(paste0('Working on station ',.x,'!'))
+
+  daily_flows = hy_daily_flows(station_number = c(.x)) %>%
+    filter(!is.na(Value)) %>%
+    mutate(Year = lubridate::year(Date)) %>%
+    group_by(STATION_NUMBER,Year) %>%
+    mutate(my_row = row_number()) %>%
+    ungroup()
+
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
+
+  daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
+
+  daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
+
+  min_7_day_dat = daily_flows_dt %>%
+    group_by(STATION_NUMBER,Year) %>%
+    slice_min(Min_7_Day) %>%
+    group_by(STATION_NUMBER,Year,Min_7_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+
+  min_30_day_dat = daily_flows_dt %>%
+    group_by(STATION_NUMBER,Year) %>%
+    slice_min(Min_30_Day) %>%
+    group_by(STATION_NUMBER,Year,Min_30_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
+
+  min_7_day_dat %>%
+    left_join(min_30_day_dat,
+              by = join_by(STATION_NUMBER, Year)
+    )
+}) %>%
+  bind_rows()
+
+# Total volume
+
+totalvolume_dat = flow_dat %>%
+  # The flow parameter here is a flow rate, i.e. m^3/second.
+  # Multiply by number of seconds in a day to get volume.
+  mutate(Volume = Value*86400) %>%
+  group_by(STATION_NUMBER,Year) %>%
+  summarise(Total_Volume_m3 = sum(Volume))
+
+annual_flow_dat = annual_mean_dat %>%
+  left_join(flow_timing_dat) %>%
+  left_join(lowflow_dat) %>%
+  left_join(totalvolume_dat)
+
+# write.csv(annual_flow_dat, './app/www/annual_flow_dat.csv', row.names = F)
+
+# Do the same but by month!
+
+monthly_mean_dat = flow_dat %>%
+  group_by(Year,Month,STATION_NUMBER) %>%
+  summarise(Mean = mean(Value),
+            Median = median(Value)) %>%
+  ungroup()
+
+# 7-day and 30-day rolling averages for Low flow
+monthly_lowflow_dat = stations_list %>% map( ~ {
+
+  print(paste0('Working on station ',.x,'!'))
+
+  daily_flows = flow_dat %>%
+    filter(STATION_NUMBER == .x) %>%
+    group_by(STATION_NUMBER,Year) %>%
+    mutate(my_row = row_number()) %>%
+    ungroup()
+
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
+
+  daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
+
+  daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
+
+  min_7_day_dat = daily_flows_dt %>%
+    group_by(STATION_NUMBER,Year,Month) %>%
+    slice_min(Min_7_Day) %>%
+    group_by(STATION_NUMBER,Year,Month,Min_7_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+
+  min_30_day_dat = daily_flows_dt %>%
+    group_by(STATION_NUMBER,Year,Month) %>%
+    slice_min(Min_30_Day) %>%
+    group_by(STATION_NUMBER,Year,Month,Min_30_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
+
+  min_7_day_dat %>%
+    left_join(min_30_day_dat,
+              by = join_by(STATION_NUMBER, Year, Month)
+    )
+}) %>%
+  bind_rows()
+
+# Total volume
+
+# totalvolume_dat = calc_annual_cumulative_stats(station_number = stations_to_keep) %>%
+#   filter(!is.na(Total_Volume_m3))
+monthly_totalvolume_dat = flow_dat %>%
+  # The flow parameter here is a flow rate, i.e. m^3/second.
+  # Multiply by number of seconds in a day to get volume.
+  mutate(Volume = Value*86400) %>%
+  group_by(STATION_NUMBER,Year,Month) %>%
+  summarise(Total_Volume_m3 = sum(Volume))
+
+monthly_flow_dat = monthly_mean_dat %>%
+  left_join(monthly_lowflow_dat) %>%
+  left_join(monthly_totalvolume_dat)
+
+# write.csv(monthly_flow_dat, './app/www/monthly_flow_dat.csv', row.names = F)
+
+# =====================================
+# Combine annual and monthly data, let's see if that works better.
+# Split table by data type: numeric or date. Question: do we need the date vars??
+
+dat_combo = annual_flow_dat %>%
+  mutate(Month = 'All') %>%
+  bind_rows(monthly_flow_dat %>%
+              mutate(Month =  month.abb[Month]))
+
+# Remove Date variables. Should we keep them...? Uncertain.
+dat_combo_num = dat_combo %>%
+  dplyr::select(-contains('Date'))
+
+# Experimental: transform Day-of-Year variables such that
+# day 182 (half-way through the year) is the largest possible value,
+# while days 1 and 364 have 182 subtracted from them and the
+# absolute value is taken of the results, such that these 2 dates are
+# very close to each other.
+dat_combo_num = dat_combo_num %>%
+  mutate(DoY_50pct_TotalQ_halfyear_max = abs(DoY_50pct_TotalQ - 182),
+         Min_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
+
+# Write out dataset at this point - data wide, unsummarised.
+write.csv(dat_combo_num,'app/www/combined_flow_dat.csv',row.names = F)
+
+# Get station locations
+stations_sf = tidyhydat::hy_stations(station_number = unique(dat_combo$STATION_NUMBER)) %>%
+  mutate(STATION_NAME = stringr::str_to_title(STATION_NAME),
+         HYD_STATUS = stringr::str_to_title(HYD_STATUS)) %>%
+  st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326) %>%
+  dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS)
+
+write_sf(stations_sf, 'app/www/stations.gpkg')
