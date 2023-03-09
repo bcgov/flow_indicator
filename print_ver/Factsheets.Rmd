@@ -24,12 +24,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and limitations under the License.
 -->
 ```
-
 ```{r packages and options, echo=F, warning=F, results=F, message=F}
 library(envreportutils)
-library(tidyhydat)
-library(sf)
-library(leaflet)
+library(tidyhydat) # to access hydrometric flow database (GWELLS?)
+library(sf) # To work with spatial data (shapefiles, geopackages etc.)
+library(leaflet) # To make (interactive) maps
+library(leaflegend) # To add legend for station size based on mean flow.
 library(EnvStats) # Necessary for Mann-Kendall test
 library(data.table) # Necessary for use of fcase().
 library(gridExtra) # For making table Grob.
@@ -41,20 +41,25 @@ library(ggrepel)
 library(ggpubr)
 library(knitr)
 library(knitrProgressBar)
+library(shiny) # For leaflet size legend. Hopefully can drop this dependency.
 
 knitr::opts_chunk$set(echo=FALSE, cache=FALSE, warning=FALSE, message=FALSE)
 
 if(!dir.exists('factsheet_figures')) dir.create('factsheet_figures')
 
+# Set options (e.g. page size, how far to look for nearby stations, etc.)
+
 print_page_width = 8.27
+
 print_page_height = 11.69
 
-station_search_dist = 150000
+station_search_dist = 100000
 
-variable_label_df = data.frame(
-  varname = c('Mean','Median','Min_7_Day','Min_30_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
-  labelname = c('Mean Flow','Median Flow','7-Day Low Flow','30-Day Low Flow','7-Day Low Flow Day-of-year','50% Annual Flow Day-of-year')
-)
+# How many separate bins should be used to display mean flow in leaflet map?
+number_size_classes = 4
+
+# What baselayer should we use in the leaflet map?
+leaflet_provider_choice = providers$Stamen.Terrain
 ```
 
 ```{r MK_test_as_function}
@@ -82,9 +87,6 @@ mk_test = function(dat){
 ```
 
 ```{r load_data}
-
-leaflet_provider_choice = providers$Stamen.Terrain
-
 # Load in data.
 flow_dat = read.csv(here::here('app','www/combined_flow_dat.csv')) %>% 
   as_tibble()
@@ -97,6 +99,26 @@ bc = bcmaps::bc_bound() %>% st_transform(crs = 4326)
 
 ```
 
+```{r calculate_constants_and_labels}
+# Pretty labels that replace the variable names in the data.
+variable_label_df = data.frame(
+  varname = c('Mean','Median','Min_7_Day','Min_30_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
+  labelname = c('Mean Flow','Median Flow','7-Day Low Flow','30-Day Low Flow','7-Day Low Flow Day-of-year','50% Annual Flow Day-of-year')
+)
+
+# Most recent data.
+most_recent_data = paste(
+    flow_dat %>% filter(Year == max(flow_dat$Year)) %>% select(Month) %>% distinct() %>% tail(1),
+  max(flow_dat$Year)
+)
+
+# Oldest data.
+oldest_data = paste(
+  flow_dat %>% filter(Year == min(flow_dat$Year)) %>% select(Month) %>% distinct() %>% slice(2),
+  min(flow_dat$Year)
+)
+```
+
 ```{r add_most_recent_mean_flow_to_stations}
 stations = stations %>% 
   left_join(flow_dat %>% 
@@ -105,22 +127,7 @@ stations = stations %>%
               group_by(STATION_NUMBER) %>% 
               slice_max(Year) %>% 
               ungroup() %>% 
-              dplyr::select(STATION_NUMBER,Mean,Year_of_Mean_Flow = Year)) %>% 
-  mutate(FlowGroup = case_when(
-    Mean < 10 ~ 1,
-    Mean >= 10 & Mean < 25 ~ 2,
-    Mean >= 25 & Mean < 100 ~ 3,
-    Mean >= 100 & Mean < 1500 ~ 4,
-    Mean >= 1500 ~ 5
-  )) #%>%
-  # mutate(FlowGroup = case_when(
-  #   Mean < 10 ~ 'Very Low',
-  #   Mean >= 10 & Mean < 25 ~ 'Low',
-  #   Mean >= 25 & Mean < 100 ~ 'Moderate',
-  #   Mean >= 100 & Mean < 1500 ~ 'High',
-  #   Mean >= 1500 ~ 'Very High'
-  # )) %>% 
-  # mutate(FlowGroup = factor(FlowGroup, levels = c('Very Low','Low','Moderate','High','Very High')))
+              dplyr::select(STATION_NUMBER,Mean,Year_of_Mean_Flow = Year)) 
 ```
 
 ```{r make_leaflet_function}
@@ -128,15 +135,84 @@ stations = stations %>%
 
 make_leaflet = function(station, stations){
   
-  # Add a column indicating if each station is the station of focus of this loop.
+  # Add a column identifying the station of focus of this loop.
   stations_marked = stations %>% 
     mutate(focus_station = STATION_NUMBER == station$STATION_NUMBER) %>% 
     mutate(focus_station = ifelse(focus_station == T, "Station of Interest", "Other Station")) %>% 
     mutate(focus_station = factor(focus_station, levels = c("Station of Interest",
                                                             "Other Station"))) %>%
-    # Find other stations within 100 km. Use these for labelling.
-    st_join(., st_buffer(station,station_search_dist) %>% summarise(within_100km = TRUE)) %>% 
-    mutate(leaflet_label = ifelse(within_100km == T, paste0(STATION_NAME, ", (",STATION_NUMBER,")")))
+    # Find other stations within search radius. Use these for labelling.
+    st_join(., st_buffer(station,station_search_dist) %>% summarise(within_search_radius = TRUE)) %>% 
+    mutate(leaflet_label = ifelse(within_search_radius == T, paste0(STATION_NAME, ", (",STATION_NUMBER,")")))
+  
+  # For nearby stations that will be labelled, only include the largest station in
+  # cases where 2+ stations are quite close (according to the zoom factor of 9 that
+  # is currently being used, this might be stations that are within 20 kilometers)
+  stations_with_labels = stations_marked %>% 
+    filter(!is.na(leaflet_label))
+    
+  # Add a nested distance matrix for each station.
+  stations_with_labels = stations_with_labels %>% 
+    left_join(
+      st_distance(stations_with_labels, stations_with_labels) %>% 
+        as.data.frame() %>% 
+        setNames(stations_with_labels$STATION_NUMBER) %>% 
+        pivot_longer(cols = everything(), names_to = "STATION_NUMBER", values_to = 'dist_mat') %>% 
+        mutate(dist_mat = as.numeric(dist_mat)) %>% 
+        group_by(STATION_NUMBER) %>% 
+        nest() %>% 
+        ungroup(),
+      by = join_by(STATION_NUMBER)
+    )
+    
+  # Find which stations are close to which other stations... if within 20 km,
+    # just keep label for station with largest mean flow. The below map function
+  # uses the distance matrix from above to order 'clumped' (<= 20km) stations
+  # by their most recent year of mean flow rate to produce a list of stations
+  # to NOT label.
+  stations_to_not_label = map(stations_with_labels$data, ~ {
+    .x %>%
+    # stations_with_labels$data[1] %>% 
+    #   as.data.frame() %>% 
+      #Add column identifying 'other' station for each distance measurement.
+      mutate(other_station = stations_with_labels$STATION_NUMBER) %>% 
+      #Add column identifying 'focal' station.
+      mutate(this_station = .[.$dist_mat == 0,]$other_station) %>% 
+      # Just keep stations within 20km
+      filter(dist_mat <= 20000) %>% 
+      # Add mean flow of last year for focal station
+      mutate(focal_st_flow = stations_with_labels[stations_with_labels$STATION_NUMBER == .[.$dist_mat == 0,]$other_station,]$Mean) %>% 
+      # Add mean flow of last year for each nearby 'other station'
+      left_join(stations_with_labels %>% st_drop_geometry() %>% dplyr::select(other_station = STATION_NUMBER, other_flow = Mean),
+                by = join_by(other_station)) %>% 
+      # arrange (descending) by mean annual flow. Use this to find the largest 
+      # station out of any 2+ stations within 20 km of each other.
+      arrange(desc(other_flow)) %>% 
+      # Drop the first row (the biggest station)
+      slice(-1) %>% 
+      dplyr::select(other_station) %>% 
+      distinct()
+  }) %>% 
+    bind_rows() %>% 
+    distinct(other_station)
+  
+  # Use the list of 'not-to-labels' to update our stations_marked table.
+  stations_marked = stations_marked %>% 
+    mutate(leaflet_label = ifelse(STATION_NUMBER %in% stations_to_not_label$other_station, NA, leaflet_label))
+  
+  # Determine the breaks/bins in circle size for plotting.
+  stations_marked = stations_marked %>% 
+    mutate(size_bins = cut(Mean,number_size_classes,labels = F))
+  
+  size_legend_labels = tibble(
+    range = cut(stations_marked$Mean,number_size_classes, dig.lab = 4) %>% 
+        levels() %>% 
+        str_remove_all('\\(|\\]') %>% 
+        str_replace_all(',',' - ') %>% 
+        str_replace_all('^-[0-9\\.]*(?= )','0')
+  ) %>% 
+    mutate(bin_number = row_number()) %>% 
+    deframe()
   
   # Create a colour palette to indicate the station of focus.
   mypal = colorFactor(palette = c("darkred", "darkblue"),
@@ -147,35 +223,50 @@ make_leaflet = function(station, stations){
   station_coords = st_coordinates(stations_marked %>% 
                                     filter(focus_station=='Station of Interest')) %>% as.data.frame
 
-  main_leaf = leaflet() %>% 
+  
+  main_leaf = leaflet(options = leafletOptions(zoomControl = FALSE)) %>% 
   addProviderTiles(leaflet_provider_choice) %>%
-  # Add other stations that are not our chosen station.
-  addCircleMarkers(
-    radius = ~Mean^(3/4),
-    color = ~mypal(focus_station),
-    fillColor = ~mypal(focus_station),
-    fillOpacity = .5,
-    label = ~leaflet_label,
-    labelOptions = labelOptions(noHide = T,
-                                direction = 'left'),
-    data = stations_marked) %>% 
-  addMiniMap(
-    tiles = providers$Wikimedia,
-    position = 'topright',
-    width = 200, 
-    height = 200,
-    toggleDisplay = FALSE
-  ) %>% 
-  setView(lng = station_coords$X, 
-          lat = station_coords$Y, 
-          zoom = 8) %>% 
-  addScaleBar('bottomright') %>% 
-  addLegend(
-    title = 'Focal Station',
-    pal = mypal,
-    values = ~focus_station,
-    position = 'topleft',
-    data = stations_marked)
+    removeControl(layerId = '') %>% 
+    addSymbolsSize(
+      lng = ~X,
+      lat = ~Y,
+      shape = 'circle',
+      color = ~mypal(focus_station),
+      fillColor = ~mypal(focus_station),
+      fillOpacity = .5,
+      baseSize = 30,
+      values = ~size_bins,
+      label = ~leaflet_label,
+      labelOptions = labelOptions(noHide = T,
+                                  direction = 'auto'),
+      data = cbind(stations_marked, st_coordinates(stations_marked))
+    ) %>%
+    addLegendSize(
+      title = HTML('Mean Flow (m<sup>3</sup>/s)'),
+      color = 'grey',
+      values = (1:length(size_legend_labels)),
+      breaks = size_legend_labels,
+      baseSize = 45,
+      shape = 'circle',
+      data = stations_marked
+    ) %>% 
+    addMiniMap(
+      tiles = providers$Wikimedia,
+      position = 'topright',
+      width = 200, 
+      height = 200,
+      toggleDisplay = FALSE
+    ) %>% 
+    setView(lng = station_coords$X, 
+            lat = station_coords$Y, 
+            zoom = 9) %>% 
+    addScaleBar('bottomright') %>% 
+    addLegend(
+      title = 'Focal Station',
+      pal = mypal,
+      values = ~focus_station,
+      position = 'topleft',
+      data = stations_marked)
   
   # Find station region. Used in creating alt text.
   station_region = st_join(station,districts) %>% pull(DISTRICT_NAME)
@@ -187,7 +278,7 @@ make_leaflet = function(station, stations){
   #Save leaflet plot to disk. We load this back in with geom_bgimage.
   mapview::mapshot(x = main_leaf,
                    file = path_of_main_leaf,
-                   vwidth = 1050, vheight = 600)
+                   vwidth = 1050, vheight = 650)
   
   ## 2. Leaflet map as a static shot.
 
@@ -204,7 +295,7 @@ make_leaflet = function(station, stations){
     labs(x = "", y = "",
          alt = paste0("This station is located in the ",station_region,
                       " and there are ",
-                      nrow(stations_marked[stations_marked$within_100km==T,]),
+                      nrow(stations_marked[stations_marked$within_search_radius==T,]),
                       " stations within ",
                       station_search_dist/1000," kilometers.")) +
     theme(
@@ -234,7 +325,7 @@ make_summary_table = function(dat, station){
     mutate(Coordinates = paste0(round(st_coordinates(station),3),collapse = ', ')) %>% 
     mutate(Region = st_join(station,districts) %>% pull(DISTRICT_NAME)) %>% 
     # Count number of other stations within X km
-    mutate(`Other Stations in 150km` = as.character( 
+    mutate(`Other Stations within x` = as.character( 
       nrow(
         st_join(
           st_buffer(
@@ -248,7 +339,7 @@ make_summary_table = function(dat, station){
     mutate(across(c(Mean,Median,Min_7_Day,Min_30_Day), ~ paste0(round(.x,1),' m^3/s'))) %>% 
     dplyr::select(`Station Name`,`Station ID Number`,
                   `Years of Data`,Coordinates,Region,
-                  `Other Stations in 150km`,
+                  `Other Stations within x`,
                   Mean,Median,Min_7_Day,Min_30_Day) %>% 
     pivot_longer(cols = everything(), names_to = 'Parameter', values_to = 'Mean Value') %>% 
     mutate(Parameter = case_when(
@@ -256,6 +347,7 @@ make_summary_table = function(dat, station){
       Parameter == 'Median' ~ 'Median Flow',
       Parameter == 'Min_7_Day' ~ '7-Day Low Flow',
       Parameter == 'Min_30_Day' ~ '30-Day Low Flow',
+      Parameter == 'Other Stations within x' ~ paste0('Other Stations within ',station_search_dist/1000,' km'),
       T ~ Parameter
     )) %>% 
     setNames(c('Station Information',paste0('(',max(this_dat$Year),')'), ' '))
@@ -349,7 +441,151 @@ make_data_histogram = function(dat){
 }
 ```
 
-```{r compose_factsheet_pages, fig.height=10, fig.width=8}
+```{r make_circle_plot_function}
+# make_circle_plot = function(dat,station,variable_to_plot){
+# 
+#   label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname
+# 
+#   plot_dat = dat %>%
+#     filter(Month != 'All') %>%
+#     rowwise() %>%
+#     mutate(Month = which(month.abb == Month)) %>%
+#     as_tibble() %>%
+#     mutate(Date = lubridate::ymd(paste0(Year,'-',Month,'-01'))) %>%
+#     rename("Value" = variable_to_plot)
+# 
+#   log10_floor <- function(x) {
+#     10^(floor(log10(x)))
+#   }
+# 
+#   log10_ceiling <- function(x) {
+#     10^(ceiling(log10(x)))
+#   }
+# 
+#   flow_var_minimum = min(plot_dat$Value)
+#   flow_var_min_mag = log10_floor(flow_var_minimum)
+#   flow_var_maximum = max(plot_dat$Value)
+#   flow_var_max_mag = log10_ceiling(flow_var_maximum)
+# 
+#   y_axis_text_labels = data.frame(
+#     y_values = log10(flow_var_min_mag):log10(flow_var_max_mag)
+#   ) %>%
+#     mutate(
+#       labels = 10^y_values) %>%
+#     mutate(Month = 11)
+# 
+#   x_axis_text_labels = data.frame(
+#     x_values = c(3,6,9,12),
+#     y_values = rep(log10(flow_var_max_mag),4),
+#     labels = c("Spring",
+#                "Summer",
+#                "Autumn",
+#                "Winter")
+#   )
+# 
+#   plot_dat %>%
+#     mutate(Date = as.factor(Date)) %>%
+#     mutate(Date = forcats::fct_inorder(Date)) %>%
+#     ggplot(aes(x = Month, y = log10(Value))) +
+#     geom_line(aes(colour = Year, group = Year),
+#               linewidth = 1.5,
+#               alpha = 0.8
+#     ) +
+#     geom_label(aes(x = Month, y = y_values, label = labels),
+#                alpha = 0.6,
+#                data = y_axis_text_labels) +
+#     geom_label(aes(x = x_values, y = y_values, label = labels),
+#                alpha = 0.6,
+#                data = x_axis_text_labels) +
+#     labs(caption = paste0(label," (m<sup>3</sup>/s) by Month of Year")) +
+#     coord_polar() +
+#     scale_colour_distiller(palette = 'Spectral') +
+#     scale_y_continuous(limits = c(1,5)) +
+#     theme(
+#       plot.background = element_rect(fill = '#302e27'),
+#       panel.background = element_rect(fill = '#302e27'),
+#       axis.title = element_blank(),
+#       axis.text = element_blank(),
+#       plot.caption = element_markdown(colour = 'white',
+#                                       size = 12,
+#                                       face = 'bold',
+#                                       # halign = 0.5,
+#                                       hjust = 0.5)
+#       )
+# }
+```
+
+```{r make_day_of_year_circle_plot}
+
+make_day_of_year_circle_plot = function(dat,variable_to_plot){
+
+  label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname 
+  
+  plot_dat = this_dat %>%
+    filter(Month == 'All') %>%
+    filter(!is.na(variable_to_plot))
+  
+  max_year = max(plot_dat$Year)
+  min_year = min(plot_dat$Year)
+  
+  y_axis_text_labels = tibble(
+    # Use 'floor division' (name?) to create prettier, round-number breaks (i.e. 1940 instead of 1938)
+    y = 10*seq(min_year+20, max_year, by = (max_year-min_year)/4) %/% 10
+  ) %>% 
+    mutate(x = 300)
+  
+  x_axis_text_labels = data.frame(
+    x_values = c(80,172,265,355),
+    y_values = rep(2030,4),
+    labels = c("Spring",
+               "Summer",
+               "Autumn",
+               "Winter")
+  )
+  
+  plot_dat %>% 
+    ggplot(aes(x = .data[[variable_to_plot]], y = Year)) +
+    geom_point(aes(colour = Year),alpha = 0.8) +
+    geom_text(aes(x = x_values, y = y_values, label = labels),
+               alpha = 0.6,
+               data = x_axis_text_labels) +
+    geom_text(aes(x = x, y = y, label = y),
+              col = '#706c5e',
+               data = y_axis_text_labels) + 
+    labs(title = label) +
+    coord_polar() +
+    scale_colour_distiller(palette = 'Spectral') +
+    labs(y = "") +
+    scale_x_continuous(limits = c(0,365)) +
+    scale_y_continuous(limits = c(min_year,max_year+10)) +
+    theme(
+      # plot.title = element_text(colour = 'white', hjust = 0.5),
+      # plot.background = element_rect(fill = '#302e27'),
+      # panel.background = element_rect(fill = '#302e27'),
+      plot.title = element_text(hjust = 0.5),
+      panel.grid = element_line(colour = 'darkgrey'),
+      plot.background = element_rect(fill = 'white'),
+      panel.background = element_rect(fill = 'white'),
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank()
+    )
+}
+```
+
+# **Long-term Change in Timing & Volume of River Flow in B.C.**
+
+Changes in the timing and volume of river flow can affect both natural ecosystems and human communities---they can affect our ability to predict and manage seasonal water resources and flood risks, and may impact natural systems that rely on natural flow patterns. Low river flows in summer may reduce the amount of water available for agriculture, hydroelectric power generation, industry and communities. Low river flows are also associated with declines in water quality and warmer water temperatures which can threaten the health of aquatic ecosystems. This indicator measures changes in timing and volume of river flow across the province over a `r max(flow_dat$Year)-min(flow_dat$Year)`-year period (`r oldest_data` to `r most_recent_data`).
+
+-   **Long-term change in magnitude or timing of river flow has occurred at several locations in B.C.** The magnitude of flow is defined as the mean annual flow in cubic meters per second and the timing of flow is defined as the day of year by which one-half of the total annual volume of each river has passed.
+
+-   **Many factors affect trends in timing and volume of river flow.** Changes in [temperature](https://www.env.gov.bc.ca/soe/indicators/climate-change/temp.html), [precipitation](https://www.env.gov.bc.ca/soe/indicators/climate-change/precip.html), and evapotranspiration can all affect the timing and volume of river flow. Trends also depend on the location, size, elevation, and whether the river basin is predominately rainfall- or snowmelt-fed---and whether substantial glacial cover exists. Thus, trends in river timing and flows are not uniform across B.C.
+
+```{r compose_factsheet_pages, fig.height=12, fig.width=8}
+
+stations_all = stations
+
+stations = stations_all[c(1:10),]
 
 my_progress_bar = knitrProgressBar::progress_estimated(n = nrow(stations))
 
@@ -383,34 +619,44 @@ for(i in 1:nrow(stations)){
   
   half_flow_plot = make_linegraph(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
    
+  # mean_flow_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Mean")
+  # 
+  # min_7day_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Min_7_Day")
+  
+  min_7day_doy_circle_plot = make_day_of_year_circle_plot(this_dat, variable_to_plot = 'Min_7_Day_DoY')
+  
+  # halfflow_doy_circle_plot = make_day_of_year_circle_plot(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
   # Compose elements===================================
   
-  row_two = ggarrange(
+  col_one = ggarrange(
     summary_table_plot,
-    mean_flow_linegraph,
-    ncol = 2
+    min_7day_doy_circle_plot,
+    nrow = 2
   )
   
-  row_three = ggarrange(
-    dat_year_histogram,
+  col_two = ggarrange(
+    mean_flow_linegraph,
     lowflow_sevenday_linegraph,
-    ncol = 2
+    dat_year_histogram,
+    nrow = 3
   )
+  
   # Put it all together ========================================================
 
   this_arranged_plot = ggarrange(
     main_plot,
-    row_two,
-    row_three,
-    nrow = 3,
-    heights = c(2,1,1)
+    ggarrange(
+      col_one,
+      col_two,
+      ncol = 2
+    ),
+    nrow = 2,
+    heights = c(4,5)
   )
   
   plot(this_arranged_plot)
-
 }
 ```
-
 
 \newpage
 
@@ -418,8 +664,6 @@ for(i in 1:nrow(stations)){
 
 \*By accessing these datasets, you agree to the licence associated with each file, as indicated below.
 
-
 ------------------------------------------------------------------------
 
 \newpage
-
