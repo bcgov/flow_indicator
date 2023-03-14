@@ -12,13 +12,14 @@
 
 ### Load in data that was accessed in the '01_load.R' script.
 
-if(!exists("final_stations_summary")){final_stations_summary = read.csv('data/finalstns.csv')}
-
 library(EnvStats)
 library(tidyverse)
 library(data.table)
 library(tidyhydat)
 library(sf)
+
+if(!exists("final_stations_summary")){final_stations_summary = read_csv('data/finalstns.csv')}
+if(!exists("station_year_trim_table")){station_year_trim_table = read_csv('data/station_year_trim_table.csv')}
 
 # If no /www folder (used for the shiny app, and also for static results PDF)
 if(!dir.exists('app/www')) dir.create('app/www')
@@ -38,6 +39,21 @@ flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
   filter(!is.na(Value)) %>%
   mutate(Year = lubridate::year(Date)) %>%
   mutate(Month = lubridate::month(Date))
+
+# Take out big data gaps.
+flow_dat = unique(flow_dat$STATION_NUMBER) %>%
+  map( ~ {
+    year_for_trimming = unique(station_year_trim_table[station_year_trim_table$STATION_NUMBER == .x,]$Year_from)
+
+    station_dat = flow_dat %>%
+      filter(STATION_NUMBER == .x)
+
+    filtered_dat = station_dat %>%
+      filter(Year >= year_for_trimming)
+
+    filtered_dat
+  }) %>%
+  bind_rows()
 
 # Annual Values =========================================================
 annual_mean_dat = flow_dat %>%
@@ -144,8 +160,6 @@ annual_flow_dat = annual_mean_dat %>%
   left_join(flow_timing_dat) %>%
   left_join(low_high_flow_dat)
 
-# write.csv(annual_flow_dat, './app/www/annual_flow_dat.csv', row.names = F)
-
 # Do the same but by month!
 
 monthly_mean_dat = flow_dat %>%
@@ -154,51 +168,6 @@ monthly_mean_dat = flow_dat %>%
   summarise(Average = median(Value)) %>%
   ungroup() %>%
   pivot_wider(names_from = Month, values_from = Average, names_prefix = 'Average_')
-
-# # 7-day and 30-day rolling averages for Low flow
-# monthly_lowflow_dat = stations_list %>% map( ~ {
-#
-#   print(paste0('Working on station ',.x,'!'))
-#
-#   daily_flows = flow_dat %>%
-#     filter(STATION_NUMBER == .x) %>%
-#     group_by(STATION_NUMBER,Year) %>%
-#     mutate(my_row = row_number()) %>%
-#     ungroup()
-#
-#   daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
-#
-#   daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
-#
-#   daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
-#
-#   min_7_day_dat = daily_flows_dt %>%
-#     group_by(STATION_NUMBER,Year,Month) %>%
-#     slice_min(Min_7_Day) %>%
-#     group_by(STATION_NUMBER,Year,Month,Min_7_Day) %>%
-#     slice(1) %>%
-#     ungroup() %>%
-#     dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
-#
-#   min_30_day_dat = daily_flows_dt %>%
-#     group_by(STATION_NUMBER,Year,Month) %>%
-#     slice_min(Min_30_Day) %>%
-#     group_by(STATION_NUMBER,Year,Month,Min_30_Day) %>%
-#     slice(1) %>%
-#     ungroup() %>%
-#     dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
-#
-#   min_7_day_dat %>%
-#     left_join(min_30_day_dat,
-#               by = join_by(STATION_NUMBER, Year, Month)
-#     )
-# }) %>%
-#   bind_rows()
-
-# monthly_flow_dat = monthly_mean_dat %>%
-  # left_join(monthly_lowflow_dat)
-
-# write.csv(monthly_flow_dat, './app/www/monthly_flow_dat.csv', row.names = F)
 
 # =====================================
 # Combine annual and monthly data, let's see if that works better.
@@ -223,7 +192,7 @@ dat_combo_num = dat_combo_num %>%
          Max_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
 
 # Write out dataset at this point - data wide, unsummarised.
-write_csv(dat_combo_num,'app/www/combined_flow_dat.csv')
+write_csv(dat_combo_num,'app/www/combined_flow_dat2.csv')
 
 # Get station locations
 stations_sf = tidyhydat::hy_stations(station_number = unique(dat_combo$STATION_NUMBER)) %>%

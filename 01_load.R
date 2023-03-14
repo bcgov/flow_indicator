@@ -31,7 +31,7 @@ library(stringr)
 
 ##### First pass to filter for stations with complete data
 
-tidyhydat::download_hydat()
+#tidyhydat::download_hydat()
 
 ## Filter stations for last n years of data, minimum number of years
 year_filt <- year(Sys.Date())-5
@@ -352,7 +352,8 @@ stations_filt3 <- stations_filt2 %>%
 ###### Year filtering
 
 
-min_years_allowed <- 25
+# min_years_allowed <- 25
+min_years_allowed <- 10
 
 stns_ann_data <- hydat_daily_all %>%
   filter(STATION_NUMBER %in% unique(stations_filt3$STATION_NUMBER)) %>%
@@ -436,7 +437,6 @@ dates_custom <- tribble(
   "08HB032", 1986,
   "08HB025", 1985,
   "08HB002", 1979,
-  "08HA003", 1954,
   "08HA001", 1952,
   "08GA022", 1955,
   "08FA002", 1961,
@@ -462,27 +462,34 @@ dates_custom <- tribble(
 stations_filt4 <- stations_filt3 %>%
   filter(!STATION_NUMBER %in% remove_custom$STATION_NUMBER) %>%
   left_join(dates_custom, by = "STATION_NUMBER") %>%
-  mutate(Year_from = ifelse(is.na(Year_from), Year_from_OLD, Year_from),
-         Year_from = ifelse(is.na(Year_from), year_min, Year_from)) %>%
-  select(-Year_from_OLD)
+  mutate(Year_from = case_when(
+    !is.na(Year_from_OLD) ~ Year_from_OLD,
+    T ~ year_min)) %>%
+  dplyr::select(-Year_from_OLD)
+  # mutate(Year_from = ifelse(is.na(Year_from), Year_from_OLD, Year_from),
+  #        Year_from = ifelse(is.na(Year_from), year_min, Year_from))# %>%
+  # select(-Year_from_OLD)
 
 
-stns_ann_data2 <- bind_rows(lapply(unique(stations_filt4$STATION_NUMBER), function(i){
-  # i=stations_filt4$STATION_NUMBER[1]
-  stn_yr_from <- stations_filt4 %>% filter(STATION_NUMBER == i) %>% pull(Year_from)
+# For each station, filter out big data gaps.
+stns_ann_data2 <- stations_filt4$STATION_NUMBER %>%
+    map( ~ {
+      stns_ann_data %>%
+        filter(STATION_NUMBER == .x) %>%
+        filter(Year >= stations_filt4[stations_filt4$STATION_NUMBER == .x,]$Year_from)
+    }) %>%
+  bind_rows()
 
-  stns_ann_data %>%
-    filter(STATION_NUMBER == i,
-           Year >= stn_yr_from)
+stns_ann_data %>%
+  count(STATION_NUMBER, sort = T)
 
-}))%>%
-  filter(sum(!is.na(Ann_Mean)) >= min_years_allowed)
+stns_ann_data2 %>%
+  filter(sum(!is.na(Ann_Mean)) >= min_years_allowed) %>%
+  count(STATION_NUMBER, sort = T)
 
 ggplot(stns_ann_data2, aes(Year,STATION_NUMBER, colour = Ann_Mean))+
   geom_point()+
   geom_vline(xintercept = max(stns_ann_data2$Year)-25-0.5, colour = "red")+
-  # geom_vline(xintercept = max(stns_ann_data2$Year)-40-0.5, colour = "red")+
-  # geom_vline(xintercept = max(stns_ann_data2$Year)-60-0.5, colour = "red")+
   geom_vline(xintercept = max(stns_ann_data2$Year)-50-0.5, colour = "red")+
   geom_vline(xintercept = max(stns_ann_data2$Year)-75-0.5, colour = "red")
 plotly::ggplotly()
@@ -503,3 +510,5 @@ final_stations_summary <- final_stations_table %>%
 # rm(list=setdiff(ls(), "final_stations_table"))
 write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
 
+stations_filt4 %>% dplyr::select(STATION_NUMBER, Year_from) %>%
+  write.csv("data/station_year_trim_table.csv", row.names = F)
