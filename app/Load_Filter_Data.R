@@ -10,14 +10,21 @@
 flow_dat_all = vroom::vroom('www/combined_flow_dat.csv')
 stations_sf = read_sf('www/stations.gpkg')
 
+# Drop variables that do not pertain to the selected time scale.
 flow_dat = reactive({
   if(input$time_scale == 'Annual'){
-    dat = flow_dat_all %>% filter(Month == 'All')
+    dat = flow_dat_all %>%
+      dplyr::select(-contains('Average_'))
   }
   if(input$time_scale == 'Monthly'){
     req(input$month_selector)
     dat = flow_dat_all %>%
-             filter(Month == input$month_selector)
+      dplyr::select(Year,STATION_NUMBER,contains('Average_')) %>%
+      pivot_longer(-c(Year,STATION_NUMBER),names_to='Month',values_to='Average') %>%
+      mutate(Month = str_remove(Month,'Average_')) %>%
+      filter(Month == input$month_selector) %>%
+      filter(!is.na(Average))
+
   }
   # If the user chooses to restrict the years included in the analysis, implement here.
   if(input$user_period_choice == '2010+'){
@@ -31,34 +38,9 @@ flow_dat = reactive({
   }
 })
 
-# mk_results_f = reactive({
-#   mk_results %>%
-#     filter(name == input$user_var_choice) %>%
-#     dplyr::select(-name)
-# })
-
 flow_dat_chosen_var = reactive({
   flow_dat() %>%
-    dplyr::select(STATION_NUMBER,Year,Month, values = !!sym(input$user_var_choice))
+    dplyr::select(STATION_NUMBER,Year,values = !!sym(input$user_var_choice))
 })
-
-# # Filter the full dataset so that it only lists the parameter the user has chosen with the dropdown.
-# flow_dat_focused = reactive({
-#   if(input$user_var_choice == 'Mean Flow'){
-#     return(flow_dat() %>% dplyr::select(STATION_NUMBER,Year,Month,values = Mean))
-#   }
-#   if(input$user_var_choice == 'Median Flow'){
-#     return(flow_dat() %>% dplyr::select(STATION_NUMBER,Year,Month,values = Median))
-#   }
-#   if(input$user_var_choice == "Date of 50% Annual Flow"){
-#     return(flow_dat() %>% dplyr::select(STATION_NUMBER,Year,Month,values = DoY_50pct_TotalQ))
-#   }
-#   if(input$user_var_choice == 'Minimum Flow (7day)'){
-#     return(flow_dat() %>% dplyr::select(STATION_NUMBER,Year,Month,values = Min_7_Day_DoY))
-#   }
-#   if(input$user_var_choice == 'Total Flow'){
-#     return(flow_dat() %>% dplyr::select(STATION_NUMBER,Year,Month,values = Total_Volume_m3))
-#   }
-# })
 
 

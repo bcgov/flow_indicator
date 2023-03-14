@@ -25,14 +25,14 @@ trend_select_options_tab = wellPanel(
   ),
   selectizeInput(inputId = 'user_var_choice',
                  label = 'Trend to Display',
-                 choices = c('Mean Flow' = 'Mean',
-                             'Median Flow' = 'Median',
+                 choices = c('Average Flow' = 'Average',
                              'Date of 50% Flow' = 'DoY_50pct_TotalQ',
                              'Minimum Flow (7-day)' = 'Min_7_Day',
                              'Date of Minimum Flow (7-day)' = 'Min_7_Day_DoY',
                              'Minimum Flow (30-day)' = 'Min_30_Day',
                              'Date of Minimum Flow (30-day)' = 'Min_30_Day_DoY',
-                             'Total Flow' = 'Total_Volume_m3'),
+                             'Maximum Flow (7-day)' = 'Max_7_Day',
+                             'Date of Maximum Flow (7-day)' = 'Max_7_Day_DoY'),
                  selected = 'Mean',
                  width = '100%'),
   radioButtons(inputId = 'user_period_choice',
@@ -55,8 +55,8 @@ trend_select_abs_panel = absolutePanel(
   tabsetPanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab),
-    tabPanel('Datview',DT::DTOutput('test'))
+    tabPanel('Station Plot',station_plot_tab)
+    # tabPanel('Datview',DT::DTOutput('test'))
   )
 )
 

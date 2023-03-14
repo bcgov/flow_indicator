@@ -11,31 +11,33 @@ data %>%
   pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
   mutate(trend_sig = fcase(
     abs(Tau) <= 0.05 , "No Trend",
-    Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
-    Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
-    Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
-    Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
-    Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
-    Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
-    Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
-    Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
+    Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Significant Trend Earlier",
+    Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Non-Significant Trend Earlier",
+    Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Non-Significant Trend Later",
+    Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Significant Trend Later",
+    Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Down",
+    Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Down",
+    Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Up",
+    Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Up"
   ))
 }
 
 
 station_flow_plot = function(data,variable_choice,clicked_station,stations_shapefile,slopes,caption_label){
 
-  label.frame = data.frame(varname = c('Mean','Median',
+  label.frame = data.frame(varname = c('Average',
                                        'DoY_50pct_TotalQ','Min_7_Day',
                                        'Min_7_Day_DoY','Min_30_Day',
-                                       'Min_30_Day_DoY','Total_Volume_m3'),
-                           labels = c('Mean Flow','Median Flow',
+                                       'Min_30_Day_DoY',
+                                       'Max_7_Day','Max_7_Day_DoY'),
+                           labels = c('Average Flow',
                                       'Date of 50% Annual Flow',
                                       'Minimum Flow (7day)',
                                       'Date of Minimum Flow (7day)',
                                       'Minimum Flow (30day)',
                                       'Date of Minimum Flow (30day)',
-                                      'Total Flow'))
+                                      'Maximum Flow (7day)',
+                                      'Date of Maximum Flow (7day)'))
 
   if(clicked_station == 'no_selection'){
       ggplot() +
@@ -44,8 +46,8 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
     } else {
 
       plot_units = fcase(
-        variable_choice %in% c('Mean','Median','Total_Volume_m3','Min_7_Day','Min_30_Day') , '(m<sup>3</sup>/second)',
-        variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Min_30_Day_DoY'), " "
+        variable_choice %in% c('Average','Total_Volume_m3','Min_7_Day','Min_30_Day') , '(m<sup>3</sup>/second)',
+        variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Min_30_Day_DoY','Max_7_Day_DoY'), " "
       )
 
       station_name = unique(stations_shapefile[stations_shapefile$STATION_NUMBER == clicked_station,]$STATION_NAME)

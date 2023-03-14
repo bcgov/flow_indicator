@@ -32,25 +32,20 @@ server <- function(input, output) {
   # Update month selector to show months, if user picks month time-scale
   observeEvent(input$time_scale, {
     if(input$time_scale == 'Monthly'){
-      # updateSelectizeInput(inputId = 'month_selector',
-      #                      choices = month.abb,
-      #                      selected = month.abb[1])
       updateSelectizeInput(inputId = 'user_var_choice',
-                           choices = c('Mean Flow' = 'Mean',
-                                       'Median Flow' = 'Median',
-                                       'Total Flow' = 'Total_Volume_m3')
+                           choices = c('Average Flow' = 'Average')
       )
     }
     if(input$time_scale == 'Annual'){
       updateSelectizeInput(inputId = 'user_var_choice',
-                           choices = c('Mean Flow' = 'Mean',
-                                       'Median Flow' = 'Median',
+                           choices = c('Average Flow' = 'Average',
                                        'Date of 50% Flow' = 'DoY_50pct_TotalQ',
                                        'Minimum Flow (7-day)' = 'Min_7_Day',
                                        'Date of Minimum Flow (7-day)' = 'Min_7_Day_DoY',
                                        'Minimum Flow (30-day)' = 'Min_30_Day',
                                        'Date of Minimum Flow (30-day)' = 'Min_30_Day_DoY',
-                                       'Total Flow' = 'Total_Volume_m3')
+                                       'Maximum Flow (7-day)' = 'Max_7_Day',
+                                       'Date of Maximum Flow (7-day)' = 'Max_7_Day_DoY')
       )
     }
   })
