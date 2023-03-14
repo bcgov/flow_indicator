@@ -31,6 +31,8 @@ library(stringr)
 
 ##### First pass to filter for stations with complete data
 
+tidyhydat::download_hydat()
+
 ## Filter stations for last n years of data, minimum number of years
 year_filt <- year(Sys.Date())-5
 n_years_filt <- 10 # will likely use >10 years in final, but this reduces number for first pass
@@ -500,3 +502,4 @@ final_stations_summary <- final_stations_table %>%
 
 # rm(list=setdiff(ls(), "final_stations_table"))
 write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
+
