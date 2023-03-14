@@ -42,8 +42,7 @@ flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
 # Annual Values =========================================================
 annual_mean_dat = flow_dat %>%
   group_by(Year,STATION_NUMBER) %>%
-  summarise(Mean = mean(Value),
-            Median = median(Value)) %>%
+  summarise(Average = median(Value)) %>%
   ungroup()
 
 flow_timing_dat = flow_dat %>%
@@ -62,126 +61,142 @@ flow_timing_dat = flow_dat %>%
   )
 
 # 7-day and 30-day rolling averages for Low flow (flow value, day of year, Date)
+# Note: this is SUMMER low flow (i.e. May - October)
 stations_list = as.list(stations_to_keep)
 
-lowflow_dat = stations_list %>% map( ~ {
+low_high_flow_dat = stations_list %>% map( ~ {
 
   print(paste0('Working on station ',.x,'!'))
 
   daily_flows = hy_daily_flows(station_number = c(.x)) %>%
     filter(!is.na(Value)) %>%
-    mutate(Year = lubridate::year(Date)) %>%
+    mutate(Year = lubridate::year(Date),
+           Month = lubridate::month(Date)) %>%
     group_by(STATION_NUMBER,Year) %>%
     mutate(my_row = row_number()) %>%
     ungroup()
 
-  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
+  # Summer low flows (7-day average low flow and 30-day average low flow)
+  low_daily_flows = daily_flows %>%
+    filter(Month %in% c(5:10))
 
-  daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
+  low_daily_flows_dt = data.table::data.table(low_daily_flows, key = c('STATION_NUMBER','Year'))
 
-  daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
+  low_daily_flows_dt$Min_7_Day = frollmean(low_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
 
-  min_7_day_dat = daily_flows_dt %>%
-    group_by(STATION_NUMBER,Year) %>%
+  low_daily_flows_dt$Min_30_Day = frollmean(low_daily_flows_dt[, Value], 30, align = 'right', na.rm=T)
+
+  min_7_day_dat = low_daily_flows_dt %>%
+    as_tibble() %>%
+    # Missing data can produce identical minimum flow values.
+    # Keep only the latest record for each such duplication.
+    filter(Min_7_Day != lead(Min_7_Day)) %>%
+    group_by(Year) %>%
     slice_min(Min_7_Day) %>%
-    group_by(STATION_NUMBER,Year,Min_7_Day) %>%
+    group_by(Year,Min_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+    dplyr::select(-Parameter,-Value,-Symbol, -Month, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
 
-  min_30_day_dat = daily_flows_dt %>%
-    group_by(STATION_NUMBER,Year) %>%
+  min_30_day_dat = low_daily_flows_dt %>%
+    as_tibble() %>%
+    # Missing data can produce identical minimum flow values.
+    # Keep only the latest record for each such duplication.
+    filter(Min_30_Day != lead(Min_30_Day)) %>%
+    group_by(Year) %>%
     slice_min(Min_30_Day) %>%
-    group_by(STATION_NUMBER,Year,Min_30_Day) %>%
+    group_by(Year,Min_30_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
+    dplyr::select(-Parameter,-Value,-Symbol, -Month, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
 
-  min_7_day_dat %>%
+  summer_low_flows = min_7_day_dat %>%
+    dplyr::select(STATION_NUMBER, Year, everything()) %>%
     left_join(min_30_day_dat,
               by = join_by(STATION_NUMBER, Year)
     )
+
+  # Peak flows (7-day average flows, could be any time of year)
+
+  high_daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
+
+  high_daily_flows_dt$Max_7_Day = frollmean(high_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
+
+  max_7_day_dat = high_daily_flows_dt %>%
+    as_tibble() %>%
+    # Missing data can produce identical minimum flow values.
+    # Keep only the latest record for each such duplication.
+    filter(Max_7_Day != lead(Max_7_Day)) %>%
+    group_by(Year) %>%
+    slice_max(Max_7_Day) %>%
+    group_by(Year,Max_7_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Month, Max_7_Day_DoY = my_row, Max_7_Day_Date = Date)
+
+  summer_low_flows %>%
+    left_join(max_7_day_dat,
+              by = join_by(STATION_NUMBER,Year))
 }) %>%
   bind_rows()
 
-# Total volume
-
-totalvolume_dat = flow_dat %>%
-  # The flow parameter here is a flow rate, i.e. m^3/second.
-  # Multiply by number of seconds in a day to get volume.
-  mutate(Volume = Value*86400) %>%
-  group_by(STATION_NUMBER,Year) %>%
-  summarise(Total_Volume_m3 = sum(Volume))
-
 annual_flow_dat = annual_mean_dat %>%
   left_join(flow_timing_dat) %>%
-  left_join(lowflow_dat) %>%
-  left_join(totalvolume_dat)
+  left_join(low_high_flow_dat)
 
 # write.csv(annual_flow_dat, './app/www/annual_flow_dat.csv', row.names = F)
 
 # Do the same but by month!
 
 monthly_mean_dat = flow_dat %>%
+  mutate(Month = lubridate::month(Month, abbr = T, label = T)) %>%
   group_by(Year,Month,STATION_NUMBER) %>%
-  summarise(Mean = mean(Value),
-            Median = median(Value)) %>%
-  ungroup()
+  summarise(Average = median(Value)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = Month, values_from = Average, names_prefix = 'Average_')
 
-# 7-day and 30-day rolling averages for Low flow
-monthly_lowflow_dat = stations_list %>% map( ~ {
+# # 7-day and 30-day rolling averages for Low flow
+# monthly_lowflow_dat = stations_list %>% map( ~ {
+#
+#   print(paste0('Working on station ',.x,'!'))
+#
+#   daily_flows = flow_dat %>%
+#     filter(STATION_NUMBER == .x) %>%
+#     group_by(STATION_NUMBER,Year) %>%
+#     mutate(my_row = row_number()) %>%
+#     ungroup()
+#
+#   daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
+#
+#   daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
+#
+#   daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
+#
+#   min_7_day_dat = daily_flows_dt %>%
+#     group_by(STATION_NUMBER,Year,Month) %>%
+#     slice_min(Min_7_Day) %>%
+#     group_by(STATION_NUMBER,Year,Month,Min_7_Day) %>%
+#     slice(1) %>%
+#     ungroup() %>%
+#     dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+#
+#   min_30_day_dat = daily_flows_dt %>%
+#     group_by(STATION_NUMBER,Year,Month) %>%
+#     slice_min(Min_30_Day) %>%
+#     group_by(STATION_NUMBER,Year,Month,Min_30_Day) %>%
+#     slice(1) %>%
+#     ungroup() %>%
+#     dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
+#
+#   min_7_day_dat %>%
+#     left_join(min_30_day_dat,
+#               by = join_by(STATION_NUMBER, Year, Month)
+#     )
+# }) %>%
+#   bind_rows()
 
-  print(paste0('Working on station ',.x,'!'))
-
-  daily_flows = flow_dat %>%
-    filter(STATION_NUMBER == .x) %>%
-    group_by(STATION_NUMBER,Year) %>%
-    mutate(my_row = row_number()) %>%
-    ungroup()
-
-  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
-
-  daily_flows_dt$Min_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right')
-
-  daily_flows_dt$Min_30_Day = frollmean(daily_flows_dt[, Value], 30, align = 'right')
-
-  min_7_day_dat = daily_flows_dt %>%
-    group_by(STATION_NUMBER,Year,Month) %>%
-    slice_min(Min_7_Day) %>%
-    group_by(STATION_NUMBER,Year,Month,Min_7_Day) %>%
-    slice(1) %>%
-    ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Min_30_Day, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
-
-  min_30_day_dat = daily_flows_dt %>%
-    group_by(STATION_NUMBER,Year,Month) %>%
-    slice_min(Min_30_Day) %>%
-    group_by(STATION_NUMBER,Year,Month,Min_30_Day) %>%
-    slice(1) %>%
-    ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Min_7_Day, Min_30_Day_DoY = my_row, Min_30_Day_Date = Date)
-
-  min_7_day_dat %>%
-    left_join(min_30_day_dat,
-              by = join_by(STATION_NUMBER, Year, Month)
-    )
-}) %>%
-  bind_rows()
-
-# Total volume
-
-# totalvolume_dat = calc_annual_cumulative_stats(station_number = stations_to_keep) %>%
-#   filter(!is.na(Total_Volume_m3))
-monthly_totalvolume_dat = flow_dat %>%
-  # The flow parameter here is a flow rate, i.e. m^3/second.
-  # Multiply by number of seconds in a day to get volume.
-  mutate(Volume = Value*86400) %>%
-  group_by(STATION_NUMBER,Year,Month) %>%
-  summarise(Total_Volume_m3 = sum(Volume))
-
-monthly_flow_dat = monthly_mean_dat %>%
-  left_join(monthly_lowflow_dat) %>%
-  left_join(monthly_totalvolume_dat)
+# monthly_flow_dat = monthly_mean_dat %>%
+  # left_join(monthly_lowflow_dat)
 
 # write.csv(monthly_flow_dat, './app/www/monthly_flow_dat.csv', row.names = F)
 
@@ -190,9 +205,8 @@ monthly_flow_dat = monthly_mean_dat %>%
 # Split table by data type: numeric or date. Question: do we need the date vars??
 
 dat_combo = annual_flow_dat %>%
-  mutate(Month = 'All') %>%
-  bind_rows(monthly_flow_dat %>%
-              mutate(Month =  month.abb[Month]))
+  # mutate(Month = 'All') %>%
+  left_join(monthly_mean_dat)
 
 # Remove Date variables. Should we keep them...? Uncertain.
 dat_combo_num = dat_combo %>%
@@ -205,10 +219,11 @@ dat_combo_num = dat_combo %>%
 # very close to each other.
 dat_combo_num = dat_combo_num %>%
   mutate(DoY_50pct_TotalQ_halfyear_max = abs(DoY_50pct_TotalQ - 182),
-         Min_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
+         Min_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182),
+         Max_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
 
 # Write out dataset at this point - data wide, unsummarised.
-write.csv(dat_combo_num,'app/www/combined_flow_dat.csv',row.names = F)
+write_csv(dat_combo_num,'app/www/combined_flow_dat.csv')
 
 # Get station locations
 stations_sf = tidyhydat::hy_stations(station_number = unique(dat_combo$STATION_NUMBER)) %>%
