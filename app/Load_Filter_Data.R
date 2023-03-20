@@ -39,6 +39,7 @@ flow_dat = reactive({
 })
 
 flow_dat_chosen_var = reactive({
+  if(input$time_scale == 'Monthly')req(input$month_selector)
   flow_dat() %>%
     dplyr::select(STATION_NUMBER,Year,values = !!sym(input$user_var_choice))
 })

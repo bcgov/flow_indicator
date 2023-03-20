@@ -53,7 +53,8 @@ server <- function(input, output) {
 
   mk_results = reactive({
     calculate_MK_results(data = flow_dat_chosen_var(),
-                         chosen_variable = input$user_var_choice)
+                         chosen_variable = input$user_var_choice,
+                         time_scale = input$time_scale)
   })
 
   flow_dat_with_mk = reactive({
