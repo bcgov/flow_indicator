@@ -9,66 +9,105 @@ library(data.table)
 library(tidyverse)
 library(ggtext)
 
+oldest_data_filter_ui = radioButtons(
+  inputId = 'user_period_choice',
+  label = 'Oldest data to include',
+  choices = c('2010' = '2010+',
+              '1990' = '1990+',
+              'All' = 'all'),
+  selected = 'all',
+  inline = T)
+
+timescale_ui = fluidRow(
+  radioButtons(
+    inputId = 'time_scale',
+    label = 'Yearly or Monthly Data',
+    choices = c('Annual','Monthly'),
+    inline = T,
+    selected = 'Annual'),
+  uiOutput('month_selector_UI')
+)
+
+varchoice_ui = selectizeInput(
+  inputId = 'user_var_choice',
+  label = 'Trend to Display',
+  choices = c('Average Flow' = 'Average',
+              'Date of 50% Flow' = 'DoY_50pct_TotalQ',
+              'Minimum Flow (7-day)' = 'Min_7_Day',
+              'Date of Minimum Flow (7-day)' = 'Min_7_Day_DoY',
+              'Minimum Flow (30-day)' = 'Min_30_Day',
+              'Date of Minimum Flow (30-day)' = 'Min_30_Day_DoY',
+              'Maximum Flow (7-day)' = 'Max_7_Day',
+              'Date of Maximum Flow (7-day)' = 'Max_7_Day_DoY'),
+  selected = 'Mean',
+  width = '100%')
+
+left_col = fluidRow(
+  oldest_data_filter_ui,
+  varchoice_ui
+)
+
 # Trend selection options
-trend_select_options_tab = wellPanel(
+trend_select_options = tagList(
   fluidRow(
     column(width = 6,
-           radioButtons(inputId = 'time_scale',
-                        label = 'Yearly or Monthly Data',
-                        choices = c('Annual','Monthly'),
-                        selected = 'Annual'
-           )
+           left_col
     ),
     column(width = 6,
-           uiOutput('month_selector_UI')
+           timescale_ui
     )
-  ),
-  selectizeInput(inputId = 'user_var_choice',
-                 label = 'Trend to Display',
-                 choices = c('Average Flow' = 'Average',
-                             'Date of 50% Flow' = 'DoY_50pct_TotalQ',
-                             'Minimum Flow (7-day)' = 'Min_7_Day',
-                             'Date of Minimum Flow (7-day)' = 'Min_7_Day_DoY',
-                             'Minimum Flow (30-day)' = 'Min_30_Day',
-                             'Date of Minimum Flow (30-day)' = 'Min_30_Day_DoY',
-                             'Maximum Flow (7-day)' = 'Max_7_Day',
-                             'Date of Maximum Flow (7-day)' = 'Max_7_Day_DoY'),
-                 selected = 'Mean',
-                 width = '100%'),
-  radioButtons(inputId = 'user_period_choice',
-               label = 'Date Cutoff',
-               choices = c('One decade (2010 - present)' = '2010+',
-                           'Three decades (1990 - present)' = '1990+',
-                           'All available data' = 'all'),
-               selected = 'all',
-               inline = F)
+  )
 )
 
-station_plot_tab = wellPanel(
-  plotOutput('myplot',height=225)
+# station_plot = card(height = '20%',
+#   card_body(height = '20%',
+#     plotOutput('myplot')
+#   )
+# )
+
+station_plot = tagList(
+  h4("Station Plot",style = 'text-align:center;'),
+  plotOutput('myplot')
 )
-# Absolute Panel with trend selection.
-trend_select_abs_panel = absolutePanel(
-  id = 'trend_selector',
-  top = 240, left = 10, width = 450, height = 550,
-  draggable = T,
+
+hydrograph = tagList(
+  h4("Hydrograph",style = 'text-align:center;'),
+  plotOutput('my_hydrograph')
+)
+
+the_sidebar = sidebar(
+  width = '40%',
+  trend_select_options,
   tabsetPanel(
     id = 'tabset',
-    tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab)
-    # tabPanel('Datview',DT::DTOutput('test'))
+    tabPanel('Flow Metric Plot',station_plot),
+    tabPanel('Hydrograph Plot',hydrograph)
   )
 )
 
-# Absolute panel with map as background.
-map_abs_panel = absolutePanel(
-  top = 0, left = 0, right = 0,
-  fixed = TRUE,
-  div(
-    style="padding: 8px; border-bottom: 1px solid #CCC; background: #FFFFEE;",
-    fluidRow(
-      leafletOutput('leafmap',
-                    height = '600px')
-    )
-  )
-)
+
+# # Absolute Panel with trend selection.
+# trend_select_abs_panel = absolutePanel(
+#   id = 'trend_selector',
+#   top = 240, left = 10, width = 450, height = 550,
+#   draggable = T,
+#   tabsetPanel(
+#     id = 'tabset',
+#     tabPanel('Trend Options',trend_select_options_tab),
+#     tabPanel('Station Plot',station_plot_tab)
+#     # tabPanel('Datview',DT::DTOutput('test'))
+#   )
+# )
+
+# # Absolute panel with map as background.
+# map_panel = fluidRow(
+#   div(
+#     style="padding: 8px; border-bottom: 1px solid #CCC; background: #FFFFEE;",
+#     fluidRow(
+#       leafletOutput('leafmap',
+#                     height = '600px')
+#     )
+#   )
+# )
+
+map = leafletOutput('leafmap',height = '550px')

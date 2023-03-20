@@ -80,3 +80,64 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
                   axis.text = element_text(size = 11))
     }
 }
+
+hydrograph_plot = function(dat, clicked_station,stations_shapefile){
+
+  if(clicked_station == 'no_selection'){
+    ggplot() +
+      geom_text(aes(x=1,y=1,label='Click a station on the map to see its plot.')) +
+      ggthemes::theme_map()
+  } else {
+    # browser()
+
+    # 'dat' should be flow_dat(), the filtered form of
+    # 'flow_dat_all', a ~13,500 row .csv file with various
+    # precalculated metrics. It has averages per month, which we can pivot longer
+    # to get a yearly average flow trend for a hydrograph.
+    dat = dat |>
+      filter(STATION_NUMBER == clicked_station) |>
+      dplyr::select(STATION_NUMBER,starts_with('Average_')) |>
+      pivot_longer(cols = -c(STATION_NUMBER), names_to = 'Month', values_to = 'av_flow') |>
+      filter(!is.na(av_flow)) |>
+      group_by(STATION_NUMBER,Month) |>
+      mutate(Month = str_remove(Month, 'Average_')) |>
+      mutate(Month = factor(Month, levels = month.abb)) |>
+      mutate(Month = as.numeric(Month)) |>
+      arrange(Month)
+
+    station_name = unique(stations_shapefile[stations_shapefile$STATION_NUMBER == clicked_station,]$STATION_NAME)
+
+    plotting_df = dat %>%
+      group_by(STATION_NUMBER,Month) %>%
+      reframe(median_flow = median(av_flow, na.rm=T),
+              percentiles = list(quantile(av_flow, probs = c(0.05,0.25,0.75,0.95)))) %>%
+      unnest_wider(percentiles) %>%
+      mutate(median_line_label = 'Median Flow') %>%
+      mutate(fifty_pct_label = '"Normal" range (50%) of flow') %>%
+      mutate(ninety_pct_label = 'Range of 90% of flow')
+
+    plotting_df %>%
+      ggplot() +
+      geom_ribbon(aes(x = Month, ymin = `5%`, ymax = `95%`, fill = ninety_pct_label)) +
+      geom_ribbon(aes(x = Month, ymin = `25%`, ymax = `75%`, fill = fifty_pct_label)) +
+      geom_line(aes(x = Month, y = median_flow, colour = median_line_label),
+                linewidth = 1) +
+      scale_colour_manual(values = c("Median Flow" = "#2d7ca1")) +
+      scale_fill_manual(values = c("Range of 90% of flow" = "#ceeaed",
+                                   '"Normal" range (50%) of flow' = 'lightblue')) +
+      scale_x_discrete(breaks = c(1:12), labels = month.abb[c(1:12)]) +
+      labs(y = 'Average Discharge (m<sup>3</sup>/s)',
+           x = '',
+           title = '*Daily Stream or River Discharge*',
+           subtitle = station_name,
+           col = '',
+           fill = '') +
+      theme(axis.title.y = element_markdown(size = 15),
+            axis.text.y = element_text(size = 12),
+            axis.text.x = element_text(size = 12),
+            legend.position = 'top',
+            plot.title = element_markdown(hjust = 0.5),
+            panel.background = element_rect(fill = 'transparent'),
+            panel.grid.major = element_line(colour = 'grey'))
+  }
+}

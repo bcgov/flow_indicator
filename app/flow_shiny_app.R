@@ -13,13 +13,14 @@
 source('UI.R')
 source('functions.R')
 
-ui = shiny::fluidPage(
-  tags$head(tags$style(
-    HTML('#trend_selector {opacity:0.5;}
-         #trend_selector:hover{opacity:0.9;}'))),
-  titlePanel("Flow Indicator"),
-  map_abs_panel,
-  trend_select_abs_panel
+ui = page_fillable(
+  theme = bslib::bs_theme(
+    font_scale = 0.75
+  ),
+  layout_sidebar(
+    sidebar = the_sidebar,
+    map
+  )
 )
 
 server <- function(input, output) {
@@ -56,7 +57,6 @@ server <- function(input, output) {
   })
 
   flow_dat_with_mk = reactive({
-    # flow_dat() %>%
     flow_dat_chosen_var() %>%
       left_join(mk_results(), by = join_by(STATION_NUMBER))
   })
@@ -119,7 +119,15 @@ server <- function(input, output) {
                       stations_shapefile = stations_sf,
                       slopes = senslope_dat(),
                       caption_label = date_choice_label())
-  })
+  },
+  height = 300, width = 300)
+
+  output$my_hydrograph = renderPlot({
+    hydrograph_plot(dat = flow_dat_all,
+                    clicked_station = click_station(),
+                    stations_shapefile = stations_sf)
+  },
+  height = 300, width = 300)
 
   output$test = DT::renderDT(flow_dat_with_mk())
 
