@@ -43,15 +43,45 @@ varchoice_ui = selectizeInput(
   selected = 'Mean',
   width = '100%')
 
-left_col = fluidRow(
-  oldest_data_filter_ui,
-  varchoice_ui
+number_stations_vb = value_box(
+  "Stations Included",
+  span(
+    textOutput('num_stations_on_plot')
+  ),
+  showcase = bsicons::bs_icon("moisture", size = "300%"),
+  class = "bg-secondary"
 )
 
-# Trend selection options
-trend_select_options = tagList(
-  left_col,
-  timescale_ui
+number_stations_declining = value_box(
+  "Flow Metric Shift Down/Earlier",
+  span(
+    textOutput('num_stations_dec')
+  ),
+  showcase = bsicons::bs_icon("droplet-half", size = "300%"),
+  class = 'bg-danger'
+)
+
+number_stations_increasing = value_box(
+  "Flow Metric Shift Up/Later",
+  span(
+    textOutput('num_stations_inc')
+  ),
+  showcase = bsicons::bs_icon("droplet-fill", size = "300%"),
+  class = "bg-primary"
+)
+
+summary_boxes = tagList(
+  number_stations_vb,
+  number_stations_declining,
+  number_stations_increasing
+)
+
+# Trend selection options.
+trend_select_options = fluidRow(
+  oldest_data_filter_ui,
+  varchoice_ui,
+  timescale_ui,
+  summary_boxes
 )
 
 # station_plot = card(height = '20%',
@@ -62,12 +92,12 @@ trend_select_options = tagList(
 
 station_plot = tagList(
   # h5("Station Plot",style = 'text-align:center;'),
-  plotlyOutput('myplot', height = 225)
+  plotlyOutput('myplot', height = 275)
 )
 
 hydrograph = tagList(
   # h5("Hydrograph",style = 'text-align:center;'),
-  plotlyOutput('my_hydrograph', height = 225)
+  plotlyOutput('my_hydrograph', height = 275)
 )
 
 the_sidebar = sidebar(

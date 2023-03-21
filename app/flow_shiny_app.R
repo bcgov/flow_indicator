@@ -13,10 +13,13 @@
 source('UI.R')
 source('functions.R')
 
+my_theme = bs_theme(bootswatch = 'flatly',
+                    danger = "#cc0000",
+                    primary = '#3399ff',
+                    font_scale = 0.75)
+
 ui = page_fillable(
-  theme = bslib::bs_theme(
-    font_scale = 0.75
-  ),
+  theme = my_theme,
   layout_sidebar(
     sidebar = the_sidebar,
     main_bit
@@ -136,6 +139,16 @@ server <- function(input, output) {
   )
 
   output$test = DT::renderDT(flow_dat_with_mk())
+
+  output$num_stations_on_plot = renderText({nrow(stations_sf_with_trend())})
+
+  output$num_stations_dec = renderText({nrow(stations_sf_with_trend() |>
+                                               filter(trend_sig %in% c('Significant Trend Earlier',
+                                                                       'Significant Trend Down')))})
+
+  output$num_stations_inc = renderText({nrow(stations_sf_with_trend() |>
+                                               filter(trend_sig %in% c('Significant Trend Later',
+                                                                       'Significant Trend Up')))})
 
   mypal = reactive({
     if(input$user_var_choice %in% date_vars){

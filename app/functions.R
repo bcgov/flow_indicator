@@ -42,12 +42,12 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
                                        'Max_7_Day','Max_7_Day_DoY'),
                            labels = c('Average \nFlow',
                                       'Date of \n50% Annual Flow',
-                                      'Minimum \nFlow (7day)\n',
-                                      'Date of \nMinimum Flow (7day)\n',
+                                      'Minimum \nFlow (7day)',
+                                      'Date of \nMinimum Flow (7day)',
                                       'Minimum \nFlow (30day)\n',
-                                      'Date of \nMinimum Flow (30day)\n',
+                                      'Date of \nMinimum Flow (30day)',
                                       'Maximum \nFlow (7day)\n',
-                                      'Date of \nMaximum Flow (7day)\n'))
+                                      'Date of \nMaximum Flow (7day)'))
 
   if(clicked_station == 'no_selection'){
     ggplot() +
