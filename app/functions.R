@@ -135,14 +135,14 @@ hydrograph_plot = function(dat, clicked_station,stations_shapefile){
       scale_colour_manual(values = c("Median Flow" = "#2d7ca1")) +
       scale_fill_manual(values = c("Range of 90% of flow" = "#ceeaed",
                                    '"Normal" range (50%) of flow' = 'lightblue')) +
-      scale_x_discrete(breaks = c(1:12), labels = month.abb[c(1:12)]) +
-      labs(y = 'Average Discharge (m<sup>3</sup>/s)',
+      scale_x_continuous(breaks = c(1:12), labels = month.abb[c(1:12)]) +
+      labs(y = 'Average <br>Discharge (m<sup>3</sup>/s)',
            x = '',
            title = '*Daily Stream or River Discharge*',
            subtitle = station_name,
            col = '',
            fill = '') +
-      theme(axis.title.y = element_markdown(size = 15),
+      theme(axis.title.y = element_markdown(size = 14),
             axis.text.y = element_text(size = 12),
             axis.text.x = element_text(size = 12),
             legend.position = 'top',

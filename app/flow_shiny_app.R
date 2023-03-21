@@ -19,7 +19,7 @@ ui = page_fillable(
   ),
   layout_sidebar(
     sidebar = the_sidebar,
-    map
+    main_bit
   )
 )
 
@@ -121,14 +121,14 @@ server <- function(input, output) {
                       slopes = senslope_dat(),
                       caption_label = date_choice_label())
   },
-  height = 300, width = 300)
+  height = 200)
 
   output$my_hydrograph = renderPlot({
     hydrograph_plot(dat = flow_dat_all,
                     clicked_station = click_station(),
                     stations_shapefile = stations_sf)
   },
-  height = 300, width = 300)
+  height = 200)
 
   output$test = DT::renderDT(flow_dat_with_mk())
 

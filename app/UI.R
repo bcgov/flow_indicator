@@ -16,14 +16,14 @@ oldest_data_filter_ui = radioButtons(
               '1990' = '1990+',
               'All' = 'all'),
   selected = 'all',
-  inline = T)
+  inline = F)
 
 timescale_ui = fluidRow(
   radioButtons(
     inputId = 'time_scale',
     label = 'Yearly or Monthly Data',
     choices = c('Annual','Monthly'),
-    inline = T,
+    inline = F,
     selected = 'Annual'),
   uiOutput('month_selector_UI')
 )
@@ -49,14 +49,8 @@ left_col = fluidRow(
 
 # Trend selection options
 trend_select_options = tagList(
-  fluidRow(
-    column(width = 6,
-           left_col
-    ),
-    column(width = 6,
-           timescale_ui
-    )
-  )
+  left_col,
+  timescale_ui
 )
 
 # station_plot = card(height = '20%',
@@ -66,23 +60,20 @@ trend_select_options = tagList(
 # )
 
 station_plot = tagList(
-  h4("Station Plot",style = 'text-align:center;'),
-  plotOutput('myplot')
+  h5("Station Plot",style = 'text-align:center;'),
+  plotOutput('myplot', height = 200)
 )
 
 hydrograph = tagList(
-  h4("Hydrograph",style = 'text-align:center;'),
-  plotOutput('my_hydrograph')
+  h5("Hydrograph",style = 'text-align:center;'),
+  plotOutput('my_hydrograph', height = 200)
 )
 
 the_sidebar = sidebar(
-  width = '40%',
-  trend_select_options,
-  tabsetPanel(
-    id = 'tabset',
-    tabPanel('Flow Metric Plot',station_plot),
-    tabPanel('Hydrograph Plot',hydrograph)
-  )
+  width = '20%',
+  # height = '100%',
+  trend_select_options#,
+  # some value panels?
 )
 
 
@@ -111,3 +102,20 @@ the_sidebar = sidebar(
 # )
 
 map = leafletOutput('leafmap',height = '550px')
+
+main_bit = tagList(
+  # fluidRow(
+  #   column(6,
+  #          station_plot
+  #          ),
+  #   column(6,
+  #          hydrograph
+  #          )
+  # ),
+  tabsetPanel(
+    id = 'tabset',
+    tabPanel(title = 'Flow Metric Plot', station_plot),
+    tabPanel(title = 'Hydrograph', hydrograph)
+  ),
+  map
+)
