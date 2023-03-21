@@ -1,5 +1,6 @@
 library(shiny)
 library(bslib)
+library(plotly)
 library(leaflet)
 library(leaflet.providers)
 library(envreportutils)
@@ -60,13 +61,13 @@ trend_select_options = tagList(
 # )
 
 station_plot = tagList(
-  h5("Station Plot",style = 'text-align:center;'),
-  plotOutput('myplot', height = 200)
+  # h5("Station Plot",style = 'text-align:center;'),
+  plotlyOutput('myplot', height = 225)
 )
 
 hydrograph = tagList(
-  h5("Hydrograph",style = 'text-align:center;'),
-  plotOutput('my_hydrograph', height = 200)
+  # h5("Hydrograph",style = 'text-align:center;'),
+  plotlyOutput('my_hydrograph', height = 225)
 )
 
 the_sidebar = sidebar(
@@ -101,7 +102,7 @@ the_sidebar = sidebar(
 #   )
 # )
 
-map = leafletOutput('leafmap',height = '550px')
+map = leafletOutput('leafmap',height = '500px')
 
 main_bit = tagList(
   # fluidRow(
@@ -112,10 +113,10 @@ main_bit = tagList(
   #          hydrograph
   #          )
   # ),
+  map,
   tabsetPanel(
     id = 'tabset',
     tabPanel(title = 'Flow Metric Plot', station_plot),
     tabPanel(title = 'Hydrograph', hydrograph)
-  ),
-  map
+  )
 )

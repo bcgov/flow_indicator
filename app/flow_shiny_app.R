@@ -113,22 +113,27 @@ server <- function(input, output) {
     )
   })
 
-  output$myplot = renderPlot({
-    station_flow_plot(data = flow_dat_chosen_var(),
+  output$myplot = renderPlotly({
+    p = station_flow_plot(data = flow_dat_chosen_var(),
                       variable_choice = input$user_var_choice,
                       clicked_station = click_station(),
                       stations_shapefile = stations_sf,
                       slopes = senslope_dat(),
                       caption_label = date_choice_label())
-  },
-  height = 200)
+    ggplotly(p)
+  }#,
+  #height = 200
+  )
 
-  output$my_hydrograph = renderPlot({
-    hydrograph_plot(dat = flow_dat_all,
+  output$my_hydrograph = renderPlotly({
+    h = hydrograph_plot(dat = flow_dat_all,
                     clicked_station = click_station(),
                     stations_shapefile = stations_sf)
-  },
-  height = 200)
+
+    ggplotly(h)
+  }#,
+  #height = 225
+  )
 
   output$test = DT::renderDT(flow_dat_with_mk())
 

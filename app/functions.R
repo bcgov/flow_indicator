@@ -40,14 +40,14 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
                                        'Min_7_Day_DoY','Min_30_Day',
                                        'Min_30_Day_DoY',
                                        'Max_7_Day','Max_7_Day_DoY'),
-                           labels = c('Average Flow',
-                                      'Date of 50% Annual Flow',
-                                      'Minimum Flow (7day)',
-                                      'Date of Minimum Flow (7day)',
-                                      'Minimum Flow (30day)',
-                                      'Date of Minimum Flow (30day)',
-                                      'Maximum Flow (7day)',
-                                      'Date of Maximum Flow (7day)'))
+                           labels = c('Average \nFlow',
+                                      'Date of \n50% Annual Flow',
+                                      'Minimum \nFlow (7day)\n',
+                                      'Date of \nMinimum Flow (7day)\n',
+                                      'Minimum \nFlow (30day)\n',
+                                      'Date of \nMinimum Flow (30day)\n',
+                                      'Maximum \nFlow (7day)\n',
+                                      'Date of \nMaximum Flow (7day)\n'))
 
   if(clicked_station == 'no_selection'){
     ggplot() +
@@ -70,7 +70,7 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
                     dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
         ggplot() +
             geom_point(aes(y = values, x = Year)) +
-            geom_line(aes(y = values, x = Year)) +
+            # geom_line(aes(y = values, x = Year)) +
             geom_line(aes(y = SlopePreds, x = Year),
                       colour = 'darkblue',
                       linetype = 1,
@@ -138,14 +138,14 @@ hydrograph_plot = function(dat, clicked_station,stations_shapefile){
       scale_x_continuous(breaks = c(1:12), labels = month.abb[c(1:12)]) +
       labs(y = 'Average <br>Discharge (m<sup>3</sup>/s)',
            x = '',
-           title = '*Daily Stream or River Discharge*',
-           subtitle = station_name,
+           # title = '*Daily Stream or River Discharge*',
+           title = station_name,
            col = '',
            fill = '') +
       theme(axis.title.y = element_markdown(size = 14),
             axis.text.y = element_text(size = 12),
             axis.text.x = element_text(size = 12),
-            legend.position = 'top',
+            # legend.position = 'top',
             plot.title = element_markdown(hjust = 0.5),
             panel.background = element_rect(fill = 'transparent'),
             panel.grid.major = element_line(colour = 'grey'))
