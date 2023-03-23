@@ -78,8 +78,8 @@ summary_boxes = tagList(
 
 # Trend selection options.
 trend_select_options = fluidRow(
-  oldest_data_filter_ui,
   varchoice_ui,
+  oldest_data_filter_ui,
   timescale_ui,
   summary_boxes
 )

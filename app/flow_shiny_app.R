@@ -22,7 +22,8 @@ ui = page_fillable(
   theme = my_theme,
   layout_sidebar(
     sidebar = the_sidebar,
-    main_bit
+    main_bit,
+    textOutput('number_rows_raw_dat')
   )
 )
 
@@ -53,6 +54,8 @@ server <- function(input, output) {
       )
     }
   })
+
+  output$number_rows_raw_dat = renderText(nrow(flow_dat_all))
 
   mk_results = reactive({
     calculate_MK_results(data = flow_dat_chosen_var(),
@@ -124,19 +127,14 @@ server <- function(input, output) {
                       slopes = senslope_dat(),
                       caption_label = date_choice_label())
     ggplotly(p)
-  }#,
-  #height = 200
-  )
+  })
 
   output$my_hydrograph = renderPlotly({
     h = hydrograph_plot(dat = flow_dat_all,
                     clicked_station = click_station(),
                     stations_shapefile = stations_sf)
-
     ggplotly(h)
-  }#,
-  #height = 225
-  )
+  })
 
   output$test = DT::renderDT(flow_dat_with_mk())
 

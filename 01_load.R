@@ -462,37 +462,22 @@ dates_custom <- tribble(
 stations_filt4 <- stations_filt3 %>%
   filter(!STATION_NUMBER %in% remove_custom$STATION_NUMBER) %>%
   left_join(dates_custom, by = "STATION_NUMBER") %>%
-  mutate(Year_from = case_when(
-    !is.na(Year_from_OLD) ~ Year_from_OLD,
-    T ~ year_min)) %>%
-  dplyr::select(-Year_from_OLD)
-  # mutate(Year_from = ifelse(is.na(Year_from), Year_from_OLD, Year_from),
-  #        Year_from = ifelse(is.na(Year_from), year_min, Year_from))# %>%
-  # select(-Year_from_OLD)
+  mutate(Year_from = ifelse(is.na(Year_from), Year_from_OLD, Year_from),
+         Year_from = ifelse(is.na(Year_from), year_min, Year_from)) %>%
+  select(-Year_from_OLD)
 
 
 # For each station, filter out big data gaps.
-stns_ann_data2 <- stations_filt4$STATION_NUMBER %>%
-    map( ~ {
-      stns_ann_data %>%
-        filter(STATION_NUMBER == .x) %>%
-        filter(Year >= stations_filt4[stations_filt4$STATION_NUMBER == .x,]$Year_from)
-    }) %>%
-  bind_rows()
+stns_ann_data2 <- bind_rows(lapply(unique(stations_filt4$STATION_NUMBER), function(i){
+  # i=stations_filt4$STATION_NUMBER[1]
+  stn_yr_from <- stations_filt4 %>% filter(STATION_NUMBER == i) %>% pull(Year_from)
 
-stns_ann_data %>%
-  count(STATION_NUMBER, sort = T)
+  stns_ann_data %>%
+    filter(STATION_NUMBER == i,
+           Year >= stn_yr_from)
 
-stns_ann_data2 %>%
-  filter(sum(!is.na(Ann_Mean)) >= min_years_allowed) %>%
-  count(STATION_NUMBER, sort = T)
-
-ggplot(stns_ann_data2, aes(Year,STATION_NUMBER, colour = Ann_Mean))+
-  geom_point()+
-  geom_vline(xintercept = max(stns_ann_data2$Year)-25-0.5, colour = "red")+
-  geom_vline(xintercept = max(stns_ann_data2$Year)-50-0.5, colour = "red")+
-  geom_vline(xintercept = max(stns_ann_data2$Year)-75-0.5, colour = "red")
-plotly::ggplotly()
+}))%>%
+  filter(sum(!is.na(Ann_Mean)) >= min_years_allowed)
 
 mapfilt4 <- sf::st_as_sf(stations_filt4 %>% select(STATION_NUMBER, LONGITUDE, LATITUDE), coords = c("LONGITUDE", "LATITUDE"),crs = 4326)
 mapview::mapview(mapfilt4)
@@ -507,7 +492,6 @@ final_stations_summary <- final_stations_table %>%
             Max_Year = max(Year),
             Total_Years = Max_Year - Min_Year +1)
 
-# rm(list=setdiff(ls(), "final_stations_table"))
 write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
 
 stations_filt4 %>% dplyr::select(STATION_NUMBER, Year_from) %>%

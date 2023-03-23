@@ -192,7 +192,7 @@ dat_combo_num = dat_combo_num %>%
          Max_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
 
 # Write out dataset at this point - data wide, unsummarised.
-write_csv(dat_combo_num,'app/www/combined_flow_dat2.csv')
+write_csv(dat_combo_num,'app/www/combined_flow_dat.csv')
 
 # Get station locations
 stations_sf = tidyhydat::hy_stations(station_number = unique(dat_combo$STATION_NUMBER)) %>%
