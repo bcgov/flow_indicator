@@ -26,7 +26,7 @@
 library(tidyverse)
 library(lubridate)
 library(tidyhydat)
-library(fasstr)
+# library(fasstr)
 library(stringr)
 
 ##### First pass to filter for stations with complete data
@@ -467,18 +467,37 @@ stations_filt4 <- stations_filt3 %>%
   select(-Year_from_OLD)
 
 
-# For each station, filter out big data gaps.
+# For each station, filter out big data gaps. Also,
+# filter out NA rows early on in each dataset.
+
 stns_ann_data2 <- bind_rows(lapply(unique(stations_filt4$STATION_NUMBER), function(i){
-  # i=stations_filt4$STATION_NUMBER[1]
+
   stn_yr_from <- stations_filt4 %>% filter(STATION_NUMBER == i) %>% pull(Year_from)
 
   stns_ann_data %>%
     filter(STATION_NUMBER == i,
-           Year >= stn_yr_from)
+           Year >= stn_yr_from) |>
+    mutate(Ann_Mean_na_as_0 = replace_na(Ann_Mean, 0)) |>
+    mutate(sum_up_to_row = cumsum(Ann_Mean_na_as_0)) |>
+    filter(sum_up_to_row > 0) |>
+    dplyr::select(-Ann_Mean_na_as_0, -sum_up_to_row)
 
 }))%>%
   filter(sum(!is.na(Ann_Mean)) >= min_years_allowed)
 
+# Modify the earliest permissible years for stations in stations_filt4, based on
+# the stns_ann_data2 table calculted above.
+stations_filt4 = stations_filt4 |>
+  left_join(
+    stns_ann_data2 |>
+      group_by(STATION_NUMBER) |>
+      summarise(min_year = min(Year))
+  ) |>
+  mutate(year_min = min_year) |>
+  mutate(n_years = year_max - year_min) |>
+  dplyr::select(-min_year)
+
+# Convert to spatial file and check out interim results.
 mapfilt4 <- sf::st_as_sf(stations_filt4 %>% select(STATION_NUMBER, LONGITUDE, LATITUDE), coords = c("LONGITUDE", "LATITUDE"),crs = 4326)
 mapview::mapview(mapfilt4)
 
@@ -494,5 +513,5 @@ final_stations_summary <- final_stations_table %>%
 
 write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
 
-stations_filt4 %>% dplyr::select(STATION_NUMBER, Year_from) %>%
+stations_filt4 %>% dplyr::select(STATION_NUMBER, year_min) %>%
   write.csv("data/station_year_trim_table.csv", row.names = F)
