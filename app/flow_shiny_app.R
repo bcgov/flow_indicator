@@ -179,13 +179,31 @@ server <- function(input, output) {
       addProviderTiles(providers$Stamen.Terrain, group = "Terrain") %>%
       add_bc_home_button() %>%
       set_bc_view() %>%
+      addPolygons(
+        group = 'Ecoprovinces',
+        fillOpacity = 0,
+        color = 'black',
+        weight = 2,
+        label = ~ stringr::str_to_title(ECOPROVINCE_NAME),
+        data = ecoprovs
+      ) |>
       addLayersControl(baseGroups = c("CartoDB","Streets","Terrain"),
+                       overlayGroups = c("Ecoprovinces"),
                        options = layersControlOptions(collapsed = F),
                        position = 'bottomright')
   })
 
   observe({
     leafletProxy("leafmap") %>%
+      clearGroup('Ecoprovinces') |>
+      addPolygons(
+        group = 'Ecoprovinces',
+        fillOpacity = 0,
+        color = 'black',
+        weight = 2,
+        label = ~ stringr::str_to_title(ECOPROVINCE_NAME),
+        data = ecoprovs
+      ) |>
       clearMarkers() %>%
       addCircleMarkers(layerId = ~STATION_NUMBER,
                        color = 'black',

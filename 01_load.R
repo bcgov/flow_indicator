@@ -515,3 +515,9 @@ write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
 
 stations_filt4 %>% dplyr::select(STATION_NUMBER, year_min) %>%
   write.csv("data/station_year_trim_table.csv", row.names = F)
+
+# Ecoprovinces
+ecoprovs = bcmaps::ecoprovinces() |> st_transform(crs = 4326) |>
+  st_simplify(dTolerance = 1000)
+sf::write_sf(ecoprovs, 'app/www/ecoprovinces.gpkg')
+

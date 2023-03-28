@@ -9,6 +9,7 @@
 # Load in data
 flow_dat_all = vroom::vroom('www/combined_flow_dat.csv')
 stations_sf = read_sf('www/stations.gpkg')
+ecoprovs = read_sf('www/ecoprovinces.gpkg')
 
 # Drop variables that do not pertain to the selected time scale.
 flow_dat = reactive({
