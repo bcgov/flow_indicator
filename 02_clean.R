@@ -40,7 +40,8 @@
     mutate(Year = lubridate::year(Date)) %>%
     mutate(Month = lubridate::month(Date))
 
-  # Take out big data gaps.
+  # Take out big data gaps. We'll use this dataset to calculate
+  # annual and monthly flow metrics.
   flow_dat = unique(flow_dat$STATION_NUMBER) %>%
     map( ~ {
       year_for_trimming = unique(station_year_trim_table[station_year_trim_table$STATION_NUMBER == .x,]$year_min)
@@ -84,16 +85,14 @@
 
     print(paste0('Working on station ',.x,'!'))
 
-    daily_flows = hy_daily_flows(station_number = c(.x)) %>%
-      filter(!is.na(Value)) %>%
-      mutate(Year = lubridate::year(Date),
-             Month = lubridate::month(Date)) %>%
-      group_by(STATION_NUMBER,Year) %>%
-      mutate(my_row = row_number()) %>%
+    daily_flows = flow_dat %>%
+      filter(STATION_NUMBER == .x) |>
+      group_by(STATION_NUMBER,Year) |>
+      mutate(my_row = row_number())  |>
       ungroup()
 
     # Summer low flows (7-day average low flow and 30-day average low flow)
-    low_daily_flows = daily_flows %>%
+    low_daily_flows = daily_flows  |>
       filter(Month %in% c(5:10))
 
     low_daily_flows_dt = data.table::data.table(low_daily_flows, key = c('STATION_NUMBER','Year'))
@@ -162,6 +161,7 @@
 
   # Do the same but by month!
 
+  ## Monthly median flow.
   monthly_mean_dat = flow_dat %>%
     mutate(Month = lubridate::month(Month, abbr = T, label = T)) %>%
     group_by(Year,Month,STATION_NUMBER) %>%
@@ -169,13 +169,52 @@
     ungroup() %>%
     pivot_wider(names_from = Month, values_from = Average, names_prefix = 'Average_')
 
+  ## Monthly 7-day average low flow
+  # 7-day and 30-day rolling averages for Low flow (flow value, day of year, Date)
+  # Note: this is SUMMER low flow (i.e. May - October)
+  low_flow_monthly_dat = stations_list %>% map( ~ {
+
+    print(paste0('Working on station ',.x,'!'))
+
+    low_daily_flows =  flow_dat %>%
+      filter(STATION_NUMBER == .x) %>%
+      group_by(STATION_NUMBER,Year,Month) %>%
+      mutate(my_row = row_number()) %>%
+      ungroup()
+
+    low_daily_flows_dt = data.table::data.table(low_daily_flows, key = c('STATION_NUMBER','Year','Month'))
+
+    low_daily_flows_dt$Min_7_Day = frollmean(low_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
+
+    min_7_day_dat = low_daily_flows_dt %>%
+      as_tibble() %>%
+      # Missing data can produce identical minimum flow values.
+      # Keep only the latest record for each such duplication.
+      filter(Min_7_Day != lead(Min_7_Day)) %>%
+      group_by(Year,Month) %>%
+      slice_min(Min_7_Day) %>%
+      group_by(Year,Month,Min_7_Day) %>%
+      slice(1) %>%
+      ungroup() %>%
+      dplyr::select(-Parameter,-Value,-Symbol, -my_row,
+                    Min_7_Day_Monthly = Min_7_Day, -Date)
+
+    min_7_day_dat
+  }) %>%
+    bind_rows()
+
+  low_flow_monthly_dat = low_flow_monthly_dat |>
+    dplyr::select(-Min_7_Day_Date_Monthly) |>
+    mutate(Month = paste0('LowFlow7_',month.abb[Month])) |>
+    pivot_wider(names_from = Month, values_from = Min_7_Day_Monthly)
   # =====================================
   # Combine annual and monthly data, let's see if that works better.
   # Split table by data type: numeric or date. Question: do we need the date vars??
 
   dat_combo = annual_flow_dat %>%
     # mutate(Month = 'All') %>%
-    left_join(monthly_mean_dat)
+    left_join(monthly_mean_dat) |>
+    left_join(low_flow_monthly_dat)
 
   # Remove Date variables. Should we keep them...? Uncertain.
   dat_combo_num = dat_combo %>%

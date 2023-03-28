@@ -38,7 +38,8 @@ server <- function(input, output) {
   observeEvent(input$time_scale, {
     if(input$time_scale == 'Monthly'){
       updateSelectizeInput(inputId = 'user_var_choice',
-                           choices = c('Average Flow' = 'Average')
+                           choices = c('Average Flow' = 'Average',
+                                       'Minimum Flow (7-day)' = 'Min_7_Day')
       )
     }
     if(input$time_scale == 'Annual'){

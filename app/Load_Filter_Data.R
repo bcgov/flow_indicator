@@ -14,17 +14,27 @@ stations_sf = read_sf('www/stations.gpkg')
 flow_dat = reactive({
   if(input$time_scale == 'Annual'){
     dat = flow_dat_all %>%
-      dplyr::select(-contains('Average_'))
+      dplyr::select(-contains('Average_'),-contains('LowFlow7_'))
   }
   if(input$time_scale == 'Monthly'){
     req(input$month_selector)
-    dat = flow_dat_all %>%
+
+    average_flows_monthly = flow_dat_all %>%
       dplyr::select(Year,STATION_NUMBER,contains('Average_')) %>%
       pivot_longer(-c(Year,STATION_NUMBER),names_to='Month',values_to='Average') %>%
       mutate(Month = str_remove(Month,'Average_')) %>%
       filter(Month == input$month_selector) %>%
       filter(!is.na(Average))
 
+    lowflows_monthly = flow_dat_all %>%
+      dplyr::select(Year,STATION_NUMBER,contains('LowFlow7_')) %>%
+      pivot_longer(-c(Year,STATION_NUMBER),names_to='Month',values_to='Min_7_Day') %>%
+      mutate(Month = str_remove(Month,'LowFlow7_')) %>%
+      filter(Month == input$month_selector) %>%
+      filter(!is.na(Min_7_Day))
+
+    dat = average_flows_monthly |>
+      full_join(lowflows_monthly)
   }
   # If the user chooses to restrict the years included in the analysis, implement here.
   if(input$user_period_choice == '2010+'){

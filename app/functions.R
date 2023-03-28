@@ -7,6 +7,7 @@ calculate_MK_results = function(data,chosen_variable,time_scale){
   if(time_scale == 'Monthly'){
     data = data |>
       group_by(STATION_NUMBER) |>
+      filter(values != 0) |>
       add_tally() |>
       filter(n >= 3)
   }
