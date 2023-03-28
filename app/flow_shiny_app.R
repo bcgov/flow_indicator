@@ -13,13 +13,18 @@
 source('UI.R')
 source('functions.R')
 
-ui = shiny::fluidPage(
-  tags$head(tags$style(
-    HTML('#trend_selector {opacity:0.5;}
-         #trend_selector:hover{opacity:0.9;}'))),
-  titlePanel("Flow Indicator"),
-  map_abs_panel,
-  trend_select_abs_panel
+my_theme = bs_theme(bootswatch = 'flatly',
+                    danger = "#cc0000",
+                    primary = '#3399ff',
+                    font_scale = 0.75)
+
+ui = page_fillable(
+  theme = my_theme,
+  layout_sidebar(
+    sidebar = the_sidebar,
+    main_bit,
+    textOutput('number_rows_raw_dat')
+  )
 )
 
 server <- function(input, output) {
@@ -50,13 +55,15 @@ server <- function(input, output) {
     }
   })
 
+  output$number_rows_raw_dat = renderText(nrow(flow_dat_all))
+
   mk_results = reactive({
     calculate_MK_results(data = flow_dat_chosen_var(),
-                         chosen_variable = input$user_var_choice)
+                         chosen_variable = input$user_var_choice,
+                         time_scale = input$time_scale)
   })
 
   flow_dat_with_mk = reactive({
-    # flow_dat() %>%
     flow_dat_chosen_var() %>%
       left_join(mk_results(), by = join_by(STATION_NUMBER))
   })
@@ -112,16 +119,34 @@ server <- function(input, output) {
     )
   })
 
-  output$myplot = renderPlot({
-    station_flow_plot(data = flow_dat_chosen_var(),
+  output$myplot = renderPlotly({
+    p = station_flow_plot(data = flow_dat_chosen_var(),
                       variable_choice = input$user_var_choice,
                       clicked_station = click_station(),
                       stations_shapefile = stations_sf,
                       slopes = senslope_dat(),
                       caption_label = date_choice_label())
+    ggplotly(p)
+  })
+
+  output$my_hydrograph = renderPlotly({
+    h = hydrograph_plot(dat = flow_dat_all,
+                    clicked_station = click_station(),
+                    stations_shapefile = stations_sf)
+    ggplotly(h)
   })
 
   output$test = DT::renderDT(flow_dat_with_mk())
+
+  output$num_stations_on_plot = renderText({nrow(stations_sf_with_trend())})
+
+  output$num_stations_dec = renderText({nrow(stations_sf_with_trend() |>
+                                               filter(trend_sig %in% c('Significant Trend Earlier',
+                                                                       'Significant Trend Down')))})
+
+  output$num_stations_inc = renderText({nrow(stations_sf_with_trend() |>
+                                               filter(trend_sig %in% c('Significant Trend Later',
+                                                                       'Significant Trend Up')))})
 
   mypal = reactive({
     if(input$user_var_choice %in% date_vars){
