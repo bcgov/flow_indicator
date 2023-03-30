@@ -1,25 +1,27 @@
 
 # Calculate Mann-Kendall trend test for data.
 calculate_MK_results = function(data,chosen_variable){
-data %>%
-  group_by(STATION_NUMBER) %>%
-  reframe(MK_results = kendallTrendTest(values ~ Year)[c('statistic','p.value','estimate')]) %>%
-  unnest(MK_results) %>%
-  unnest_longer(col = MK_results) %>%
-  group_by(STATION_NUMBER) %>%
-  mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
-  pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
-  mutate(trend_sig = fcase(
-    abs(Tau) <= 0.05 , "No Trend",
-    Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Significant Trend Earlier",
-    Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Non-Significant Trend Earlier",
-    Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Non-Significant Trend Later",
-    Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Significant Trend Later",
-    Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Down",
-    Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Down",
-    Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Up",
-    Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Up"
-  ))
+  data %>%
+    add_count(STATION_NUMBER, name = 'number_records') |>
+    filter(number_records >= 3) |>
+    group_by(STATION_NUMBER) %>%
+    reframe(MK_results = kendallTrendTest(values ~ Year)[c('statistic','p.value','estimate')]) %>%
+    unnest(MK_results) %>%
+    unnest_longer(col = MK_results) %>%
+    group_by(STATION_NUMBER) %>%
+    mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
+    pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
+    mutate(trend_sig = fcase(
+      abs(Tau) <= 0.05 , "No Trend",
+      Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Significant Trend Earlier",
+      Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Non-Significant Trend Earlier",
+      Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Non-Significant Trend Later",
+      Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Significant Trend Later",
+      Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Down",
+      Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Down",
+      Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Up",
+      Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Up"
+    ))
 }
 
 
@@ -89,7 +91,6 @@ station_hydrograph_plot = function(dat,clicked_station,stations_shapefile){
       ggthemes::theme_map()
 
   } else {
-    # browser()
     # Get station name for labelling the plot.
     station_name = unique(stations_shapefile[stations_shapefile$STATION_NUMBER == clicked_station,]$STATION_NAME)
 
@@ -114,7 +115,7 @@ station_hydrograph_plot = function(dat,clicked_station,stations_shapefile){
       scale_fill_manual(values = c("Range of 90% of flow" = "#ceeaed",
                                    '"Normal" range (50%) of flow' = 'lightblue')) +
       scale_x_continuous(breaks = c(1:12),
-                         labels = mydat$month_label[c(1:12)]) +
+                         labels = plotting_df$month_label[c(1:12)]) +
       labs(y = 'Average Discharge (m<sup>3</sup>/s)',
            x = '',
            title = '*Daily Stream or River Discharge*',
