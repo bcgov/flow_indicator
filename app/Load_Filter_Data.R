@@ -1,29 +1,20 @@
-# Workflow of filtering data as follows:
-
-# 1. Read in data => 'flow_dat_inclusive'
-# 2. Filter: annual or monthly => 'flow_dat'
-# 3. Filter: variable of choice => 'flow_dat_focused'
-# 4. Filter: recent, medium-term, or all data => 'flow_dat_filtered'
-
 
 # Load in data
-flow_dat_all = vroom::vroom('www/combined_flow_dat.csv')
+# flow_dat_all = vroom::vroom('www/combined_flow_dat.csv')
+annual_flow_dat = readRDS('www/annual_flow_dat.rds')
+monthly_flow_dat = readRDS('www/monthly_flow_dat.rds')
+hydrograph_dat = readRDS('www/hydrograph_dat.rds')
 stations_sf = read_sf('www/stations.gpkg')
 
 # Drop variables that do not pertain to the selected time scale.
 flow_dat = reactive({
   if(input$time_scale == 'Annual'){
-    dat = flow_dat_all %>%
-      dplyr::select(-contains('Average_'))
+    dat = annual_flow_dat
   }
   if(input$time_scale == 'Monthly'){
     req(input$month_selector)
-    dat = flow_dat_all %>%
-      dplyr::select(Year,STATION_NUMBER,contains('Average_')) %>%
-      pivot_longer(-c(Year,STATION_NUMBER),names_to='Month',values_to='Average') %>%
-      mutate(Month = str_remove(Month,'Average_')) %>%
-      filter(Month == input$month_selector) %>%
-      filter(!is.na(Average))
+    dat = monthly_flow_dat %>%
+      filter(Month == input$month_selector)
 
   }
   # If the user chooses to restrict the years included in the analysis, implement here.
@@ -40,7 +31,13 @@ flow_dat = reactive({
 
 flow_dat_chosen_var = reactive({
   flow_dat() %>%
-    dplyr::select(STATION_NUMBER,Year,values = !!sym(input$user_var_choice))
+    dplyr::select(STATION_NUMBER,Year,values = !!sym(input$user_var_choice)) |>
+    filter(!is.na(values))
 })
 
+hydrograph_data_station = reactive({
+  req(click_station() != 'no_selection')
+  hydrograph_dat |>
+    filter(STATION_NUMBER == click_station())
+})
 

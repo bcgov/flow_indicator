@@ -26,37 +26,48 @@ trend_select_options_tab = wellPanel(
   selectizeInput(inputId = 'user_var_choice',
                  label = 'Trend to Display',
                  choices = c('Average Flow' = 'Average',
-                             'Date of 50% Flow' = 'DoY_50pct_TotalQ',
-                             'Minimum Flow (7-day)' = 'Min_7_Day',
-                             'Date of Minimum Flow (7-day)' = 'Min_7_Day_DoY',
-                             'Minimum Flow (30-day)' = 'Min_30_Day',
-                             'Date of Minimum Flow (30-day)' = 'Min_30_Day_DoY',
-                             'Maximum Flow (7-day)' = 'Max_7_Day',
-                             'Date of Maximum Flow (7-day)' = 'Max_7_Day_DoY'),
+                             'Date of Freshet' = 'DoY_50pct_TotalQ',
+                             'Low Flow (7-day)' = 'Min_7_Day',
+                             'Date of Low Flow (7-day)' = 'Min_7_Day_DoY',
+                             'Peak Flow (7-day)' = 'Max_7_Day',
+                             'Date of Peak Flow (7-day)' = 'Max_7_Day_DoY'),
                  selected = 'Mean',
                  width = '100%'),
   radioButtons(inputId = 'user_period_choice',
-               label = 'Date Cutoff',
-               choices = c('One decade (2010 - present)' = '2010+',
-                           'Three decades (1990 - present)' = '1990+',
-                           'All available data' = 'all'),
+               label = 'Timespan for Trend Analysis',
+               choices = c('Recent (2010 - 2022)' = '2010+',
+                           'Three decades (1990 - 2022)' = '1990+',
+                           'All available years' = 'all'),
                selected = 'all',
                inline = F)
 )
 
-station_plot_tab = wellPanel(
-  plotOutput('myplot',height=225)
+# station_plot_tab = wellPanel(
+#   plotOutput('myplot', height = 300)
+# )
+
+flow_metric_plot_tab = card(
+  card_body_fillable(
+    plotOutput('myplot', height = 300)
+  )
 )
+
+hydrograph_plot_tab = card(
+  card_body_fillable(
+    plotOutput('myhydrograph', height = 300)
+  )
+)
+
 # Absolute Panel with trend selection.
 trend_select_abs_panel = absolutePanel(
   id = 'trend_selector',
-  top = 240, left = 10, width = 450, height = 550,
-  draggable = T,
+  top = 240, left = 10, width = 450, #height = 800,
+  draggable = F,
   tabsetPanel(
     id = 'tabset',
     tabPanel('Trend Options',trend_select_options_tab),
-    tabPanel('Station Plot',station_plot_tab)
-    # tabPanel('Datview',DT::DTOutput('test'))
+    tabPanel('Flow Metric Plot',flow_metric_plot_tab),
+    tabPanel('Station Hydrograph', hydrograph_plot_tab)
   )
 )
 

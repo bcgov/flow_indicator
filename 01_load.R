@@ -508,7 +508,7 @@ final_stations_summary <- final_stations_table %>%
             Total_Years = Max_Year - Min_Year +1)
 
 # rm(list=setdiff(ls(), "final_stations_table"))
-write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
+write.csv(final_stations_summary, "data/included_stations_and_years.csv", row.names = F)
 
-stations_filt4 %>% dplyr::select(STATION_NUMBER, Year_from) %>%
-  write.csv("data/station_year_trim_table.csv", row.names = F)
+# stations_filt4 %>% dplyr::select(STATION_NUMBER, Year_from) %>%
+#   write.csv("data/station_year_trim_table.csv", row.names = F)

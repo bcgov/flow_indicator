@@ -27,25 +27,24 @@ server <- function(input, output) {
   source(file.path('Load_Filter_Data.R'), local = T)$value
   source(file.path('Render_UI_elements.R'), local = T)$value
 
-  date_vars = c("Min_7_Day_DoY","DoY_50pct_TotalQ")
+  date_vars = c("Min_7_Day_DoY","Max_7_Day_DoY","DoY_50pct_TotalQ")
 
   # Update month selector to show months, if user picks month time-scale
   observeEvent(input$time_scale, {
     if(input$time_scale == 'Monthly'){
       updateSelectizeInput(inputId = 'user_var_choice',
-                           choices = c('Average Flow' = 'Average')
+                           choices = c('Average Flow' = 'Average',
+                                       "Low Flow (7-day)" = "Min_7_Day")
       )
     }
     if(input$time_scale == 'Annual'){
       updateSelectizeInput(inputId = 'user_var_choice',
                            choices = c('Average Flow' = 'Average',
-                                       'Date of 50% Flow' = 'DoY_50pct_TotalQ',
-                                       'Minimum Flow (7-day)' = 'Min_7_Day',
-                                       'Date of Minimum Flow (7-day)' = 'Min_7_Day_DoY',
-                                       'Minimum Flow (30-day)' = 'Min_30_Day',
-                                       'Date of Minimum Flow (30-day)' = 'Min_30_Day_DoY',
-                                       'Maximum Flow (7-day)' = 'Max_7_Day',
-                                       'Date of Maximum Flow (7-day)' = 'Max_7_Day_DoY')
+                                       'Date of Freshet' = 'DoY_50pct_TotalQ',
+                                       'Low Flow (7-day)' = 'Min_7_Day',
+                                       'Date of Low Flow (7-day)' = 'Min_7_Day_DoY',
+                                       'Peak Flow (7-day)' = 'Max_7_Day',
+                                       'Date of Peak Flow (7-day)' = 'Max_7_Day_DoY')
       )
     }
   })
@@ -100,7 +99,7 @@ server <- function(input, output) {
     click_station(input$leafmap_marker_click$id)
     shiny::updateTabsetPanel(
       inputId = 'tabset',
-      selected = 'Station Plot')
+      selected = 'Flow Metric Plot')
   })
 
   output$selected_station = renderText({paste0("Station: ",click_station())})
@@ -121,7 +120,12 @@ server <- function(input, output) {
                       caption_label = date_choice_label())
   })
 
-  output$test = DT::renderDT(flow_dat_with_mk())
+  output$myhydrograph = renderPlot({
+    station_hydrograph_plot(
+      dat = hydrograph_data_station(),
+      clicked_station = click_station(),
+      stations_shapefile = stations_sf)
+  })
 
   mypal = reactive({
     if(input$user_var_choice %in% date_vars){
