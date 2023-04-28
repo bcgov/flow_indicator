@@ -10,8 +10,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
-# The following script was shared with me (Chris Madsen) by its developper:
-# Jon Goetz. It uses various criteria to filter out flow recording stations of BC.
+# The following script was originally provided by Jon Goetz (Jon.Goetz@gov.bc.ca) and was
+# modified by Chris Madsen (Chris.Madsen@gov.bc.ca)
+
+# Purpose:  Script loads data and uses various criteria to filter out flow recording stations of BC.
 
 ## Station selection script
 
@@ -26,30 +28,34 @@
 library(tidyverse)
 library(lubridate)
 library(tidyhydat)
-# library(fasstr)
 library(stringr)
+
+# Set up folder structure, for intermediate data
+if(!dir.exists('data')) dir.create('data')
+
+# Set up /www folder - used for shiny app
+if(!dir.exists('app/www')) dir.create('app/www')
 
 ##### First pass to filter for stations with complete data
 
-#tidyhydat::download_hydat()
+# Complete step for first time users or if data is out-of-date
+tidyhydat::download_hydat()
 
 ## Filter stations for last n years of data, minimum number of years
 year_filt <- year(Sys.Date())-5
-n_years_filt <- 10 # will likely use >10 years in final, but this reduces number for first pass
+n_years_filt <- 10
 
 ## Get all BC stations with "flow"
 stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
                                  filter(Parameter == "Flow") %>%
                                  pull(STATION_NUMBER))
 
-## Get HYDAT data for all flow stations
-if(!dir.exists('data')) dir.create('data')
-if(!file.exists('data/hydat_daily_all.rds')){
-  hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
-  saveRDS(hydat_daily_all, file = 'data/hydat_daily_all.rds')
-}
+## Pulls HYDAT daily flow data for all BC stations that measure flow
+#  Step takes a few minutes to complete
 
-hydat_daily_all <- read_rds(file = "data/hydat_daily_all.rds")
+hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
+
+saveRDS(hydat_daily_all, file = 'data/hydat_daily_all.rds')
 
 ## Filter stations for n complete years
 stations_filt <- hydat_daily_all %>%
@@ -69,7 +75,6 @@ stations_filt <- hydat_daily_all %>%
   left_join(hy_stn_regulation(), by = "STATION_NUMBER")
 
 stations_filt_list <- unique(stations_filt$STATION_NUMBER)
-
 
 ## manual check for multiple stations on same river (choosing most downstream station)
 ## filter if station names
@@ -351,17 +356,13 @@ stations_filt3 <- stations_filt2 %>%
 
 ###### Year filtering
 
-
-# min_years_allowed <- 25
-min_years_allowed <- 10
-
 stns_ann_data <- hydat_daily_all %>%
   filter(STATION_NUMBER %in% unique(stations_filt3$STATION_NUMBER)) %>%
   mutate(Year = year(Date)) %>%
   group_by(STATION_NUMBER, Year) %>%
   summarise(Ann_Mean = mean(Value, na.rm = FALSE)) %>%
   group_by(STATION_NUMBER) %>%
-  filter(sum(!is.na(Ann_Mean)) >= min_years_allowed)
+  filter(sum(!is.na(Ann_Mean)) >= n_years_filt)
 stns_ann <- unique(stns_ann_data$STATION_NUMBER)
 ggplot(stns_ann_data, aes(Year,STATION_NUMBER, colour = Ann_Mean))+
   geom_point()
@@ -379,8 +380,6 @@ remove_custom <- tribble(
   "08MH156", "gap in 90s + 00s",
   "08HE006", "too short"
 )
-
-
 
 
 # DO THIS, THEN MAX OF THIS IS ANNUAL NA filt, NOT FINAL, JUST REMOVING OLD GAPPY DATA
@@ -483,7 +482,7 @@ stns_ann_data2 <- bind_rows(lapply(unique(stations_filt4$STATION_NUMBER), functi
     dplyr::select(-Ann_Mean_na_as_0, -sum_up_to_row)
 
 }))%>%
-  filter(sum(!is.na(Ann_Mean)) >= min_years_allowed)
+  filter(sum(!is.na(Ann_Mean)) >= n_years_filt)
 
 # Modify the earliest permissible years for stations in stations_filt4, based on
 # the stns_ann_data2 table calculted above.
@@ -501,9 +500,8 @@ stations_filt4 = stations_filt4 |>
 mapfilt4 <- sf::st_as_sf(stations_filt4 %>% select(STATION_NUMBER, LONGITUDE, LATITUDE), coords = c("LONGITUDE", "LATITUDE"),crs = 4326)
 mapview::mapview(mapfilt4)
 
-final_stations_table <- stns_ann_data2
 
-final_stations_summary <- final_stations_table %>%
+final_stations_summary <- stns_ann_data2 %>%
   filter(!is.na(Ann_Mean)) %>%
   group_by(STATION_NUMBER) %>%
   summarise(N_Years = n(),
@@ -515,9 +513,3 @@ write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
 
 stations_filt4 %>% dplyr::select(STATION_NUMBER, year_min) %>%
   write.csv("data/station_year_trim_table.csv", row.names = F)
-
-# Ecoprovinces
-ecoprovs = bcmaps::ecoprovinces() |> st_transform(crs = 4326) |>
-  st_simplify(dTolerance = 1000)
-sf::write_sf(ecoprovs, 'app/www/ecoprovinces.gpkg')
-
