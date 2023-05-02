@@ -10,20 +10,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
-# The following script was originally provided by Jon Goetz (Jon.Goetz@gov.bc.ca) and was
-# modified by Chris Madsen (Chris.Madsen@gov.bc.ca)
+# Purpose:  Script loads data and uses various criteria to filter out flow recording stations in BC.
 
-# Purpose:  Script loads data and uses various criteria to filter out flow recording stations of BC.
-
-## Station selection script
-
-# Annual Station filtering:
-# - filter all flow stations with at least 10 years of annual data
-# - filter out stations upstream of other stations on same stream
-# - filter out heavily regulated systems (interpreted)
-# Year filtering:
-# - for regulated streams, start year of regulation start (in HYDAT or interpreted)
-# - filter out years with very large data gaps before continuous data (interpreted)
 
 library(tidyverse)
 library(lubridate)
@@ -42,8 +30,8 @@ if(!dir.exists('app/www')) dir.create('app/www')
 tidyhydat::download_hydat()
 
 ## Filter stations for last n years of data, minimum number of years
-year_filt <- year(Sys.Date())-5
-n_years_filt <- 10
+year_filt <- year(Sys.Date())-5 # to select stations that are active within the last 5 years
+n_years_filt <- 10 # stations must have a minimum of 10 yrs for trending
 
 ## Get all BC stations with "flow"
 stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
@@ -56,12 +44,14 @@ stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
 hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
 ## Filter stations for n complete years
-stations_filt <- hydat_daily_all %>%
+daily_station_data <- hydat_daily_all %>%
   mutate(Year = year(Date)) %>%
   group_by(STATION_NUMBER, Year) %>%
   summarise(na = sum(is.na(Value)),
     Ann_Mean = mean(Value, na.rm = TRUE),
-    perc_daily_missing = na / 365 * 100) %>%
+    perc_daily_missing = na / 365 * 100)
+
+stations_filt <- daily_station_data |>
   group_by(STATION_NUMBER) %>%
   summarise(n_years = n(),
             incomplete_years = sum(na > 0),
@@ -75,5 +65,6 @@ stations_filt <- hydat_daily_all %>%
 stations_filt_list <- unique(stations_filt$STATION_NUMBER)
 
 saveRDS(hydat_daily_all, file = 'data/hydat_daily_all.rds')
+saveRDS(daily_station_data, file = 'data/daily_station_data.rds')
 saveRDS(stations_filt_list, file = 'data/stations_filt_list.rds')
 saveRDS(stations_filt, file = 'data/stations_filt.rds')

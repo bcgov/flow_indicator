@@ -10,7 +10,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
-library(EnvStats)
 library(tidyverse)
 library(data.table)
 library(tidyhydat)
@@ -19,6 +18,14 @@ library(sf)
 ### Load in data that was accessed in the '01_load.R' script.
 if (!exists("stations_filt_list")) load("./data/stations_filt_list.RData")
 if (!exists("stations_filt")) load("./data/stations_filt.RData")
+if (!exists("daily_station_data")) load("./data/daily_station_data.RData")
+
+# There are three main filtering/cleaning stages --------------------------
+# 1. Removing stations on the same river
+# 2. Removing regulated rivers
+# 3. Removing stations with large data gaps
+
+# 1. Filtering out stations on the same river --------
 
 ## manual check for multiple stations on same river (choosing most downstream station)
 ## filter if station names
@@ -31,17 +38,7 @@ check_dup_stations <- check_dup_all %>%
 check_dup_stations <- check_dup_all %>%
   filter(Name %in% unique(check_dup_stations$Name))
 
-  # write.csv(check_dup_stations, "station_selection/dups.csv")
-  ## Manual checking for drainage basin area size, and physical location
-  # stns_checking_stream <- check_dup_all %>%
-  #   filter(Name == toupper("SALMON RIVER"))
-  # stns_checking_sf <-  stns_checking_stream %>%
-  #   mutate(STATION= paste0(STATION_NUMBER, " - ", STATION_NAME)) %>%
-  #   select(STATION, LONGITUDE, LATITUDE) %>%
-  #   sf::st_as_sf(coords = c("LONGITUDE", "LATITUDE"),
-  #            crs = 4326)
-  # mapview::mapview(stns_checking_sf)
-
+# currently using a manual table to filter out stations on the same river, keeping downstream station
 
 stns_dup_table <- tibble::tribble(
   ~STATION_NUMBER,               ~Name,                                      ~STATION_NAME, ~STATION_KEEP, ~REP_STATION,
@@ -190,17 +187,19 @@ stn_dup_remove <- check_dup_stations %>%
   pull(STATION_NUMBER)
 
 # Remove the duplicated streams
-stations_filt2 <- stations_filt %>%
+stations_filt_streams <- stations_filt %>%
   filter(!STATION_NUMBER %in% stn_dup_remove)
 
+
+# Filtering out stations that are regulated by dams -----------------------
 
 ####### Check for station regulation (plot data and see (first pass))
 
 # Filter for regulated stations
-check_reg <- stations_filt2 %>%
+check_reg <- stations_filt %>%
   filter(REGULATED != FALSE) %>%
   select(STATION_NUMBER, STATION_NAME, "Year_from", "Year_to")
-#write.csv(check_reg %>%  select(STATION_NUMBER, STATION_NAME), "station_selection/regulated_stations.csv")
+
 
 # Manual checks on regulated stations for degree of regulation (open to interpretation)
 # STN <- "08NM232"
@@ -218,6 +217,7 @@ check_reg <- stations_filt2 %>%
 #          plot = plot_daily_stats(station_number = stn, complete_years = TRUE, add_year = 2000)[[1]]
 #   )
 # }
+# currently using a manual table to filter out regulated streams, keeping downstream station
 
 check_reg_results <- tibble::tribble(
   ~STATION_NUMBER, ~REG_KEEP, ~Year_from_REG,
@@ -312,6 +312,8 @@ stations_filt3 <- stations_filt2 %>%
               select(-Year_from_REG, -STATION_NAME), by = "STATION_NUMBER")
 
 
+# Filtering out stations with large data gaps -----------------------------
+
 ###### Year filtering
 
 stns_ann_data <- hydat_daily_all %>%
@@ -326,93 +328,6 @@ ggplot(stns_ann_data, aes(Year,STATION_NUMBER, colour = Ann_Mean))+
   geom_point()
 plotly::ggplotly()
 
-remove_custom <- tribble(
-  ~STATION_NUMBER, ~Note,
-  "08NP003", "large data gap 90s",
-  "08NM146", "large gap 90s",
-  "08NL039", "large data gap",
-  "08HB029", "gap in 90s",
-  "08EE005", "gap in 90s",
-  "08OA005", "gap in 00s",
-  "08OA004", "gap in 00s",
-  "08MH156", "gap in 90s + 00s",
-  "08HE006", "too short"
-)
-
-
-# DO THIS, THEN MAX OF THIS IS ANNUAL NA filt, NOT FINAL, JUST REMOVING OLD GAPPY DATA
-dates_custom <- tribble(
-  ~STATION_NUMBER, ~Year_from_OLD,
-  "08NN003", 1987,
-  "08NN002", 1966,
-  "08NN026", 1989,
-  "08NM037", 1964,
-  "08NM200", 2006,
-  "08NL004", 1947,
-  "08NK002", 1970,
-  "08NJ130", 1966,
-  "08NJ026", 1995,
-  "08NJ013", 1925,
-  "08NH115", 1964,
-  "08NH084", 1966,
-  "08NH016", 1979,
-  "08NH007", 1945,
-  "08NH005", 1964,
-  "08NG002", 1927,
-  "08NE039", 1949,
-  "08NE006", 1963,
-  "08ND012", 1963,
-  "08NA011", 1948,
-  "08NA006", 1974,
-  "08MH006", 1960,
-  "08MH005", 1960,
-  "08MH153", 1988,
-  "08MH147", 1992,
-  "08MH001", 1951,
-  "08MG001", 1979,
-  "08ME002", 1955,
-  "08MC045", 1998,
-  "08MA003", 1982,
-  "08LG049", 1965,
-  "08LG016", 1969,
-  "08LG008", 1970,
-  "08LF027", 1961,
-  "08LF007", 1961,
-  "08LF002", 1972,
-  "08LE077", 1977,
-  "08LE027", 1969,
-  "08LE024", 1965,
-  "08LE021", 1961,
-  "08LC039", 1975,
-  "08LC002", 1960,
-  "08LB038", 1984,
-  "08LB024", 1970,
-  "08LB020", 1952,
-  "08LA001", 1950,
-  "08KA001", 1966,
-  "08JB002", 1950,
-  "08HB032", 1986,
-  "08HB025", 1985,
-  "08HB002", 1979,
-  "08HA001", 1952,
-  "08GA022", 1955,
-  "08FA002", 1961,
-  "08EF001", 1936,
-  "08ED001", 1972,
-  "08DB001", 1956,
-  "07FD001", 1962,
-  "10CD001", 1965,
-  "10CB001", 1965,
-  "08KG001", 1970,
-  "08JE001", 1951,
-  "08HA003", 1960,
-  "08GD004", 1973,
-  "08FB006", 1973,
-  "08CG001", 1965,
-  "08CE001", 1965,
-  "07FB001", 1965,
-  "08MA001", 1954
-)
 
 # Remove stations with large recent gaps
 # add years to filter from old gappy data
