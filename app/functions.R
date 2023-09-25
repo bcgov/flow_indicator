@@ -1,4 +1,3 @@
-
 # Calculate Mann-Kendall trend test for data.
 calculate_MK_results = function(data,chosen_variable){
   data %>%
@@ -32,54 +31,54 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
                                        'Min_7_Day_DoY','Min_30_Day',
                                        'Min_30_Day_DoY',
                                        'Max_7_Day','Max_7_Day_DoY'),
-                           labels = c('Average \nFlow',
-                                      'Date of \n50% Annual Flow',
-                                      'Minimum \nFlow (7day)',
-                                      'Date of \nMinimum Flow (7day)',
-                                      'Minimum \nFlow (30day)\n',
-                                      'Date of \nMinimum Flow (30day)',
-                                      'Maximum \nFlow (7day)\n',
-                                      'Date of \nMaximum Flow (7day)'))
+                           labels = c('Average Flow',
+                                      'Date of 50% Annual Flow',
+                                      'Minimum Flow (7day)',
+                                      'Date of Minimum Flow (7day)',
+                                      'Minimum Flow (30day)',
+                                      'Date of Minimum Flow (30day)',
+                                      'Maximum Flow (7day)',
+                                      'Date of Maximum Flow (7day)'))
 
   if(clicked_station == 'no_selection'){
     ggplot() +
-        geom_text(aes(x=1,y=1,label='Click a station on the map to see its plot.')) +
-        ggthemes::theme_map()
-    } else {
+      geom_text(aes(x=1,y=1,label='Click a station on the map to see its plot.')) +
+      ggthemes::theme_map()
+  } else {
 
-      plot_units = fcase(
-        variable_choice %in% c('Average','Total_Volume_m3','Min_7_Day','Min_30_Day') , '(m<sup>3</sup>/second)',
-        variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Min_30_Day_DoY','Max_7_Day_DoY'), " "
-      )
+    plot_units = fcase(
+      variable_choice %in% c('Average','Total_Volume_m3','Min_7_Day','Min_30_Day') , '(m<sup>3</sup>/second)',
+      variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Min_30_Day_DoY','Max_7_Day_DoY'), " "
+    )
 
-      station_name = unique(stations_shapefile[stations_shapefile$STATION_NUMBER == clicked_station,]$STATION_NAME)
+    station_name = unique(stations_shapefile[stations_shapefile$STATION_NUMBER == clicked_station,]$STATION_NAME)
 
-      data %>%
-        ungroup() %>%
-        filter(STATION_NUMBER == clicked_station) %>%
-        left_join(stations_shapefile %>%
-                    st_drop_geometry() %>%
-                    dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
-        ggplot() +
-            geom_point(aes(y = values, x = Year)) +
-            geom_line(aes(y = SlopePreds, x = Year),
-                      colour = 'darkblue',
-                      linetype = 1,
-                      linewidth = 2,
-                      alpha = 0.75,
-                      data = slopes) +
-            labs(title = paste0(station_name," (",unique(clicked_station),")"),
-                 subtitle = paste0(unique(slopes$trend_sig),
-                                   " (Sen slope:",round(slopes$Slope,3),
-                                   ", p-value ~ ",round(unique(slopes$P_value),2),")"),
-                 caption = caption_label) +
-            labs(y = paste(label.frame[label.frame$varname == variable_choice,]$labels,plot_units,sep = " ")) +
-            scale_x_continuous(breaks = scales::pretty_breaks()) +
-            theme_minimal() +
-            theme(axis.title.y = element_markdown(size = 14),
-                  axis.title.x = element_text(size = 14),
-                  axis.text = element_text(size = 11))
-    }
+    data %>%
+      ungroup() %>%
+      filter(STATION_NUMBER == clicked_station) %>%
+      left_join(stations_shapefile %>%
+                  st_drop_geometry() %>%
+                  dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
+      ggplot() +
+      geom_point(aes(y = values, x = Year)) +
+      geom_line(aes(y = SlopePreds, x = Year),
+                colour = 'darkblue',
+                linetype = 1,
+                linewidth = 2,
+                alpha = 0.75,
+                data = slopes) +
+      labs(title = paste0(station_name," (",unique(clicked_station),")"),
+           subtitle = paste0(unique(slopes$trend_sig),
+                             " (Sen slope:",round(slopes$Slope,3),
+                             ", p-value ~ ",round(unique(slopes$P_value),2),")"),
+           caption = caption_label) +
+      labs(y = paste(label.frame[label.frame$varname == variable_choice,]$labels,plot_units,sep = " ")) +
+      scale_x_continuous(breaks = scales::pretty_breaks()) +
+      theme_minimal() +
+      theme(axis.title.y = element_markdown(size = 14),
+            axis.title.x = element_text(size = 14),
+            axis.text = element_text(size = 11))
+  }
 }
 
 station_hydrograph_plot = function(dat,clicked_station,stations_shapefile){
