@@ -47,13 +47,13 @@ trend_select_options_tab = wellPanel(
 # )
 
 flow_metric_plot_tab = card(
-  card_body_fillable(
+  card_body(
     plotOutput('myplot', height = 300)
   )
 )
 
 hydrograph_plot_tab = card(
-  card_body_fillable(
+  card_body(
     plotOutput('myhydrograph', height = 300)
   )
 )
