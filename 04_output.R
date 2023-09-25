@@ -11,3 +11,16 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 # Get BC header for factsheets =================================================
+
+
+
+
+
+
+
+# Write ecoprovinces -
+#to do: do we need ecoprovs?? KARLY
+
+ecoprovs = bcmaps::ecoprovinces() |> st_transform(crs = 4326) |>
+  st_simplify(dTolerance = 1000)
+sf::write_sf(ecoprovs, 'app/www/ecoprovinces.gpkg')

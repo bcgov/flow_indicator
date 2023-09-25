@@ -108,6 +108,7 @@ low_high_flow_dat = stations_to_keep %>% map( ~ {
   low_daily_flows_dt$Min_7_Day = frollmean(low_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
 
   # Convert back from data.table object to a dataframe, and clean it up.
+
   min_7_day_dat = low_daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
@@ -195,6 +196,7 @@ monthly_7day_lowflow_dat = stations_to_keep %>% map( ~ {
   low_daily_flows_dt$Min_7_Day = frollmean(low_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
 
   # Convert back from data.table object to a dataframe, and clean it up.
+  
   min_7_day_dat = low_daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
@@ -257,6 +259,7 @@ saveRDS(monthly_flow_dat,'app/www/monthly_flow_dat.rds')
 
 # Get station locations
 stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat$STATION_NUMBER)) %>%
+
   mutate(STATION_NAME = stringr::str_to_title(STATION_NAME),
          HYD_STATUS = stringr::str_to_title(HYD_STATUS)) %>%
   st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326) %>%

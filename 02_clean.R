@@ -191,7 +191,8 @@ stn_dup_remove <- check_dup_stations %>%
 
 # Remove the duplicated streams
 stations_filt <- stations_filt %>%
-  filter(!STATION_NUMBER %in% stn_dup_remove)
+
+ filter(!STATION_NUMBER %in% stn_dup_remove)
 
 
 # Filtering out stations that are regulated by dams -----------------------

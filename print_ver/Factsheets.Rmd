@@ -29,7 +29,7 @@ library(envreportutils)
 library(tidyhydat) # to access hydrometric flow database (GWELLS?)
 library(sf) # To work with spatial data (shapefiles, geopackages etc.)
 library(leaflet) # To make (interactive) maps
-library(leaflegend) # To add legend for station size based on mean flow.
+library(leaflegend) # To add legend for station size based on median flow.
 library(EnvStats) # Necessary for Mann-Kendall test
 library(data.table) # Necessary for use of fcase().
 library(gridExtra) # For making table Grob.
@@ -55,7 +55,7 @@ print_page_height = 11.69
 
 station_search_dist = 100000
 
-# How many separate bins should be used to display mean flow in leaflet map?
+# How many separate bins should be used to display median flow in leaflet map?
 number_size_classes = 4
 
 # What baselayer should we use in the leaflet map?
@@ -101,6 +101,8 @@ stations = read_sf(here::here('app','www/stations.gpkg'))
 
 districts = bcmaps::nr_districts() %>% st_transform(crs = 4326)
 
+ecos = bcmaps::ecoprovinces() |> st_transform(crs = 4326)
+
 bc = bcmaps::bc_bound() %>% st_transform(crs = 4326)
 
 ```
@@ -111,6 +113,15 @@ variable_label_df = data.frame(
   varname = c('Average','Min_7_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
   labelname = c('Average Flow','7-Day Low Flow','7-Day Low Flow Day-of-year','Date of Freshet')
 )
+
+# Reshape our dataset from wide (a column for each monthly median) to long.
+flow_dat = flow_dat |> 
+  dplyr::rename(Average_All = Average) |> 
+  pivot_longer(cols = starts_with("Average_"), 
+               values_to = 'Median',
+               names_to = 'Month') |> 
+  mutate(Month = stringr::str_remove(Month, 'Average_')) |> 
+  dplyr::distinct()
 
 # Most recent data.
 most_recent_data = paste(
@@ -170,9 +181,9 @@ make_leaflet = function(station, stations){
     )
     
   # Find which stations are close to which other stations... if within 20 km,
-    # just keep label for station with largest mean flow. The below map function
+    # just keep label for station with largest median flow. The below map function
   # uses the distance matrix from above to order 'clumped' (<= 20km) stations
-  # by their most recent year of mean flow rate to produce a list of stations
+  # by their most recent year of median flow rate to produce a list of stations
   # to NOT label.
   stations_to_not_label = map(stations_with_labels$data, ~ {
     .x %>%
@@ -187,7 +198,7 @@ make_leaflet = function(station, stations){
       # Add mean flow of last year for each nearby 'other station'
       left_join(stations_with_labels %>% st_drop_geometry() %>% dplyr::select(other_station = STATION_NUMBER, other_flow = Average),
                 by = join_by(other_station)) %>% 
-      # arrange (descending) by mean annual flow. Use this to find the largest 
+      # arrange (descending) by median annual flow. Use this to find the largest 
       # station out of any 2+ stations within 20 km of each other.
       arrange(desc(other_flow)) %>% 
       # Drop the first row (the biggest station)
@@ -225,10 +236,20 @@ make_leaflet = function(station, stations){
   station_coords = st_coordinates(stations_marked %>% 
                                     filter(focus_station=='Station of Interest')) %>% as.data.frame
 
+  # Identify which ecoprovice contains the station of interest.
+  my_ecoprovince = ecos |> 
+    st_join(stations |> filter(STATION_NUMBER == station$STATION_NUMBER), st_intersects) |>
+    filter(!is.na(STATION_NUMBER))
   
   main_leaf = leaflet(options = leafletOptions(zoomControl = FALSE)) %>% 
   addProviderTiles(leaflet_provider_choice) %>%
     removeControl(layerId = '') %>% 
+    addPolygons(
+      fillOpacity = 0,
+      color = 'black',
+      weight = 2,
+      data = my_ecoprovince
+    ) |> 
     addSymbolsSize(
       lng = ~X,
       lat = ~Y,
@@ -271,10 +292,11 @@ make_leaflet = function(station, stations){
       data = stations_marked)
   
   # Find station region. Used in creating alt text.
-  station_region = st_join(station,districts) %>% pull(DISTRICT_NAME)
-
+  # station_region = st_join(station,districts) %>% pull(DISTRICT_NAME)
+  station_ecoprovince = stringr::str_to_title(my_ecoprovince$ECOPROVINCE_NAME)
   # Establish the name and filepath to leaflet plot.
   name_of_main_leaf = paste0('mainleaf_station_',this_station$STATION_NAME,'_',this_station$STATION_NUMBER,'.png')
+  
   path_of_main_leaf = paste0(here::here(), "/print_ver/factsheet_figures/",name_of_main_leaf)
   
   #Save leaflet plot to disk. We load this back in with geom_bgimage.
@@ -295,8 +317,8 @@ make_leaflet = function(station, stations){
       ")"
     )) +
     labs(x = "", y = "",
-         alt = paste0("This station is located in the ",station_region,
-                      " and there are ",
+         alt = paste0("This station is located in the ",station_ecoprovince,
+                      " Ecoprovince, and there are ",
                       nrow(stations_marked[stations_marked$within_search_radius==T,]),
                       " stations within ",
                       station_search_dist/1000," kilometers.")) +
@@ -337,7 +359,7 @@ make_summary_table = function(dat, monthly_dat, station){
            `Station ID Number` = station$STATION_NUMBER,
            `Flow Group` = station$FlowGroup) %>% 
     mutate(Coordinates = paste0(round(st_coordinates(station),3),collapse = ', ')) %>% 
-    mutate(Region = st_join(station,districts) %>% pull(DISTRICT_NAME)) %>% 
+    mutate(Region = st_join(station,ecos) %>% pull(ECOPROVINCE_NAME)) %>% 
     # Count number of other stations within X km
     mutate(`Other Stations within x` = as.character( 
       nrow(
@@ -421,19 +443,30 @@ make_linegraph = function(dat, variable_to_plot) {
 
 make_data_histogram = function(dat){
   
+  # data_histogram = dat %>% 
+  #   filter(Month != 'All') %>%
+  #   count(Year, name = 'number_months') %>% 
+  #   # mutate(number_months = 12 - number_months) %>% 
+  #   ggplot() + 
+  #   geom_col(aes(x = Year, y = number_months),
+  #          fill = 'lightblue', col = 'transparent') + 
+  #   geom_label_repel(aes(x = Year, y = number_months,
+  #                        label = Year),
+  #                    data = . %>% filter(number_months > 0),
+  #                    nudge_y = 1) + 
+  #   scale_y_continuous(breaks = c(0,4,8,12), limits = c(0,12)) +
+  #   labs(y = "Months With Data") +
+  #   theme_minimal()
+
   data_histogram = dat %>% 
     count(Year, name = 'number_months') %>% 
     mutate(number_months = 12 - number_months) %>% 
     ggplot() + 
-    geom_col(aes(x = Year, y = number_months),
-           fill = '#BE3131', col = 'transparent') + 
-    geom_label_repel(aes(x = Year, y = number_months,
-                         label = Year),
-                     data = . %>% filter(number_months > 0),
-                     nudge_y = 1) + 
-    scale_y_continuous(breaks = c(0,4,8,12), limits = c(0,12)) +
-    labs(y = "Months Without Data") +
-    theme_minimal()
+    geom_tile(aes(x = Year, y = Month, fill = data_month),
+              col = 'white') +
+    labs(y = "Months With Data") +
+    theme_minimal() +
+    theme(legend.position = 'none')
 
   return(data_histogram)
 }
@@ -619,9 +652,6 @@ make_day_of_year_circle_plot = function(dat,variable_to_plot){
     scale_x_continuous(limits = c(0,365)) +
     scale_y_continuous(limits = c(min_year,max_year+10)) +
     theme(
-      # plot.title = element_text(colour = 'white', hjust = 0.5),
-      # plot.background = element_rect(fill = '#302e27'),
-      # panel.background = element_rect(fill = '#302e27'),
       plot.title = element_text(hjust = 0.5),
       panel.grid = element_line(colour = 'darkgrey'),
       plot.background = element_rect(fill = 'white'),
@@ -637,7 +667,7 @@ make_day_of_year_circle_plot = function(dat,variable_to_plot){
 
 Changes in the timing and volume of river flow can affect both natural ecosystems and human communities---they can affect our ability to predict and manage seasonal water resources and flood risks, and may impact natural systems that rely on natural flow patterns. Low river flows in summer may reduce the amount of water available for agriculture, hydroelectric power generation, industry and communities. Low river flows are also associated with declines in water quality and warmer water temperatures which can threaten the health of aquatic ecosystems. This indicator measures changes in timing and volume of river flow across the province over a `r max(annual_flow_dat$Year)-min(annual_flow_dat$Year)`-year period (`r oldest_data` to `r most_recent_data`).
 
--   **Long-term change in magnitude or timing of river flow has occurred at several locations in B.C.** The magnitude of flow is defined as the mean annual flow in cubic meters per second and the timing of flow is defined as the day of year by which one-half of the total annual volume of each river has passed.
+-   **Long-term change in magnitude or timing of river flow has occurred at several locations in B.C.** The magnitude of flow is defined as the median annual flow in cubic meters per second and the timing of flow is defined as the day of year by which one-half of the total annual volume of each river has passed.
 
 -   **Many factors affect trends in timing and volume of river flow.** Changes in [temperature](https://www.env.gov.bc.ca/soe/indicators/climate-change/temp.html), [precipitation](https://www.env.gov.bc.ca/soe/indicators/climate-change/precip.html), and evapotranspiration can all affect the timing and volume of river flow. Trends also depend on the location, size, elevation, and whether the river basin is predominately rainfall- or snowmelt-fed---and whether substantial glacial cover exists. Thus, trends in river timing and flows are not uniform across B.C.
 
@@ -645,7 +675,7 @@ Changes in the timing and volume of river flow can affect both natural ecosystem
 
 stations_all = stations
 
-stations = stations_all[c(1:10),]
+stations = stations_all[c(1:25),]
 
 my_progress_bar = knitrProgressBar::progress_estimated(n = nrow(stations))
 
