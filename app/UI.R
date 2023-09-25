@@ -48,40 +48,53 @@ number_stations_vb = value_box(
   span(
     textOutput('num_stations_on_plot')
   ),
-  showcase = bsicons::bs_icon("moisture", size = "300%"),
-  class = "bg-secondary"
+  selectizeInput(inputId = 'user_var_choice',
+                 label = 'Trend to Display',
+                 choices = c('Average Flow' = 'Average',
+                             'Date of Freshet' = 'DoY_50pct_TotalQ',
+                             'Low Flow (7-day)' = 'Min_7_Day',
+                             'Date of Low Flow (7-day)' = 'Min_7_Day_DoY',
+                             'Peak Flow (7-day)' = 'Max_7_Day',
+                             'Date of Peak Flow (7-day)' = 'Max_7_Day_DoY'),
+                 selected = 'Mean',
+                 width = '100%'),
+  radioButtons(inputId = 'user_period_choice',
+               label = 'Timespan for Trend Analysis',
+               choices = c('Recent (2010 - 2022)' = '2010+',
+                           'Three decades (1990 - 2022)' = '1990+',
+                           'All available years' = 'all'),
+               selected = 'all',
+               inline = F)
 )
 
-number_stations_declining = value_box(
-  "Flow Metric Shift Down/Earlier",
-  span(
-    textOutput('num_stations_dec')
-  ),
-  showcase = bsicons::bs_icon("droplet-half", size = "300%"),
-  class = 'bg-danger'
+# station_plot_tab = wellPanel(
+#   plotOutput('myplot', height = 300)
+# )
+
+flow_metric_plot_tab = card(
+  card_body(
+    plotOutput('myplot', height = 300)
+  )
 )
 
-number_stations_increasing = value_box(
-  "Flow Metric Shift Up/Later",
-  span(
-    textOutput('num_stations_inc')
-  ),
-  showcase = bsicons::bs_icon("droplet-fill", size = "300%"),
-  class = "bg-primary"
+hydrograph_plot_tab = card(
+  card_body(
+    plotOutput('myhydrograph', height = 300)
+  )
 )
 
-summary_boxes = tagList(
-  number_stations_vb,
-  number_stations_declining,
-  number_stations_increasing
-)
+# Absolute Panel with trend selection.
+trend_select_abs_panel = absolutePanel(
+  id = 'trend_selector',
+  top = 240, left = 10, width = 450, #height = 800,
+  draggable = F,
+  tabsetPanel(
+    id = 'tabset',
+    tabPanel('Trend Options',trend_select_options_tab),
+    tabPanel('Flow Metric Plot',flow_metric_plot_tab),
+    tabPanel('Station Hydrograph', hydrograph_plot_tab)
+  )
 
-# Trend selection options.
-trend_select_options = fluidRow(
-  varchoice_ui,
-  oldest_data_filter_ui,
-  timescale_ui,
-  summary_boxes
 )
 
 # station_plot = card(height = '20%',

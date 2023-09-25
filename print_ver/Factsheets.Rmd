@@ -63,24 +63,24 @@ leaflet_provider_choice = providers$Stamen.Terrain
 ```
 
 ```{r MK_test_as_function}
-mk_test = function(dat){
+mk_test = function(dat, variable){
+  # browser()
   dat %>% 
-    reframe(MK_results = kendallTrendTest(value ~ Year)[c('statistic','p.value','estimate')]) %>%
+    reframe(MK_results = kendallTrendTest(!!sym(variable) ~ Year)[c('statistic','p.value','estimate')]) %>%
     unnest(MK_results) %>%
     unnest_longer(col = MK_results) %>%
-    group_by(name) %>%
     mutate(MK_results_id = c('Statistic','P_value','Tau','Slope','Intercept')) %>%
     pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
     mutate(trend_sig = fcase(
       abs(Tau) <= 0.05 , "No Trend",
-      Tau < -0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
-      Tau < -0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
-      Tau > 0.05 & P_value >= 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
-      Tau > 0.05 & P_value < 0.05 & name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
-      Tau < -0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
-      Tau < -0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
-      Tau > 0.05 & P_value >= 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
-      Tau > 0.05 & P_value < 0.05 & (!name %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
+      Tau < -0.05 & P_value < 0.05 & variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Earlier",
+      Tau < -0.05 & P_value >= 0.05 & variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Earlier",
+      Tau > 0.05 & P_value >= 0.05 & variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Non-Significant Trend Later",
+      Tau > 0.05 & P_value < 0.05 & variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY'), "Significant Trend Later",
+      Tau < -0.05 & P_value < 0.05 & (!variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Down",
+      Tau < -0.05 & P_value >= 0.05 & (!variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Down",
+      Tau > 0.05 & P_value >= 0.05 & (!variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Non-Significant Trend Up",
+      Tau > 0.05 & P_value < 0.05 & (!variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY')), "Significant Trend Up"
     )) %>% 
     ungroup()
 }
@@ -88,7 +88,13 @@ mk_test = function(dat){
 
 ```{r load_data}
 # Load in data.
-flow_dat = read.csv(here::here('app','www/combined_flow_dat.csv')) %>% 
+annual_flow_dat = readRDS(here::here('app','www/annual_flow_dat.rds'))|>  
+  as_tibble()
+
+monthly_flow_dat = readRDS(here::here('app','www/monthly_flow_dat.rds'))|>  
+  as_tibble()
+
+hydrograph_dat = readRDS(here::here('app','www/hydrograph_dat.rds'))|>  
   as_tibble()
 
 stations = read_sf(here::here('app','www/stations.gpkg'))
@@ -104,8 +110,8 @@ bc = bcmaps::bc_bound() %>% st_transform(crs = 4326)
 ```{r calculate_constants_and_labels}
 # Pretty labels that replace the variable names in the data.
 variable_label_df = data.frame(
-  varname = c('Median','Min_7_Day','Min_30_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
-  labelname = c('Median Flow','7-Day Low Flow','30-Day Low Flow','7-Day Low Flow Day-of-year','50% Annual Flow Day-of-year')
+  varname = c('Average','Min_7_Day','Min_7_Day_DoY','DoY_50pct_TotalQ'),
+  labelname = c('Average Flow','7-Day Low Flow','7-Day Low Flow Day-of-year','Date of Freshet')
 )
 
 # Reshape our dataset from wide (a column for each monthly median) to long.
@@ -119,26 +125,24 @@ flow_dat = flow_dat |>
 
 # Most recent data.
 most_recent_data = paste(
-    flow_dat %>% filter(Year == max(flow_dat$Year)) %>% select(Month) %>% distinct() %>% tail(1),
-  max(flow_dat$Year)
+    monthly_flow_dat %>% filter(Year == max(monthly_flow_dat$Year)) %>% select(Month) %>% distinct() %>% tail(1),
+  max(monthly_flow_dat$Year)
 )
 
 # Oldest data.
 oldest_data = paste(
-  flow_dat %>% filter(Year == min(flow_dat$Year)) %>% select(Month) %>% distinct() %>% slice(2),
-  min(flow_dat$Year)
+  monthly_flow_dat %>% filter(Year == min(monthly_flow_dat$Year)) %>% select(Month) %>% distinct() %>% slice(2),
+  min(monthly_flow_dat$Year)
 )
 ```
 
-```{r add_most_recent_median_flow_to_stations}
-stations = stations %>% 
-  left_join(flow_dat %>% 
-              filter(!is.na(Median),
-                     Month == 'All') %>% 
-              group_by(STATION_NUMBER) %>% 
-              slice_max(Year) %>% 
-              ungroup() %>% 
-              dplyr::select(STATION_NUMBER,Median,Year_of_Median_Flow = Year)) 
+```{r add_most_recent_mean_flow_to_stations}
+stations = stations %>%
+  left_join(annual_flow_dat |> 
+              group_by(STATION_NUMBER) %>%
+              slice_max(Year) %>%
+              ungroup() %>%
+              dplyr::select(STATION_NUMBER,Average,Year_of_Average_Flow = Year))
 ```
 
 ```{r make_leaflet_function}
@@ -183,18 +187,16 @@ make_leaflet = function(station, stations){
   # to NOT label.
   stations_to_not_label = map(stations_with_labels$data, ~ {
     .x %>%
-    # stations_with_labels$data[1] %>% 
-    #   as.data.frame() %>% 
       #Add column identifying 'other' station for each distance measurement.
       mutate(other_station = stations_with_labels$STATION_NUMBER) %>% 
       #Add column identifying 'focal' station.
       mutate(this_station = .[.$dist_mat == 0,]$other_station) %>% 
       # Just keep stations within 20km
       filter(dist_mat <= 20000) %>% 
-      # Add median flow of last year for focal station
-      mutate(focal_st_flow = stations_with_labels[stations_with_labels$STATION_NUMBER == .[.$dist_mat == 0,]$other_station,]$Median) %>% 
-      # Add median flow of last year for each nearby 'other station'
-      left_join(stations_with_labels %>% st_drop_geometry() %>% dplyr::select(other_station = STATION_NUMBER, other_flow = Median),
+      # Add mean flow of last year for focal station
+      mutate(focal_st_flow = stations_with_labels[stations_with_labels$STATION_NUMBER == .[.$dist_mat == 0,]$other_station,]$Average) %>% 
+      # Add mean flow of last year for each nearby 'other station'
+      left_join(stations_with_labels %>% st_drop_geometry() %>% dplyr::select(other_station = STATION_NUMBER, other_flow = Average),
                 by = join_by(other_station)) %>% 
       # arrange (descending) by median annual flow. Use this to find the largest 
       # station out of any 2+ stations within 20 km of each other.
@@ -213,10 +215,10 @@ make_leaflet = function(station, stations){
   
   # Determine the breaks/bins in circle size for plotting.
   stations_marked = stations_marked %>% 
-    mutate(size_bins = cut(Median,number_size_classes,labels = F))
+    mutate(size_bins = cut(Average,number_size_classes,labels = F))
   
   size_legend_labels = tibble(
-    range = cut(stations_marked$Median,number_size_classes, dig.lab = 4) %>% 
+    range = cut(stations_marked$Average,number_size_classes, dig.lab = 4) %>% 
         levels() %>% 
         str_remove_all('\\(|\\]') %>% 
         str_replace_all(',',' - ') %>% 
@@ -263,7 +265,7 @@ make_leaflet = function(station, stations){
       data = cbind(stations_marked, st_coordinates(stations_marked))
     ) %>%
     addLegendSize(
-      title = HTML('Median Flow (m<sup>3</sup>/s)'),
+      title = HTML('Average Flow (m<sup>3</sup>/s)'),
       color = 'grey',
       values = (1:length(size_legend_labels)),
       breaks = size_legend_labels,
@@ -334,12 +336,24 @@ make_leaflet = function(station, stations){
 ```{r make_summary_table_function}
 # Create Summary Table =============
 
-make_summary_table = function(dat, station){
+make_summary_table = function(dat, monthly_dat, station){
 
-  summary_most_recent_year = dat %>% 
-    mutate(`Years of Data` = paste0(min(Year),' to ',max(Year))) %>% 
-    filter(Month == 'All') %>% 
-    slice_max(Year) %>% 
+  # Calculate the number of years included in the focal station's dataset. Also calculate
+  # proportion of those years with 12 months of data.
+  
+  number_of_years_with_data = length(unique(monthly_dat$Year))
+  total_possible_months = 12*number_of_years_with_data
+  
+  data_completeness = monthly_dat |> 
+    count(Year) |> 
+    summarise(data_completeness = 100 * (sum(n) / total_possible_months)) |>
+    mutate(data_completeness = paste0(data_completeness,'%')) |> 
+    pull(data_completeness)
+  
+  summary_most_recent_year = dat |>  
+    mutate(`Years of Data` = paste0(min(Year),' to ',max(Year))) |> 
+    mutate(`Data Completeness` = data_completeness) |> 
+    slice_max(Year) |> 
     # Spatial join with natural resource districts.
     mutate(`Station Name` = station$STATION_NAME,
            `Station ID Number` = station$STATION_NUMBER,
@@ -358,20 +372,19 @@ make_summary_table = function(dat, station){
         )-1 #The stations layer includes the focal station, so - 1.
       )
     ) %>% 
-    mutate(across(c(Median,Min_7_Day,Min_30_Day), ~ paste0(round(.x,1),' m^3/s'))) %>% 
+    mutate(across(c(Average,Min_7_Day), ~ paste0(round(.x,1),' m^3/s'))) %>% 
     dplyr::select(`Station Name`,`Station ID Number`,
-                  `Years of Data`,Coordinates,Region,
+                  `Years of Data`,`Data Completeness`,Coordinates,Region,
                   `Other Stations within x`,
-                  Median,Min_7_Day,Min_30_Day) %>% 
-    pivot_longer(cols = everything(), names_to = 'Parameter', values_to = 'Median Value') %>% 
+                  Average,Min_7_Day) %>% 
+    pivot_longer(cols = everything(), names_to = 'Parameter', values_to = 'Average Value') %>% 
     mutate(Parameter = case_when(
       Parameter == 'Median' ~ 'Median Flow',
       Parameter == 'Min_7_Day' ~ '7-Day Low Flow',
-      Parameter == 'Min_30_Day' ~ '30-Day Low Flow',
       Parameter == 'Other Stations within x' ~ paste0('Other Stations within ',station_search_dist/1000,' km'),
       T ~ Parameter
     )) %>% 
-    setNames(c('Station Information',paste0('(',max(this_dat$Year),')'), ' '))
+    setNames(c('Station Information',paste0('(',max(dat$Year),')'), ' '))
   
   summary_mry_raster = summary_most_recent_year %>% 
     flextable::flextable(cwidth = 2) %>%
@@ -391,24 +404,16 @@ make_summary_table = function(dat, station){
 ## Line graph of flow variable over time
 
 make_linegraph = function(dat, variable_to_plot) {
-  
+
   label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname 
   
-  dat_annual = dat %>% 
-    filter(Month == 'All')
-  
   # Perform Mann-Kendall trend analysis on 2010 - present data.
-  mk_results = dat_annual %>%
-    pivot_longer(-c(Year,STATION_NUMBER,Month)) %>% 
-    filter(name == variable_to_plot) %>% 
-    group_by(STATION_NUMBER,name) %>%
-    mk_test()
+  mk_results = mk_test(dat, variable_to_plot)
   
   # Join MK test results to the 2010-present day dataset.
-  mk_line = dat_annual %>%
+  mk_line = dat %>%
     dplyr::select(Year,STATION_NUMBER,all_of(variable_to_plot)) %>% 
-    cbind(mk_results %>% 
-            dplyr::select(-STATION_NUMBER)) %>% 
+    cbind(mk_results) %>% 
     group_by(Year,STATION_NUMBER) %>% 
     summarise(SlopePreds = Intercept+Slope*Year)
   
@@ -419,15 +424,10 @@ make_linegraph = function(dat, variable_to_plot) {
               col = 'darkblue',
               alpha = 0.4,
               data = mk_line) +
-    # geom_line(aes(y = .data[[variable_to_plot]], 
-    #               x = Year),
-    #           linewidth = 1,
-    #           col = 'skyblue',
-    #           data = dat_annual) +
     geom_point(aes(y = .data[[variable_to_plot]], 
                   x = Year),
               col = 'black',
-              data = dat_annual) +
+              data = dat) +
     labs(y = paste0(label," (m<sup>3</sup>/s)"),
          caption = paste0(mk_results$trend_sig, " (P-value ~ ",round(mk_results$P_value,2),")")) +
     theme_minimal() +
@@ -459,10 +459,8 @@ make_data_histogram = function(dat){
   #   theme_minimal()
 
   data_histogram = dat %>% 
-    filter(Month != 'All') %>%
-    count(Year,Month, name = 'data_month') |> 
-    mutate(Month = factor(Month, levels = month.abb)) |> 
-    mutate(Month = forcats::fct_rev(Month)) |> 
+    count(Year, name = 'number_months') %>% 
+    mutate(number_months = 12 - number_months) %>% 
     ggplot() + 
     geom_tile(aes(x = Year, y = Month, fill = data_month),
               col = 'white') +
@@ -474,6 +472,69 @@ make_data_histogram = function(dat){
 }
 ```
 
+```{r make_hydrograph}
+
+make_hydrograph = function(this_station){
+  
+  station_name = this_station$STATION_NAME
+  
+  # Pull data from tidyhydat database for our station of interest; calculate quantiles.
+  daily_flows = hy_daily_flows(this_station$STATION_NUMBER) |> 
+    filter(!is.na(Value)) |> 
+    mutate(Day = lubridate::day(Date),
+           Month = lubridate::month(Date)) |> 
+    group_by(Month, Day, STATION_NUMBER) %>%
+    reframe(percentiles = list(quantile(Value, probs = c(0.05,0.25,0.50,0.75,0.95)))) %>%
+    unnest_wider(percentiles) |>
+    dplyr::rename(five_perc = `5%`, twentyfive_perc = `25%`,
+                  median_flow = `50%`,
+                  seventyfive_perc = `75%`, ninetyfive_perc = `95%`)
+  
+  # Convert the month variable into an ordered factor such that
+  # October is the first year on the X axis (i.e. we're using the 'water calendar')
+  plotting_df = daily_flows %>%
+    ## Convert from calendar year to 'water year'
+    # Step 1. Add in 'dummy year' to facilitate plotting x axis...
+    mutate(dummy_year = 2000) |> 
+    mutate(plotting_date = lubridate::ymd(paste(dummy_year,Month,Day,sep = '-'))) |> 
+    mutate(Month = month.abb[Month]) |>
+    mutate(month_label = factor(Month, levels = c(month.abb[10:12],month.abb[1:9]))) %>%
+    arrange(month_label) |>
+    # Add labels for the ribbons we'll add to the figure.
+    mutate(median_line_label = 'Median Flow') %>%
+    mutate(fifty_pct_label = '"Normal" range (50%) of flow') %>%
+    mutate(ninety_pct_label = 'Range of 90% of flow')
+  
+  p = plotting_df %>%
+    ggplot() +
+    geom_ribbon(aes(x = plotting_date, ymin = five_perc, ymax = ninetyfive_perc, fill = ninety_pct_label)) +
+    geom_ribbon(aes(x = plotting_date, ymin = twentyfive_perc, ymax = seventyfive_perc, fill = fifty_pct_label)) +
+    geom_line(aes(x = plotting_date, y = median_flow, colour = median_line_label),
+              linewidth = 1) +
+    scale_colour_manual(values = c("Median Flow" = "#2d7ca1")) +
+    scale_fill_manual(values = c("Range of 90% of flow" = "#ceeaed",
+                                 '"Normal" range (50%) of flow' = 'lightblue')) +
+    scale_x_date(date_breaks = '1 month', date_labels = '%b') +
+    # scale_x_continuous(breaks = c(1:12),
+    #                    labels = plotting_df$month_label[c(1:12)]) +
+    labs(y = 'Average Discharge (m<sup>3</sup>/s)',
+         x = '',
+         title = '*Daily Stream or River Discharge*',
+         subtitle = station_name,
+         col = '',
+         fill = '') +
+    theme(axis.title.y = element_markdown(size = 15),
+          axis.text.y = element_text(size = 12),
+          axis.text.x = element_text(size = 12),
+          legend.position = 'top',
+          plot.title = element_markdown(hjust = 0.5),
+          panel.background = element_rect(fill = 'transparent'),
+          panel.grid.major = element_line(colour = 'grey'))
+  
+  return(p)
+}
+```
+  
 ```{r make_circle_plot_function}
 # make_circle_plot = function(dat,station,variable_to_plot){
 # 
@@ -555,7 +616,6 @@ make_day_of_year_circle_plot = function(dat,variable_to_plot){
   label = variable_label_df[variable_label_df$varname == variable_to_plot,]$labelname 
   
   plot_dat = this_dat %>%
-    filter(Month == 'All') %>%
     filter(!is.na(variable_to_plot))
   
   max_year = max(plot_dat$Year)
@@ -605,7 +665,7 @@ make_day_of_year_circle_plot = function(dat,variable_to_plot){
 
 # **Long-term Change in Timing & Volume of River Flow in B.C.**
 
-Changes in the timing and volume of river flow can affect both natural ecosystems and human communities---they can affect our ability to predict and manage seasonal water resources and flood risks, and may impact natural systems that rely on natural flow patterns. Low river flows in summer may reduce the amount of water available for agriculture, hydroelectric power generation, industry and communities. Low river flows are also associated with declines in water quality and warmer water temperatures which can threaten the health of aquatic ecosystems. This indicator measures changes in timing and volume of river flow across the province over a `r max(flow_dat$Year)-min(flow_dat$Year)`-year period (`r oldest_data` to `r most_recent_data`).
+Changes in the timing and volume of river flow can affect both natural ecosystems and human communities---they can affect our ability to predict and manage seasonal water resources and flood risks, and may impact natural systems that rely on natural flow patterns. Low river flows in summer may reduce the amount of water available for agriculture, hydroelectric power generation, industry and communities. Low river flows are also associated with declines in water quality and warmer water temperatures which can threaten the health of aquatic ecosystems. This indicator measures changes in timing and volume of river flow across the province over a `r max(annual_flow_dat$Year)-min(annual_flow_dat$Year)`-year period (`r oldest_data` to `r most_recent_data`).
 
 -   **Long-term change in magnitude or timing of river flow has occurred at several locations in B.C.** The magnitude of flow is defined as the median annual flow in cubic meters per second and the timing of flow is defined as the day of year by which one-half of the total annual volume of each river has passed.
 
@@ -619,7 +679,8 @@ stations = stations_all[c(1:25),]
 
 my_progress_bar = knitrProgressBar::progress_estimated(n = nrow(stations))
 
-for(i in 1:nrow(stations)){
+# for(i in 1:nrow(stations)){
+for(i in 1:1){
 
   # Update progress bar (helps us know how far we've gotten!)
   my_progress_bar$tick()
@@ -630,45 +691,42 @@ for(i in 1:nrow(stations)){
   this_station = stations %>% 
     filter(row_number() == i)
   
-  this_dat = flow_dat %>% 
+  this_dat_annual = annual_flow_dat |> 
     filter(STATION_NUMBER == this_station$STATION_NUMBER)
 
+  this_dat_monthly = monthly_flow_dat |> 
+    filter(STATION_NUMBER == this_station$STATION_NUMBER)
+  
+  this_hydrograph_dat = hy_daily_flows(this_station$STATION_NUMBER)
+  
   # Create page elements =======================================================
   
   main_plot = make_leaflet(station = this_station, stations = stations)
 
-  summary_table_plot = make_summary_table(dat = this_dat, station = this_station)
+  summary_table_plot = make_summary_table(dat = this_dat_annual, monthly_dat = this_dat_monthly, station = this_station)
 
-  median_flow_linegraph = make_linegraph(dat = this_dat, variable_to_plot = 'Median')
+  average_flow_linegraph = make_linegraph(dat = this_dat_annual, variable_to_plot = 'Average')
   
-  lowflow_sevenday_linegraph = make_linegraph(dat = this_dat, variable_to_plot = 'Min_7_Day')
+  lowflow_sevenday_linegraph = make_linegraph(dat = this_dat_annual, variable_to_plot = 'Min_7_Day')
   
-  dat_year_histogram = make_data_histogram(this_dat)
+  # dat_year_histogram = make_data_histogram(this_dat_monthly)
   
-  min_flow_plot = make_linegraph(this_dat, variable_to_plot = 'Min_7_Day_DoY')
+  hydrograph_plot = make_hydrograph(this_station)
   
-  half_flow_plot = make_linegraph(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
+  min_flow_plot = make_linegraph(this_dat_annual, variable_to_plot = 'Min_7_Day_DoY')
+  
+  half_flow_plot = make_linegraph(this_dat_annual, variable_to_plot = 'DoY_50pct_TotalQ')
    
-  # mean_flow_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Mean")
-  # 
-  # min_7day_circle_plot = make_circle_plot(this_dat, station = this_station, variable_to_plot = "Min_7_Day")
-  
-  min_7day_doy_circle_plot = make_day_of_year_circle_plot(this_dat, variable_to_plot = 'Min_7_Day_DoY')
-  
-  # halfflow_doy_circle_plot = make_day_of_year_circle_plot(this_dat, variable_to_plot = 'DoY_50pct_TotalQ')
   # Compose elements===================================
   
   col_one = ggarrange(
-    summary_table_plot,
-    min_7day_doy_circle_plot,
-    nrow = 2
+    summary_table_plot
   )
   
   col_two = ggarrange(
-    median_flow_linegraph,
+    average_flow_linegraph,
     lowflow_sevenday_linegraph,
-    dat_year_histogram,
-    nrow = 3
+    nrow = 2
   )
   
   # Put it all together ========================================================
@@ -680,12 +738,17 @@ for(i in 1:nrow(stations)){
       col_two,
       ncol = 2
     ),
-    nrow = 2,
-    heights = c(4,5)
+    hydrograph_plot,
+    nrow = 3,
+    heights = c(5,4,3)
   )
   
   plot(this_arranged_plot)
 }
+```
+
+```{r}
+
 ```
 
 \newpage

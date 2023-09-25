@@ -48,8 +48,9 @@ daily_station_data <- hydat_daily_all %>%
   mutate(Year = year(Date)) %>%
   group_by(STATION_NUMBER, Year) %>%
   summarise(na = sum(is.na(Value)),
-    Ann_Mean = mean(Value, na.rm = TRUE),
-    perc_daily_missing = na / 365 * 100)
+            Ann_Mean = mean(Value, na.rm = TRUE),
+            perc_daily_missing = na / 365 * 100)
+
 
 stations_filt <- daily_station_data |>
   group_by(STATION_NUMBER) %>%
