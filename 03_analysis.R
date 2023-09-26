@@ -18,7 +18,7 @@ library(data.table)
 library(tidyhydat)
 library(sf)
 
-if(!exists("final_stations_summary")){final_stations_summary = read_csv('data/included_stations_and_years.csv')}
+if(!exists("final_stations_summary")){final_stations_summary = read_csv('data/finalstns.csv')}
 
 # If no /www folder (used for the shiny app, and also for static results PDF)
 if(!dir.exists('app/www')) dir.create('app/www')
@@ -196,7 +196,7 @@ monthly_7day_lowflow_dat = stations_to_keep %>% map( ~ {
   low_daily_flows_dt$Min_7_Day = frollmean(low_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
 
   # Convert back from data.table object to a dataframe, and clean it up.
-  
+
   min_7_day_dat = low_daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
