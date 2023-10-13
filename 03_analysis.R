@@ -97,50 +97,47 @@ low_high_flow_dat = stations_to_keep %>% map( ~ {
     ungroup()
 
   # Filter for just summer months...
-  low_daily_flows = daily_flows %>%
+  daily_flows = daily_flows %>%
     filter(Month %in% c(5:10))
 
   # Use {data.table} package to convert our dataframe into a data.table object
-  low_daily_flows_dt = data.table::data.table(low_daily_flows, key = c('STATION_NUMBER','Year'))
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
 
   # Calculate the rolling average with a 'window' of 7 days, such that a given day's
   # mean flow is the average of that day plus six days LATER in the year ("align = 'right'").
-  low_daily_flows_dt$Min_7_Day = frollmean(low_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
+  daily_flows_dt$flow_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
 
   # Convert back from data.table object to a dataframe, and clean it up.
 
-  min_7_day_dat = low_daily_flows_dt %>%
+  min_7_day_dat = daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
-    filter(Min_7_Day != lead(Min_7_Day)) %>%
+    filter(flow_7_Day != lead(flow_7_Day)) %>%
     group_by(Year) %>%
-    slice_min(Min_7_Day) %>%
-    group_by(Year,Min_7_Day) %>%
+    slice_min(flow_7_Day) %>%
+    group_by(Year,flow_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_7_Day_DoY = my_row,
+                  Min_7_Day_Date = Date, Min_7_Day = flow_7_Day)
 
   summer_low_flows = min_7_day_dat %>%
     dplyr::select(STATION_NUMBER, Year, everything())
 
   # Find Peak flows (7-day average flows, could be any time of year)
-
-  high_daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
-
-  high_daily_flows_dt$Max_7_Day = frollmean(high_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
-
-  max_7_day_dat = high_daily_flows_dt %>%
+  max_7_day_dat = daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
-    filter(Max_7_Day != lead(Max_7_Day)) %>%
     group_by(Year) %>%
-    slice_max(Max_7_Day) %>%
-    group_by(Year,Max_7_Day) %>%
+    slice_max(flow_7_Day) %>%
+    group_by(Year,flow_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Month, Max_7_Day_DoY = my_row, Max_7_Day_Date = Date)
+    dplyr::select(-Parameter,-Value,-Symbol, -Month,
+                  Max_7_Day_DoY = my_row, Max_7_Day_Date = Date,
+                  Max_7_Day = flow_7_Day)
 
   summer_low_flows %>%
     left_join(max_7_day_dat,
@@ -189,25 +186,27 @@ monthly_7day_lowflow_dat = stations_to_keep %>% map( ~ {
     ungroup()
 
   # Use {data.table} package to convert our dataframe into a data.table object
-  low_daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year','Month'))
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year','Month'))
 
   # Calculate the rolling average with a 'window' of 7 days, such that a given day's
   # mean flow is the average of that day plus six days LATER in the year ("align = 'right'").
-  low_daily_flows_dt$Min_7_Day = frollmean(low_daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
+  daily_flows_dt$flow_7_Day = frollmean(daily_flows_dt[, Value], 7, align = 'right', na.rm=T)
 
   # Convert back from data.table object to a dataframe, and clean it up.
 
-  min_7_day_dat = low_daily_flows_dt %>%
+  min_7_day_dat = daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
-    filter(Min_7_Day != lead(Min_7_Day)) %>%
+    filter(flow_7_Day != lead(flow_7_Day)) %>%
     group_by(Year,Month) %>%
-    slice_min(Min_7_Day) %>%
-    group_by(Year,Month,Min_7_Day) %>%
+    slice_min(flow_7_Day) %>%
+    group_by(Year,Month,flow_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, Min_7_Day_DoY = my_row, Min_7_Day_Date = Date)
+    dplyr::select(-Parameter,-Value,-Symbol,
+                  Min_7_Day_DoY = my_row, Min_7_Day_Date = Date,
+                  Min_7_Day = flow_7_Day)
 
   min_7_day_dat %>%
     dplyr::select(STATION_NUMBER, Year, Month, everything())
