@@ -71,11 +71,11 @@ server <- function(input, output) {
                                                         'No Trend',
                                                         'Non-Significant Trend Later',
                                                         'Significant Trend Later')),
-               magnitude = factor(magnitude, levels = c("> 25% later",
-                                                        "5 - 25% later",
-                                                        "< 5% change",
+               magnitude = factor(magnitude, levels = c("> 25% earlier",
                                                         "5 - 25% earlier",
-                                                        "> 25 % earlier")))
+                                                        "< 5% change",
+                                                        "5 - 25% later",
+                                                        "> 25 % later")))
     } else {
       dat %>%
         mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
@@ -163,20 +163,20 @@ server <- function(input, output) {
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude,
-                  levels = c("> 25% later",
-                             "5 - 25% later",
-                             "< 5% change",
+                  levels = c("> 25% earlier",
                              "5 - 25% earlier",
-                             "> 25 % earlier"),
+                             "< 5% change",
+                             "5 - 25% later",
+                             "> 25 % later"),
                   ordered = T)
     } else {
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude,
-                  levels = c("> 25% increase",
-                             "5 - 25% increase",
-                             "< 5% change",
+                  levels = c("> 25% decrease",
                              "5 - 25% decrease",
-                             "> 25% decrease"),
+                             "< 5% change",
+                             "5 - 25% increase",
+                             "> 25% increase"),
                   ordered = T)
     }
   })

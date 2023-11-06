@@ -20,6 +20,18 @@ calculate_MK_results = function(data,chosen_variable){
       Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Down",
       Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Up",
       Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Up"
+    ),
+    magnitude = fcase(      
+      Slope < -0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "> 25 % earlier",
+      between(Slope, -0.25, -0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "5 - 25% earlier",
+      between(Slope, -0.05, 0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "< 5% change",
+      between(Slope, 0.05, 0.25) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "5 - 25% later",
+      Slope > 0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "> 25% later",
+      Slope < -0.25 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "> 25% decrease",
+      between(Slope, -0.25, -0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "5 - 25% decrease",
+      between(Slope, -0.05, 0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "< 5% change",
+      between(Slope, 0.05, 0.25) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "5 - 25% increase",
+      Slope > 0.25 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "> 25% increase"
     ))
 }
 
