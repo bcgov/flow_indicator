@@ -70,14 +70,24 @@ server <- function(input, output) {
                                                         'Non-Significant Trend Earlier',
                                                         'No Trend',
                                                         'Non-Significant Trend Later',
-                                                        'Significant Trend Later')))
+                                                        'Significant Trend Later')),
+               magnitude = factor(magnitude, levels = c("> 25% later",
+                                                        "5 - 25% later",
+                                                        "< 5% change",
+                                                        "5 - 25% earlier",
+                                                        "> 25 % earlier")))
     } else {
       dat %>%
         mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
                                                         'Non-Significant Trend Down',
                                                         'No Trend',
                                                         'Non-Significant Trend Up',
-                                                        'Significant Trend Up')))
+                                                        'Significant Trend Up')),
+               magnitude = factor(magnitude, levels = c("> 25% decrease",
+                                                        "5 - 25% decrease",
+                                                        "< 5% change",
+                                                        "5 - 25% increase",
+                                                        "> 25% increase")))
     }
   })
 
@@ -149,6 +159,28 @@ server <- function(input, output) {
     }
   })
 
+    mypal2 = reactive({
+    if(input$user_var_choice %in% date_vars){
+      colorFactor(palette = 'RdBu',
+                  domain = mk_results()$magnitude,
+                  levels = c("> 25% later",
+                             "5 - 25% later",
+                             "< 5% change",
+                             "5 - 25% earlier",
+                             "> 25 % earlier"),
+                  ordered = T)
+    } else {
+      colorFactor(palette = 'RdBu',
+                  domain = mk_results()$magnitude,
+                  levels = c("> 25% increase",
+                             "5 - 25% increase",
+                             "< 5% change",
+                             "5 - 25% decrease",
+                             "> 25% decrease"),
+                  ordered = T)
+    }
+  })
+
   output$leafmap <- renderLeaflet({
 
     leaflet() %>%
@@ -167,15 +199,15 @@ server <- function(input, output) {
       clearMarkers() %>%
       addCircleMarkers(layerId = ~STATION_NUMBER,
                        color = 'black',
-                       fillColor = ~mypal()(trend_sig),
+                       fillColor = ~mypal2()(magnitude),
                        radius = 8,
                        weight = 1,
                        fillOpacity = 0.75,
                        label = ~paste0(STATION_NAME, " (",STATION_NUMBER,") - ",HYD_STATUS),
                        data = stations_sf_with_trend()) %>%
       removeControl("legend") %>%
-      addLegend(pal = mypal(),
-                values = ~trend_sig,
+      addLegend(pal = mypal2(),
+                values = ~magnitude,
                 title = 'Mann-Kendall Trend Result',
                 data = stations_sf_with_trend(),
                 layerId = 'legend')
