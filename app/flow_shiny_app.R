@@ -66,28 +66,72 @@ server <- function(input, output) {
 
     if(input$user_var_choice %in% date_vars){
       dat %>%
-        mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Earlier",
-                                                        'Non-Significant Trend Earlier',
-                                                        'No Trend',
-                                                        'Non-Significant Trend Later',
-                                                        'Significant Trend Later')),
-               magnitude = factor(magnitude, levels = c("> 25% earlier",
-                                                        "5 - 25% earlier",
-                                                        "< 5% change",
-                                                        "5 - 25% later",
-                                                        "> 25 % later")))
+        # mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Earlier",
+        #                                                 'Non-Significant Trend Earlier',
+        #                                                 'No Trend',
+        #                                                 'Non-Significant Trend Later',
+        #                                                 'Significant Trend Later')),
+        #        magnitude = factor(magnitude, levels = c("> 25% earlier",
+        #                                                 "5 - 25% earlier",
+        #                                                 "< 5% change",
+        #                                                 "5 - 25% later",
+        #                                                 "> 25% later")))
+
+      # mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Earlier",
+      #                                                 'Non-Significant Trend Earlier',
+      #                                                 'No Trend',
+      #                                                 'Non-Significant Trend Later',
+      #                                                 'Significant Trend Later')),
+      #        magnitude = factor(magnitude, levels = c("Much Earlier",
+      #                                                 "Earlier",
+      #                                                 "Little Earlier",
+      #                                                 "Little Later",
+      #                                                 "Later",
+      #                                                 "Much Later")))
+
+      mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Earlier",
+                                                      'Non-Significant Trend Earlier',
+                                                      'No Trend',
+                                                      'Non-Significant Trend Later',
+                                                      'Significant Trend Later')),
+             magnitude = factor(magnitude, levels = c("Earlier",
+                                                      "Minimal Change",
+                                                      "Later")))
     } else {
       dat %>%
-        mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
-                                                        'Non-Significant Trend Down',
-                                                        'No Trend',
-                                                        'Non-Significant Trend Up',
-                                                        'Significant Trend Up')),
-               magnitude = factor(magnitude, levels = c("> 25% decrease",
-                                                        "5 - 25% decrease",
-                                                        "< 5% change",
-                                                        "5 - 25% increase",
-                                                        "> 25% increase")))
+        # mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
+        #                                                 'Non-Significant Trend Down',
+        #                                                 'No Trend',
+        #                                                 'Non-Significant Trend Up',
+        #                                                 'Significant Trend Up')),
+        #        magnitude = factor(magnitude, levels = c("> 25% decrease",
+        #                                                 "5 - 25% decrease",
+        #                                                 "< 5% change",
+        #                                                 "5 - 25% increase",
+        #                                                 "> 25% increase")))
+
+      # mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
+      #                                                 'Non-Significant Trend Down',
+      #                                                 'No Trend',
+      #                                                 'Non-Significant Trend Up',
+      #                                                 'Significant Trend Up')),
+      #        magnitude = factor(magnitude, levels = c("Strong Negative",
+      #                                                 "Negative",
+      #                                                 "Weak Negative",
+      #                                                 "Weak Positive",
+      #                                                 "Positive",
+      #                                                 "Strong Positive")))
+
+      mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Down",
+                                                      'Non-Significant Trend Down',
+                                                      'No Trend',
+                                                      'Non-Significant Trend Up',
+                                                      'Significant Trend Up')),
+             magnitude = factor(magnitude, levels = c("Strong Decrease",
+                                                      "Decrease",
+                                                      "Minimal Change",
+                                                      "Increase",
+                                                      "Strong Increase")))
     }
   })
 
@@ -159,24 +203,68 @@ server <- function(input, output) {
     }
   })
 
-    mypal2 = reactive({
+  #   mypal2 = reactive({
+  #   if(input$user_var_choice %in% date_vars){
+  #     colorFactor(palette = 'RdBu',
+  #                 domain = mk_results()$magnitude,
+  #                 levels = c("> 25% earlier",
+  #                            "5 - 25% earlier",
+  #                            "< 5% change",
+  #                            "5 - 25% later",
+  #                            "> 25% later"),
+  #                 ordered = T)
+  #   } else {
+  #     colorFactor(palette = 'RdBu',
+  #                 domain = mk_results()$magnitude,
+  #                 levels = c("> 25% decrease",
+  #                            "5 - 25% decrease",
+  #                            "< 5% change",
+  #                            "5 - 25% increase",
+  #                            "> 25% increase"),
+  #                 ordered = T)
+  #   }
+  # })
+
+  # mypal2 = reactive({
+  #   if(input$user_var_choice %in% date_vars){
+  #     colorFactor(palette = 'RdBu',
+  #                 domain = mk_results()$magnitude,
+  #                 levels = c("Much Earlier",
+  #                            "Earlier",
+  #                            "Little Earlier",
+  #                            "Little Later",
+  #                            "Later",
+  #                            "Much Later"),
+  #                 ordered = T)
+  #   } else {
+  #     colorFactor(palette = 'RdBu',
+  #                 domain = mk_results()$magnitude,
+  #                 levels = c("Strong Negative",
+  #                            "Negative",
+  #                            "Weak Negative",
+  #                            "Weak Positive",
+  #                            "Positive",
+  #                            "Strong Positive"),
+  #                 ordered = T)
+  #   }
+  # })
+
+  mypal2 = reactive({
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude,
-                  levels = c("> 25% earlier",
-                             "5 - 25% earlier",
-                             "< 5% change",
-                             "5 - 25% later",
-                             "> 25 % later"),
+                  levels = c("Earlier",
+                             "Minimal Change",
+                             "Later"),
                   ordered = T)
     } else {
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude,
-                  levels = c("> 25% decrease",
-                             "5 - 25% decrease",
-                             "< 5% change",
-                             "5 - 25% increase",
-                             "> 25% increase"),
+                  levels = c("Strong Decrease",
+                             "Decrease",
+                             "Minimal Change",
+                             "Increase",
+                             "Strong Increase"),
                   ordered = T)
     }
   })
@@ -202,7 +290,7 @@ server <- function(input, output) {
                        fillColor = ~mypal2()(magnitude),
                        radius = 8,
                        weight = 1,
-                       fillOpacity = 0.75,
+                       fillOpacity = ~significant,
                        label = ~paste0(STATION_NAME, " (",STATION_NUMBER,") - ",HYD_STATUS),
                        data = stations_sf_with_trend()) %>%
       removeControl("legend") %>%
