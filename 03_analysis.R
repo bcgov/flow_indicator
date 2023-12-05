@@ -84,7 +84,7 @@ flow_timing_dat = flow_dat %>%
 # 7-day Summer Low flow (flow value, day of year, Date)
 # Note: this is SUMMER low flow (i.e. May - October)
 
-low_high_flow_dat = stations_to_keep %>% map( ~ {
+low_high_flow_dat_7day = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
@@ -145,9 +145,71 @@ low_high_flow_dat = stations_to_keep %>% map( ~ {
 }) %>%
   bind_rows()
 
+low_high_flow_dat_3day = stations_to_keep %>% map( ~ {
+
+  # Tell us which station the map function is on...
+  print(paste0('Working on station ',.x))
+
+  # Grab daily flows for the station of interest in this iteration...
+  daily_flows = flow_dat |>
+    filter(STATION_NUMBER == .x) |>
+    group_by(STATION_NUMBER,Year) |>
+    mutate(my_row = row_number()) |>
+    ungroup()
+
+  # Filter for just summer months...
+  daily_flows = daily_flows %>%
+    filter(Month %in% c(5:10))
+
+  # Use {data.table} package to convert our dataframe into a data.table object
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year'))
+
+  # Calculate the rolling average with a 'window' of 3 days, such that a given day's
+  # mean flow is the average of that day plus six days LATER in the year ("align = 'right'").
+  daily_flows_dt$flow_3_Day = frollmean(daily_flows_dt[, Value], 3, align = 'right', na.rm=T)
+
+  # Convert back from data.table object to a dataframe, and clean it up.
+
+  min_3_day_dat = daily_flows_dt %>%
+    as_tibble() %>%
+    # Missing data can produce identical minimum flow values.
+    # Keep only the latest record for each such duplication.
+    filter(flow_3_Day != lead(flow_3_Day)) %>%
+    group_by(Year) %>%
+    slice_min(flow_3_Day) %>%
+    group_by(Year,flow_3_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_3_Day_DoY = my_row,
+                  Min_3_Day_Date = Date, Min_3_Day = flow_3_Day)
+
+  summer_low_flows = min_3_day_dat %>%
+    dplyr::select(STATION_NUMBER, Year, everything())
+
+  # Find Peak flows (3-day average flows, could be any time of year)
+  max_3_day_dat = daily_flows_dt %>%
+    as_tibble() %>%
+    # Missing data can produce identical minimum flow values.
+    # Keep only the latest record for each such duplication.
+    group_by(Year) %>%
+    slice_max(flow_3_Day) %>%
+    group_by(Year,flow_3_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol, -Month,
+                  Max_3_Day_DoY = my_row, Max_3_Day_Date = Date,
+                  Max_3_Day = flow_3_Day)
+
+  summer_low_flows %>%
+    left_join(max_3_day_dat,
+              by = join_by(STATION_NUMBER,Year))
+}) %>%
+  bind_rows()
+
 annual_flow_dat = annual_mean_dat  |>
   left_join(flow_timing_dat) |>
-  left_join(low_high_flow_dat) |>
+  left_join(low_high_flow_dat_7day) |>
+  left_join(low_high_flow_dat_3day) |>
   dplyr::select(-ends_with("_Date"))
 
 
@@ -213,6 +275,46 @@ monthly_7day_lowflow_dat = stations_to_keep %>% map( ~ {
 }) %>%
   bind_rows()
 
+monthly_3day_lowflow_dat = stations_to_keep %>% map( ~ {
+
+  # Tell us which station the map function is on...
+  print(paste0('Working on station ',.x))
+
+  # Grab daily flows for the station of interest in this iteration...
+  daily_flows = flow_dat |>
+    filter(STATION_NUMBER == .x) |>
+    group_by(STATION_NUMBER,Year,Month) |>
+    mutate(my_row = row_number()) |>
+    ungroup()
+
+  # Use {data.table} package to convert our dataframe into a data.table object
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year','Month'))
+
+  # Calculate the rolling average with a 'window' of 3 days, such that a given day's
+  # mean flow is the average of that day plus six days LATER in the year ("align = 'right'").
+  daily_flows_dt$flow_3_Day = frollmean(daily_flows_dt[, Value], 3, align = 'right', na.rm=T)
+
+  # Convert back from data.table object to a dataframe, and clean it up.
+
+  min_3_day_dat = daily_flows_dt %>%
+    as_tibble() %>%
+    # Missing data can produce identical minimum flow values.
+    # Keep only the latest record for each such duplication.
+    filter(flow_3_Day != lead(flow_3_Day)) %>%
+    group_by(Year,Month) %>%
+    slice_min(flow_3_Day) %>%
+    group_by(Year,Month,flow_3_Day) %>%
+    slice(1) %>%
+    ungroup() %>%
+    dplyr::select(-Parameter,-Value,-Symbol,
+                  Min_3_Day_DoY = my_row, Min_3_Day_Date = Date,
+                  Min_3_Day = flow_3_Day)
+
+  min_3_day_dat %>%
+    dplyr::select(STATION_NUMBER, Year, Month, everything())
+}) %>%
+  bind_rows()
+
 # Combine these monthly datasets into 2 files:
 ## 1. Average flow + low flow (metrics for the app).
 ## 2. Average flow + quantiles (needed for hydrograph)
@@ -220,6 +322,8 @@ monthly_7day_lowflow_dat = stations_to_keep %>% map( ~ {
 monthly_flow_dat = monthly_mean_dat |>
   left_join(monthly_7day_lowflow_dat |>
               dplyr::select(-Min_7_Day_DoY)) |>
+  left_join(monthly_3day_lowflow_dat |>
+              dplyr::select(-Min_3_Day_DoY)) |>
   mutate(Month = month.abb[Month]) |>
   dplyr::rename('Average' = median_flow) |>
   dplyr::select(-ends_with("_Date"))
