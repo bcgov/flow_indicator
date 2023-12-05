@@ -35,6 +35,7 @@ calculate_MK_results = function(data,chosen_variable){
     group_by(direction) %>%
     mutate(bins = chop_equally(Slope,
                              groups = 3))%>%
+    ungroup() %>%
     mutate(trend_sig = fcase(
       abs(Tau) <= 0.05 , "No Trend",
       Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Significant Trend Earlier",
@@ -46,20 +47,6 @@ calculate_MK_results = function(data,chosen_variable){
       Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Non-Significant Trend Up",
       Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Up"
     ),
-    # magnitude = fcase(
-    #   bins == levels(bins)[1] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Strong Negative",
-    #   bins == levels(bins)[2] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Negative",
-    #   bins == levels(bins)[3] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Weak Negative",
-    #   bins == levels(bins)[4] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Weak Positive",
-    #   bins == levels(bins)[5] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Positive",
-    #   bins == levels(bins)[6] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Strong Positive",
-    #   bins == levels(bins)[1] & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Much Earlier",
-    #   bins == levels(bins)[2] & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Earlier",
-    #   bins == levels(bins)[3] & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Little Earlier",
-    #   bins == levels(bins)[4] & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Little Later",
-    #   bins == levels(bins)[5] & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Later",
-    #   bins == levels(bins)[6] & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Much Later"
-    # ),
     magnitude = fcase(
       bins == levels(bins)[1] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Strong Decrease",
       bins == levels(bins)[2] & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Decrease",
@@ -69,6 +56,18 @@ calculate_MK_results = function(data,chosen_variable){
       bins %in% c(levels(bins)[1],levels(bins)[2]) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Earlier",
       bins %in% c(levels(bins)[3],levels(bins)[4]) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Minimal Change",
       bins %in% c(levels(bins)[5],levels(bins)[6]) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "Later"
+    ),
+    magnitude_fixed = fcase(
+            Slope < -0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "> 25% earlier",
+            between(Slope, -0.25, -0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "5 - 25% earlier",
+            between(Slope, -0.05, 0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "< 5% change",
+            between(Slope, 0.05, 0.25) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "5 - 25% later",
+            Slope > 0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "> 25% later",
+            Slope < -0.25 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "> 25% decrease",
+            between(Slope, -0.25, -0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "5 - 25% decrease",
+            between(Slope, -0.05, 0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "< 5% change",
+            between(Slope, 0.05, 0.25) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "5 - 25% increase",
+            Slope > 0.25 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "> 25% increase"
     ),
     significant = case_when(P_value <=0.05~ 1,
                             .default = 0.1))
@@ -98,16 +97,7 @@ calculate_MK_results = function(data,chosen_variable){
 #       Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "Significant Trend Up"
 #     ),
 #     magnitude = fcase(
-#       Slope < -0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "> 25% earlier",
-#       between(Slope, -0.25, -0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "5 - 25% earlier",
-#       between(Slope, -0.05, 0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "< 5% change",
-#       between(Slope, 0.05, 0.25) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "5 - 25% later",
-#       Slope > 0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY'), "> 25% later",
-#       Slope < -0.25 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "> 25% decrease",
-#       between(Slope, -0.25, -0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "5 - 25% decrease",
-#       between(Slope, -0.05, 0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "< 5% change",
-#       between(Slope, 0.05, 0.25) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "5 - 25% increase",
-#       Slope > 0.25 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY')), "> 25% increase"
+
 #     ),
 #     significant = case_when(P_value <=0.05~ 1,
 #                             .default = 0.1))
