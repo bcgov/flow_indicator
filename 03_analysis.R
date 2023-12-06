@@ -39,7 +39,14 @@ flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
   filter(Parameter == 'Flow') %>%
   filter(!is.na(Value)) %>%
   mutate(Year = lubridate::year(Date)) %>%
-  mutate(Month = lubridate::month(Date))
+  mutate(Month = lubridate::month(Date)) %>%
+  mutate(decade = floor(Year/10)*10)
+
+n_years_decade = flow_dat %>%
+  group_by(STATION_NUMBER, decade) %>%
+  filter(decade<2020) %>%
+  summarise(n_years = length(unique(Year)))
+
 
 # Take out big data gaps. This map function cycles through our station numbers,
 # identifying the new start year, if any (e.g. a station might have one year of
