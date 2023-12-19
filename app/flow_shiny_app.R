@@ -29,6 +29,12 @@ server <- function(input, output) {
 
   date_vars = c("Min_7_Day_DoY","Max_7_Day_DoY","Min_3_Day_DoY","Max_3_Day_DoY","DoY_50pct_TotalQ")
 
+  recent_stations = annual_flow_dat %>%
+    group_by(STATION_NUMBER) %>%
+    summarise(minYear = min(Year)) %>%
+    filter(minYear>=1990) %>%
+    pull(STATION_NUMBER)
+
   # Update month selector to show months, if user picks month time-scale
   observeEvent(input$time_scale, {
     if(input$time_scale == 'Monthly'){
@@ -69,6 +75,13 @@ server <- function(input, output) {
     dat = stations_sf %>%
       left_join(mk_results(), by = join_by(STATION_NUMBER))
 
+    if(input$recent == FALSE){
+      dat = dat %>%
+        filter(!(STATION_NUMBER %in% recent_stations))
+    }
+    else{
+      dat = dat
+    }
     if(input$user_var_choice %in% date_vars){
       dat %>%
         mutate(trend_sig = factor(trend_sig, levels = c("Significant Trend Earlier",
