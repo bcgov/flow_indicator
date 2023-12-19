@@ -39,13 +39,53 @@ flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
   filter(Parameter == 'Flow') %>%
   filter(!is.na(Value)) %>%
   mutate(Year = lubridate::year(Date)) %>%
-  mutate(Month = lubridate::month(Date)) %>%
-  mutate(decade = floor(Year/10)*10)
+  mutate(Month = lubridate::month(Date))
 
 n_years_decade = flow_dat %>%
-  group_by(STATION_NUMBER, decade) %>%
+  mutate(decade = floor(Year/10)*10) %>%
+  group_by(STATION_NUMBER, decade)  %>%
   filter(decade<2020) %>%
   summarise(n_years = length(unique(Year)))
+
+test_filter = flow_dat  %>%
+  mutate(decade = floor(Year/10)*10) %>%
+  group_by(STATION_NUMBER, decade) %>%
+  summarise(n_years = length(unique(Year))) %>%
+  mutate(n_decades = length(unique(decade)),
+         span = (max(decade)+10 - min(decade))/10,
+         diff = span - n_decades)
+
+test = flow_dat %>%
+  mutate(decade = floor(Year/10)*10) %>%
+  select(STATION_NUMBER, Year, decade) %>%
+  distinct() %>%
+  group_by(STATION_NUMBER) %>%
+  complete(Year = min(Year):max(Year)) %>%
+  mutate(include = case_when(is.na(decade)~ 0,
+                             .default = 1)) %>%
+  mutate(cumsum = cumsum(include))
+
+ggplot(test) +
+  geom_line(aes(x = Year, y = cumsum, col = STATION_NUMBER)) +
+  theme(legend.position = "none")
+
+ test = test %>%
+  group_by(STATION_NUMBER, cumsum) %>%
+  mutate(n = n()) %>%
+  filter(n<10)
+
+ test.plot = test %>%
+  ggplot() +
+  geom_line(aes(x = Year, y = cumsum, col = STATION_NUMBER)) +
+  theme(legend.position = "none")
+
+
+test.plot
+
+flow_dat_filtered = flow_dat %>%
+  left_join(test, by = c("STATION_NUMBER", "Year")) %>%
+  filter(!is.na(cumsum))
+
 
 
 # Take out big data gaps. This map function cycles through our station numbers,
