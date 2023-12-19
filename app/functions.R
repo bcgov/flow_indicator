@@ -113,20 +113,14 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
 
     station_name = unique(stations_shapefile[stations_shapefile$STATION_NUMBER == clicked_station,]$STATION_NAME)
 
-    data %>%
+    plot = data %>%
       ungroup() %>%
       filter(STATION_NUMBER == clicked_station) %>%
       left_join(stations_shapefile %>%
                   st_drop_geometry() %>%
                   dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
       ggplot() +
-      geom_point(aes(y = values, x = Year)) +
-      geom_line(aes(y = SlopePreds, x = Year),
-                colour = 'darkblue',
-                linetype = 1,
-                linewidth = 2,
-                alpha = 0.75,
-                data = slopes) +
+      geom_point(aes(y = values, x = Year))  +
       labs(title = paste0(station_name," (",unique(clicked_station),")"),
            subtitle = paste0(unique(slopes$trend_sig),
                              " (Sen slope:",round(slopes$Slope,3),
@@ -138,6 +132,19 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
       theme(axis.title.y = element_markdown(size = 14),
             axis.title.x = element_text(size = 14),
             axis.text = element_text(size = 11))
+
+    if(round(unique(slopes$P_value),2)<=0.05) {
+      plot +
+        geom_line(aes(y = SlopePreds, x = Year),
+                  colour = 'darkblue',
+                  linetype = 1,
+                  linewidth = 2,
+                  alpha = 0.75,
+                  data = slopes)
+    }
+    else{
+    plot
+    }
   }
 }
 
