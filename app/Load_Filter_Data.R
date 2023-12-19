@@ -17,9 +17,9 @@ flow_dat = reactive({
 
   }
   # If the user chooses to restrict the years included in the analysis, implement here.
-  if(input$user_period_choice == '2010+'){
-    return(dat %>% filter(Year >= 2010))
-  }
+  # if(input$user_period_choice == '2010+'){
+  #   return(dat %>% filter(Year >= 2010))
+  # }
   if(input$user_period_choice == '1990+'){
     return(dat %>% filter(Year >= 1990))
   }
