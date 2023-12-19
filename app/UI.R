@@ -37,13 +37,23 @@ trend_select_options_tab = wellPanel(
                              'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY'),
                  selected = 'Mean',
                  width = '100%'),
-  radioButtons(inputId = 'user_period_choice',
-               label = 'Timespan for Trend Analysis',
-               choices = c('Recent (2010 - 2022)' = '2010+',
-                           'Three decades (1990 - 2022)' = '1990+',
-                           'All available years' = 'all'),
-               selected = 'all',
-               inline = F)
+  fluidRow(
+    column(width = 7,
+           radioButtons(inputId = 'user_period_choice',
+                        label = 'Timespan for Trend Analysis',
+                        choices = c(
+                          # 'Recent (2010 - 2022)' = '2010+',
+                                    'Three decades (1990 - 2022)' = '1990+',
+                                    'All available years' = 'all'),
+                        selected = 'all',
+                        inline = F)
+    ),
+    column(width = 5,
+           checkboxInput(inputId = 'recent',
+                         label = ' Include recently installed stations (1990+)',
+                         value = FALSE)
+    )
+  )
 )
 
 # station_plot_tab = wellPanel(
