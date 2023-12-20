@@ -50,8 +50,11 @@ trend_select_options_tab = wellPanel(
     ),
     column(width = 5,
            checkboxInput(inputId = 'recent',
-                         label = ' Include recently installed stations (1990+)',
-                         value = FALSE)
+                         label = 'Include recently installed stations (1990+)',
+                         value = FALSE),
+           checkboxInput(inputId = 'upstream',
+                         label = 'Include upstream stations',
+                         value = F)
     )
   )
 )
@@ -75,7 +78,7 @@ hydrograph_plot_tab = card(
 # Absolute Panel with trend selection.
 trend_select_abs_panel = absolutePanel(
   id = 'trend_selector',
-  top = 240, left = 10, width = 450, #height = 800,
+  top = 220, left = 10, width = 450, #height = 800,
   draggable = F,
   tabsetPanel(
     id = 'tabset',
