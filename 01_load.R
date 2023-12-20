@@ -27,7 +27,7 @@ if(!dir.exists('app/www')) dir.create('app/www')
 ##### First pass to filter for stations with complete data
 
 # Complete step for first time users or if data is out-of-date
-tidyhydat::download_hydat()
+# tidyhydat::download_hydat()
 
 ## Filter stations for last n years of data, minimum number of years
 year_filt <- year(Sys.Date())-5 # to select stations that are active within the last 5 years
@@ -43,13 +43,18 @@ stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
 
 hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
-## Filter stations for n complete years
+## Filter stations for n complete years - use water years
+hydat_daily_all = hydat_daily_all %>%
+  mutate(sYear = case_when(month(Date) >= 10 ~ year(Date),
+                               month(Date) < 10 ~ year(Date) - 1),
+         Year = year(Date))
+
 daily_station_data <- hydat_daily_all %>%
-  mutate(Year = year(Date)) %>%
-  group_by(STATION_NUMBER, Year) %>%
+  group_by(STATION_NUMBER, sYear) %>%
   summarise(na = sum(is.na(Value)),
             Ann_Mean = mean(Value, na.rm = TRUE),
-            perc_daily_missing = na / 365 * 100)
+            perc_daily_missing = na / 365 * 100) %>%
+  rename(Year = sYear)
 
 
 stations_filt <- daily_station_data |>
