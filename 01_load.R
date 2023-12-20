@@ -45,16 +45,17 @@ hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
 ## Filter stations for n complete years - use water years
 hydat_daily_all = hydat_daily_all %>%
-  mutate(sYear = case_when(month(Date) >= 10 ~ year(Date),
+  mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
                                month(Date) < 10 ~ year(Date) - 1),
+         lfYear = case_when(month(Date) >=4 ~ year(Date),
+                            month(Date) < 4 ~ year(Date +1)),
          Year = year(Date))
 
 daily_station_data <- hydat_daily_all %>%
-  group_by(STATION_NUMBER, sYear) %>%
+  group_by(STATION_NUMBER, Year) %>%
   summarise(na = sum(is.na(Value)),
             Ann_Mean = mean(Value, na.rm = TRUE),
-            perc_daily_missing = na / 365 * 100) %>%
-  rename(Year = sYear)
+            perc_daily_missing = na / 365 * 100)
 
 
 stations_filt <- daily_station_data |>
