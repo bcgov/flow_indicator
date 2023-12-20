@@ -191,8 +191,9 @@ stn_dup_remove <- check_dup_stations %>%
 
 # Remove the duplicated streams
 stations_filt <- stations_filt %>%
-
- filter(!STATION_NUMBER %in% stn_dup_remove)
+  mutate(keep_dup = case_when(STATION_NUMBER %in% stn_dup_remove ~ FALSE,
+                              .default = TRUE)) #%>%
+ # filter(keep_dup)
 
 
 # Filtering out stations that are regulated by dams -----------------------
@@ -311,7 +312,9 @@ stn_reg_remove <- check_reg_results %>%
 # Filter and add years of regulated to filter
 stations_filt <- stations_filt %>%
   select(-Year_to, -Year_from) %>%
-  filter(!STATION_NUMBER %in% stn_reg_remove) %>%
+  mutate(keep_reg = case_when(STATION_NUMBER %in% stn_reg_remove~ FALSE,
+                              .default = TRUE)) %>%
+  filter(keep_reg) %>%
   left_join(check_reg_results %>%
               select(-Year_from_REG, -STATION_NAME), by = "STATION_NUMBER")
 
@@ -323,8 +326,7 @@ n_years_filt = 10
 
 stns_ann_data <- hydat_daily_all %>%
   filter(STATION_NUMBER %in% unique(stations_filt$STATION_NUMBER)) %>%
-  mutate(Year = year(Date)) %>%
-  group_by(STATION_NUMBER, Year) %>%
+  group_by(STATION_NUMBER, sYear) %>%
   summarise(Ann_Mean = mean(Value, na.rm = FALSE)) %>%
   group_by(STATION_NUMBER) %>%
   filter(sum(!is.na(Ann_Mean)) >= n_years_filt) |>
@@ -371,7 +373,7 @@ stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
 
   stns_ann_data %>%
     dplyr::filter(STATION_NUMBER == .x,
-           Year >= stn_yr_from) |>
+           sYear >= stn_yr_from) |>
     dplyr::mutate(Ann_Mean_na_as_0 = tidyr::replace_na(Ann_Mean, 0)) |>
     dplyr::mutate(sum_up_to_row = cumsum(Ann_Mean_na_as_0)) |>
     dplyr::filter(sum_up_to_row > 0) |>
@@ -379,7 +381,8 @@ stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
 }) |>
   dplyr::bind_rows() |>
   # Reapply the n years filter number once we've trimmed out big data gaps!
-  dplyr::filter(sum(!is.na(Ann_Mean)) >= n_years_filt)
+  dplyr::filter(sum(!is.na(Ann_Mean)) >= n_years_filt) %>%
+  left_join(stations_filt %>% select(STATION_NUMBER, keep_dup))
 
 # # Modify the earliest permissible years for stations in stations_filt, based on
 # # the stns_ann_data2 table calculated above.
@@ -398,12 +401,14 @@ stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
 # mapview::mapview(mapfilt4)
 
 final_stations_summary <- stns_ann_data2 %>%
+  rename(Year = sYear) %>%
   filter(!is.na(Ann_Mean)) %>%
   group_by(STATION_NUMBER) %>%
   summarise(N_Years = n(),
             Min_Year = min(Year),
             Max_Year = max(Year),
-            Total_Years = Max_Year - Min_Year +1)
+            Total_Years = Max_Year - Min_Year +1,
+            keep = unique(keep_dup))
 
 write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
 
