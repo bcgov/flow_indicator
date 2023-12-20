@@ -36,9 +36,10 @@ stations_to_keep = final_stations_summary$STATION_NUMBER
 # Note: this includes 'gappy' data we identified in script 1.
 # ~5 million rows, 7 columns.
 flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
+  mutate(Year = case_when(month(Date) >= 10 ~ year(Date),
+                           month(Date) < 10 ~ year(Date) - 1)) %>%
   filter(Parameter == 'Flow') %>%
   filter(!is.na(Value)) %>%
-  mutate(Year = lubridate::year(Date)) %>%
   mutate(Month = lubridate::month(Date))
 
 n_years_decade = flow_dat %>%
@@ -413,6 +414,7 @@ stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat$STA
   mutate(STATION_NAME = stringr::str_to_title(STATION_NAME),
          HYD_STATUS = stringr::str_to_title(HYD_STATUS)) %>%
   st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326) %>%
-  dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS)
+  dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS) %>%
+  left_join(final_stations_summary)
 
 write_sf(stations_sf, 'app/www/stations.gpkg')
