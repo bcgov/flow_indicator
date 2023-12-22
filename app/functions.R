@@ -22,7 +22,7 @@ calculate_MK_results = function(data,chosen_variable){
   library(santoku)
   data %>%
     add_count(STATION_NUMBER, name = 'number_records') |>
-    filter(number_records >= 3) |>
+    filter(number_records > 3) |>
     group_by(STATION_NUMBER) %>%
     reframe(MK_results = kendallTrendTest(values ~ Year)[c('statistic','p.value','estimate')]) %>%
     unnest(MK_results) %>%
@@ -111,15 +111,19 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
       variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Min_3_Day_DoY','Min_30_Day_DoY','Max_7_Day_DoY', 'Max_3_Day_DoY'), " "
     )
 
+    if(variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Min_3_Day_DoY','Min_30_Day_DoY','Max_7_Day_DoY', 'Max_3_Day_DoY')){
+      y_labs = data.frame()
+    }
+
     station_name = unique(stations_shapefile[stations_shapefile$STATION_NUMBER == clicked_station,]$STATION_NAME)
 
-    plot = data %>%
+    plot_dat = data %>%
       ungroup() %>%
       filter(STATION_NUMBER == clicked_station) %>%
       left_join(stations_shapefile %>%
                   st_drop_geometry() %>%
-                  dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
-      ggplot() +
+                  dplyr::select(STATION_NUMBER,STATION_NAME))
+      plot = ggplot(plot_dat) +
       geom_point(aes(y = values, x = Year))  +
       labs(title = paste0(station_name," (",unique(clicked_station),")"),
            subtitle = paste0(unique(slopes$trend_sig),
@@ -133,6 +137,16 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
             axis.title.x = element_text(size = 14),
             axis.text = element_text(size = 11))
 
+
+    if(variable_choice %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Min_3_Day_DoY','Min_30_Day_DoY','Max_7_Day_DoY', 'Max_3_Day_DoY')){
+      plot = plot +
+        scale_y_continuous(breaks = c(min(plot_dat$values), max(plot_dat$values)),
+                           labels = c("Earlier", "Later"))
+    }
+    else{
+      plot = plot
+    }
+
     if(round(unique(slopes$P_value),2)<=0.05) {
       plot +
         geom_line(aes(y = SlopePreds, x = Year),
@@ -145,6 +159,7 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
     else{
     plot
     }
+
   }
 }
 
