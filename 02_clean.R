@@ -326,7 +326,7 @@ n_years_filt = 10
 
 stns_ann_data <- hydat_daily_all %>%
   filter(STATION_NUMBER %in% unique(stations_filt$STATION_NUMBER)) %>%
-  group_by(STATION_NUMBER, sYear) %>%
+  group_by(STATION_NUMBER, wYear) %>%
   summarise(Ann_Mean = mean(Value, na.rm = FALSE)) %>%
   group_by(STATION_NUMBER) %>%
   filter(sum(!is.na(Ann_Mean)) >= n_years_filt) |>
@@ -373,7 +373,7 @@ stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
 
   stns_ann_data %>%
     dplyr::filter(STATION_NUMBER == .x,
-           sYear >= stn_yr_from) |>
+           wYear >= stn_yr_from) |>
     dplyr::mutate(Ann_Mean_na_as_0 = tidyr::replace_na(Ann_Mean, 0)) |>
     dplyr::mutate(sum_up_to_row = cumsum(Ann_Mean_na_as_0)) |>
     dplyr::filter(sum_up_to_row > 0) |>
@@ -401,12 +401,11 @@ stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
 # mapview::mapview(mapfilt4)
 
 final_stations_summary <- stns_ann_data2 %>%
-  rename(Year = sYear) %>%
   filter(!is.na(Ann_Mean)) %>%
   group_by(STATION_NUMBER) %>%
   summarise(N_Years = n(),
-            Min_Year = min(Year),
-            Max_Year = max(Year),
+            Min_Year = min(wYear),
+            Max_Year = max(wYear),
             Total_Years = Max_Year - Min_Year +1,
             keep = unique(keep_dup))
 
