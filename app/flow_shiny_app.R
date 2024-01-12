@@ -17,12 +17,27 @@ ui = shiny::fluidPage(
   tags$head(tags$style(
     HTML('#trend_selector {opacity:0.9;}
          #trend_selector:hover{opacity:1;}'))),
+  # Enables us to do some fancy things in javascript...
+  useShinyjs(),
+  # Include our own styling sheet; defined class 'my_home_button'
+  includeCSS('www/bc_button.css'),
+
+  tags$head(tags$style(
+    HTML('#trend_selector {opacity:0.9;}
+         #trend_selector:hover{opacity:0.9;}'))),
+  titlePanel("Flow Indicator"),
+  # Throw in our own action button, setting class to 'my_home_button'
+  actionButton(
+    'abs_button',
+    '',
+    class = 'my_bc_button'
+  ),
   titlePanel("Flow Indicator"),
   map_abs_panel,
   trend_select_abs_panel
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
 
   source(file.path('Load_Filter_Data.R'), local = T)$value
   source(file.path('Render_UI_elements.R'), local = T)$value
@@ -64,6 +79,53 @@ server <- function(input, output) {
     }
   })
 
+  #New BC Button
+  observeEvent(input$abs_button, {
+    zoom = input$leafmap_zoom
+    lat = input$leafmap_center[2]
+    lon = input$leafmap_center[1]
+
+    # Change region_rv() to 'All'
+    if(hydro_rv() != 'All'| zoom != 5 | lat != 50 | lon != -130){
+      hydro_rv('All')
+
+      # Update map to BC zoom (customizable)
+      leafletProxy('leafmap') |>
+        set_bc_view()
+
+      updateSelectInput(session = session,
+                        'hydrozone_choice',
+                        selected = 'All')
+    }
+  })
+
+  #Some reactives
+
+  hydro_rv = reactiveVal('All')
+
+  # Hydrozone reactives
+  hydro_drop_rv = reactive({
+    input$hydrozone_choice
+  })
+
+  observeEvent(input$hydrozone_choice,{
+
+    hydro_rv(hydro_drop_rv())
+
+  })
+
+  hydro_click_rv = reactive({
+    input$leafmap_shape_click$id
+  })
+
+  observeEvent(input$leafmap_shape_click$id,{
+    updateSelectInput(session = session,
+                      'hydrozone_choice',
+                      selected = input$leafmap_shape_click$id)
+    hydro_rv(hydro_click_rv())
+  })
+
+  #Calculate trend results
   mk_results = reactive({
     calculate_MK_results(data = flow_dat_chosen_var(),
                          chosen_variable = input$user_var_choice)
@@ -128,6 +190,13 @@ server <- function(input, output) {
                                                                     "< 5% change",
                                                                     "5 - 10% increase",
                                                                     "> 10% increase")))
+    }
+    if(hydro_rv() == "All"){
+      dat
+    }
+    else {
+      dat %>%
+        filter(HYDZN_NAME == hydro_rv())
     }
   })
 
@@ -287,22 +356,68 @@ server <- function(input, output) {
     }
   })
 
+  # zoom
+  boundary_data = reactive({
+    if(hydro_rv()== "All") {
+      hydrozones
+    }
+    else{
+      stations_sf %>%
+        filter(HYDZN_NAME == hydro_rv()) %>%
+        st_bbox()
+    }
+  })
+
+  # polygon
+  hydro_data = reactive({
+    if(hydro_rv()== "All") {
+      hydrozones
+    }
+    else{
+      hydrozones %>%
+        filter(HYDZN_NAME == hydro_rv())
+    }
+  })
+
   output$leafmap <- renderLeaflet({
 
-    leaflet() %>%
+   map = leaflet() %>%
       addProviderTiles(providers$CartoDB,group = "CartoDB") %>%
       addTiles(group = 'Streets') %>%
       addProviderTiles(providers$Stamen.Terrain, group = "Terrain") %>%
-      add_bc_home_button() %>%
+      # add_bc_home_button() %>%
       set_bc_view() %>%
       addLayersControl(baseGroups = c("CartoDB","Streets"),
                        options = layersControlOptions(collapsed = F),
                        position = 'bottomright')
+
+    if(hydro_rv() == "All"){
+      map %>%
+        set_bc_view()
+    }
+   else{
+     map %>%
+       fitBounds(as.numeric(boundary_data()$xmin)-1, as.numeric(boundary_data()$ymin)-1, as.numeric(boundary_data()$xmax)+1, as.numeric(boundary_data()$ymax)+1)
+   }
   })
 
   observe({
     leafletProxy("leafmap") %>%
       clearMarkers() %>%
+      addPolygons(layerId = ~HYDZN_NAME,
+                  data = hydrozones,
+                  label = ~paste0(HYDZN_NAME), color = "grey", fillColor = "white",
+                  weight = 1, smoothFactor = 0.5, opacity = 1.0, fillOpacity = 0.2,
+                  highlightOptions = highlightOptions(color = "#979B9D", weight = 2,
+                                                      bringToFront = FALSE)
+      ) %>%
+      addPolygons(layerId = ~HYDZN_NAME,
+                  data = hydro_data(),
+                  label = ~paste0(HYDZN_NAME), color = "black", fillColor = "white",
+                  weight = 1, smoothFactor = 0.5, opacity = 1.0, fillOpacity = 0.2,
+                  highlightOptions = highlightOptions(color = "black", weight = 2,
+                                                      bringToFront = FALSE)
+      ) %>%
       addCircleMarkers(layerId = ~STATION_NUMBER,
                        color = 'black',
                        fillColor = ~mypal3()(magnitude_fixed),
