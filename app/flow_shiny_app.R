@@ -156,6 +156,13 @@ server <- function(input, output, session) {
     else{
       dat = dat
     }
+    if(hydro_rv() == "All"){
+      dat = dat
+    }
+    else {
+      dat = dat %>%
+        filter(HYDZN_NAME == hydro_rv())
+    }
 
     if(input$user_var_choice %in% date_vars){
       dat %>%
@@ -190,13 +197,6 @@ server <- function(input, output, session) {
                                                                     "< 5% change",
                                                                     "5 - 10% increase",
                                                                     "> 10% increase")))
-    }
-    if(hydro_rv() == "All"){
-      dat
-    }
-    else {
-      dat %>%
-        filter(HYDZN_NAME == hydro_rv())
     }
   })
 
@@ -246,27 +246,27 @@ server <- function(input, output, session) {
       stations_shapefile = stations_sf)
   })
 
-  mypal = reactive({
-    if(input$user_var_choice %in% date_vars){
-      colorFactor(palette = 'RdBu',
-                  domain = mk_results()$trend_sig,
-                  levels = c("Significant Trend Earlier",
-                             'Non-Significant Trend Earlier',
-                             'No Trend',
-                             'Non-Significant Trend Later',
-                             'Significant Trend Later'),
-                  ordered = T)
-    } else {
-      colorFactor(palette = 'RdBu',
-                  domain = mk_results()$trend_sig,
-                  levels = c("Significant Trend Down",
-                             'Non-Significant Trend Down',
-                             'No Trend',
-                             'Non-Significant Trend Up',
-                             'Significant Trend Up'),
-                  ordered = T)
-    }
-  })
+  # mypal = reactive({
+  #   if(input$user_var_choice %in% date_vars){
+  #     colorFactor(palette = 'RdBu',
+  #                 domain = mk_results()$trend_sig,
+  #                 levels = c("Significant Trend Earlier",
+  #                            'Non-Significant Trend Earlier',
+  #                            'No Trend',
+  #                            'Non-Significant Trend Later',
+  #                            'Significant Trend Later'),
+  #                 ordered = T)
+  #   } else {
+  #     colorFactor(palette = 'RdBu',
+  #                 domain = mk_results()$trend_sig,
+  #                 levels = c("Significant Trend Down",
+  #                            'Non-Significant Trend Down',
+  #                            'No Trend',
+  #                            'Non-Significant Trend Up',
+  #                            'Significant Trend Up'),
+  #                 ordered = T)
+  #   }
+  # })
 
   #   mypal2 = reactive({
   #   if(input$user_var_choice %in% date_vars){
