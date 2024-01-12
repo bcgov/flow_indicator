@@ -8,9 +8,45 @@ library(EnvStats)
 library(data.table)
 library(tidyverse)
 library(ggtext)
+library(shinyjs)
 
 # Trend selection options
 trend_select_options_tab = wellPanel(
+  fluidRow(
+    selectizeInput(inputId = 'hydrozone_choice',
+                   label = 'Hydrologic Zone',
+                   choice = c('All',
+                              "Northern Coast Mountains",
+                              "Stikine Plateau",
+                              "Haida Gwaii",
+                              "Central Coast Mountains",
+                              "Northern Rocky Mountains",
+                              "Northern Central Uplands",
+                              "Western Vancouver Island",
+                              "Western South Coast Mountains",
+                              "Southern Hazelton Mountains",
+                              "Eastern Vancouver Island",
+                              "Central South Coast Mountains",
+                              "Nechako Plateau",
+                              "Eastern South Coast Mountains",
+                              "Northern Interior Plains",
+                              "Fraser Plateau",
+                              "Southern Rocky Mountain Foothills",
+                              "Southern Interior Plains",
+                              "Mcgregor Basin",
+                              "Northern Columbia Mountains",
+                              "Northern Thompson Plateau",
+                              "Southern Quesnel Highland",
+                              "Upper Fraser Basin",
+                              "Southern Thompson Plateau",
+                              "Okanagan Highland",
+                              "Lower Columbia Basin",
+                              "Upper Columbia Basin",
+                              "Lower Kootenay Basin",
+                              "Upper Kootenay Basin",
+                              "Central Kootenay Basin")
+    )
+  ),
   fluidRow(
     column(width = 6,
            radioButtons(inputId = 'time_scale',
@@ -65,20 +101,20 @@ trend_select_options_tab = wellPanel(
 
 flow_metric_plot_tab = card(
   card_body(
-    plotOutput('myplot', height = 300)
+    plotOutput('myplot', height = 400)
   )
 )
 
 hydrograph_plot_tab = card(
   card_body(
-    plotOutput('myhydrograph', height = 300)
+    plotOutput('myhydrograph', height = 400)
   )
 )
 
 # Absolute Panel with trend selection.
 trend_select_abs_panel = absolutePanel(
   id = 'trend_selector',
-  top = 220, left = 10, width = 450, #height = 800,
+  top = 200, left = 10, width = 450, #height = 800,
   draggable = F,
   tabsetPanel(
     id = 'tabset',
@@ -96,7 +132,7 @@ map_abs_panel = absolutePanel(
     style="padding: 8px; border-bottom: 1px solid #CCC; background: #FFFFEE;",
     fluidRow(
       leafletOutput('leafmap',
-                    height = '600px')
+                    height = '650px')
     )
   )
 )
