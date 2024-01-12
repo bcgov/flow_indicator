@@ -173,8 +173,6 @@ mk_timing = mk_results_all %>%
 # Metrics - Magnitude of River Flow
 # - Average Annual Flow
 
-
-
 annual_bar = mk_annual %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
