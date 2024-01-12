@@ -453,8 +453,17 @@ stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat$STA
   dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS) %>%
   left_join(final_stations_summary)
 
+#Hydrologic Zones
+hydrozones = read_sf('data/HYDZ_HYDROLOGICZONE_SP/HYD_BC_H_Z_polygon.shp') %>%
+  st_transform(crs = st_crs(stations_sf)) %>%
+  mutate(HYDZN_NAME = str_to_title(HYDZN_NAME))
+
+write_sf(hydrozones, 'app/www/hydrozones.gpkg')
+
+#spatial join with hydrozones
+stations_sf = stations_sf %>%
+  st_join(hydrozones)
+
 write_sf(stations_sf, 'app/www/stations.gpkg')
 
-#check NA stations
-na_Station = annual_flow_dat %>%
-  filter(STATION_NUMBER=="08LF033")
+
