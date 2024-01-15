@@ -145,9 +145,13 @@ mk_magnitude = mk_results_all %>%
   group_by(metric, magnitude_fixed) %>%
   summarise(n = n()) %>%
   ggplot() +
-  geom_col(aes(x = metric, y = n, fill = magnitude_fixed)) +
+  geom_col(aes(x = metric, y = n, fill = magnitude_fixed), col = "black") +
   scale_fill_manual(values = colour.scale) +
-  coord_flip()
+  labs(x = "", y = "") +
+  coord_flip()+
+  theme_soe() +
+  theme(legend.position = "none") +
+  ggtitle("Magnitude")
 
 mk_timing = mk_results_all %>%
   filter(!metric %in% c("Average Annual flow",
@@ -164,12 +168,23 @@ mk_timing = mk_results_all %>%
   group_by(metric, magnitude_fixed) %>%
   summarise(n = n()) %>%
   ggplot() +
-  geom_col(aes(x = metric, y = n, fill = magnitude_fixed)) +
+  labs(x = "", y = "Number of Stations") +
+  geom_col(aes(x = metric, y = n, fill = magnitude_fixed), col = "black") +
   scale_fill_manual(values = colour.scale.date) +
-  coord_flip()
+  coord_flip() +
+  theme_soe() +
+  theme(legend.position = "none") +
+  ggtitle("Timing")
 
-plot_grid(mk_magnitude, mk_timing, nrow = 2)
+legend = get_legend(
+  mk_magnitude +
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom",
+          legend.title = NULL)
+)
 
+mk_all = plot_grid(mk_magnitude, mk_timing, legend, nrow = 3, rel_heights = c(1,1,0.2))
+mk_all
 
 # Metrics - Magnitude of River Flow
 # - Average Annual Flow
@@ -238,7 +253,7 @@ dev.off()
 
 # - Low Flow
 
-  Low_bar = mk_annual %>%
+  low_bar = mk_annual %>%
     mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                        .default = magnitude_fixed)) %>%
     mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 10% increase",
@@ -264,8 +279,8 @@ dev.off()
     coord_flip() +
     theme_soe()
 
-  svg_px("./print_ver/out/figs/Low_bar.svg", width = 800, height = 600)
-  plot(Low_bar)
+  svg_px("./print_ver/out/figs/low_bar.svg", width = 800, height = 600)
+  plot(low_bar)
   dev.off()
 
   #Metrics - Timing of Flow
@@ -339,3 +354,5 @@ freshet_bar = mk_freshet %>%
 # ecoprovs = bcmaps::ecoprovinces() |> st_transform(crs = 4326) |>
 #   st_simplify(dTolerance = 1000)
 # sf::write_sf(ecoprovs, 'app/www/ecoprovinces.gpkg')
+
+save(mk_all, annual_bar, low_bar, peak_bar, freshet_bar, date_low_bar,  file = "print_ver/out/figures.RData")
