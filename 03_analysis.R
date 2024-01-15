@@ -284,13 +284,13 @@ annual_flow_dat = annual_mean_dat  |>
 
 #Recalibrate values that are just beyond April 1 (set 1 month buffer)
 annual_flow_dat = annual_flow_dat %>%
-  mutate(Min_7_Day_DoY = case_when(Min_7_Day_DoY <60 ~ 365 + Min_7_Day_DoY,
+  mutate(Min_7_Day_DoY = case_when(Min_7_Day_DoY < 30 ~ 365 + Min_7_Day_DoY,
                                    .default = Min_7_Day_DoY),
-         Min_3_Day_DoY = case_when(Min_3_Day_DoY <60 ~ 365 + Min_3_Day_DoY,
+         Min_3_Day_DoY = case_when(Min_3_Day_DoY < 30 ~ 365 + Min_3_Day_DoY,
                                    .default = Min_3_Day_DoY),
-         Max_3_Day_DoY = case_when(Max_3_Day_DoY <30 ~ 365 + Max_3_Day_DoY,
+         Max_3_Day_DoY = case_when(Max_3_Day_DoY < 30 ~ 365 + Max_3_Day_DoY,
                                    .default = Max_3_Day_DoY),
-         Max_7_Day_DoY = case_when(Max_7_Day_DoY <30 ~ 365 + Max_7_Day_DoY,
+         Max_7_Day_DoY = case_when(Max_7_Day_DoY < 30 ~ 365 + Max_7_Day_DoY,
                                    .default = Max_7_Day_DoY))
 
 
