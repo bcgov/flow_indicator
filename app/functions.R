@@ -19,7 +19,7 @@ calculate_bins = function(data, chosen_variable){
 }
 
 calculate_MK_results = function(data,chosen_variable){
-  # library(santoku)
+  library(santoku)
   data %>%
     add_count(STATION_NUMBER, name = 'number_records') |>
     filter(number_records > 3) |>
