@@ -18,7 +18,7 @@ library(sf)
 ### Load in data that was accessed in the '01_load.R' script.
 hydat_daily_all = read_rds('./data/hydat_daily_all.rds')
 stations_filt_list = read_rds("./data/stations_filt_list.rds")
-stations_filt = read_rds("./data/stations_filt.rds")
+stations_filt = read_rds("./data/stations_filt_no_missing.rds")
 daily_station_data = read_rds("./data/daily_station_data.rds")
 
 # There are three main filtering/cleaning stages --------------------------
@@ -409,9 +409,14 @@ final_stations_summary <- stns_ann_data2 %>%
             Total_Years = Max_Year - Min_Year +1,
             keep = unique(keep_dup))
 
+station_year = stns_ann_data2 %>%
+  select(STATION_NUMBER, wYear)
+
 write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
 
-write_rds(stns_ann_data2, 'data/filtered_annual_data.rds')
+write.csv(stns_ann_data2, 'data/filtered_annual_data.csv', row.names = F)
+
+write.csv(station_year, 'data/station_year.csv', row.names = F)
 
 # # Get station spatial files.
 # stations_for_spatial_table = tidyhydat::hy_stations(station_number =  final_stations_summary$STATION_NUMBER) |>
