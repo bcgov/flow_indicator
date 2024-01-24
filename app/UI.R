@@ -1,6 +1,7 @@
 library(shiny)
 library(bslib)
 library(leaflet)
+library(leaflet.extras)
 library(leaflet.providers)
 library(envreportutils)
 library(sf)
