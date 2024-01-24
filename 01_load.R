@@ -43,7 +43,6 @@ stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
 
 hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
-## Filter stations for n complete years - use water years
 hydat_daily_all = hydat_daily_all %>%
   mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
                                month(Date) < 10 ~ year(Date) - 1),
@@ -58,27 +57,32 @@ daily_station_data <- hydat_daily_all %>%
             perc_daily_missing = na / 365 * 100)
 
 
-threshold = 30
+#Create complete station-year df
+minYear = min(daily_station_data$Year)
+maxYear = max(daily_station_data$Year)
+years = seq(minYear, maxYear)
+stations = unique(daily_station_data$STATION_NUMBER)
 
-# Identify years that have any missing data
-percent_missing_30 = daily_station_data %>%
-  filter(perc_daily_missing >= threshold)
+station_year = expand.grid(stations, years) %>%
+  select("STATION_NUMBER" = "Var1", "Year" = "Var2")# this will then be joined with each step of filtering (new column with keep/discard based on filter)
 
-stations_filt <- daily_station_data |>
-  filter(perc_daily_missing < threshold) %>%
-  group_by(STATION_NUMBER) %>%
-  summarise(n_years = n(),
-            incomplete_years = sum(na > 0),
-            year_min = min(Year),
-            year_max = max(Year)) %>%
-  filter(year_max >= year_filt,
-         n_years >= n_years_filt) %>%
-  left_join(hy_stations(), by = "STATION_NUMBER") %>%
-  left_join(hy_stn_regulation(), by = "STATION_NUMBER")
+# stations_filt <- daily_station_data |>
+#   mutate(missing_data = case_when(perc_daily_missing >=30 ~ 0,
+#                                   .default = 1)) %>%
+#   group_by(STATION_NUMBER) %>%
+#   summarise(n_years = n(),
+#             incomplete_years = sum(na > 0),
+#             year_min = min(Year),
+#             year_max = max(Year)) %>%
+#   mutate(min_data = case_when(year_max >= year_filt | n_years >= n_years_filt ~ 1,
+#          .default = 0)) %>%
+#   left_join(hy_stations(), by = "STATION_NUMBER") %>%
+#   left_join(hy_stn_regulation(), by = "STATION_NUMBER")
 
-stations_filt_list <- unique(stations_filt$STATION_NUMBER)
+# stations_filt_list <- unique(stations_filt$STATION_NUMBER)
 
 saveRDS(hydat_daily_all, file = 'data/hydat_daily_all.rds')
 saveRDS(daily_station_data, file = 'data/daily_station_data.rds')
-saveRDS(stations_filt_list, file = 'data/stations_filt_list.rds')
-saveRDS(stations_filt, file = 'data/stations_filt_no_missing.rds')
+# saveRDS(stations_filt_list, file = 'data/stations_filt_list.rds')
+# saveRDS(stations_filt, file = 'data/stations_filt_no_missing.rds')
+saveRDS(station_year, file = 'data/station_year.rds')
