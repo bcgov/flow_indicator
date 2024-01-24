@@ -57,8 +57,13 @@ daily_station_data <- hydat_daily_all %>%
             Ann_Mean = mean(Value, na.rm = TRUE),
             perc_daily_missing = na / 365 * 100)
 
+# Identify years that have any missing data
+percent_missing_10 = daily_station_data %>%
+  filter(perc_daily_missing > 0)
+
 
 stations_filt <- daily_station_data |>
+  filter(perc_daily_missing == 0) %>%
   group_by(STATION_NUMBER) %>%
   summarise(n_years = n(),
             incomplete_years = sum(na > 0),
@@ -74,4 +79,4 @@ stations_filt_list <- unique(stations_filt$STATION_NUMBER)
 saveRDS(hydat_daily_all, file = 'data/hydat_daily_all.rds')
 saveRDS(daily_station_data, file = 'data/daily_station_data.rds')
 saveRDS(stations_filt_list, file = 'data/stations_filt_list.rds')
-saveRDS(stations_filt, file = 'data/stations_filt.rds')
+saveRDS(stations_filt, file = 'data/stations_filt_no_missing.rds')
