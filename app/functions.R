@@ -20,6 +20,17 @@ calculate_bins = function(data, chosen_variable){
 
 calculate_MK_results = function(data,chosen_variable){
   library(santoku)
+
+  # data = annual_flow_dat %>%
+  #   dplyr::select(STATION_NUMBER,Year,values = !!sym("DoY_50pct_TotalQ")) |>
+  #   filter(!is.na(values))
+
+  yeardat = data %>%
+    group_by(STATION_NUMBER) %>%
+    summarise(minYear =min(Year),
+              maxYear = max(Year),
+              range = max(Year) - min(Year))
+
   data %>%
     add_count(STATION_NUMBER, name = 'number_records') |>
     filter(number_records > 3) |>
@@ -32,9 +43,13 @@ calculate_MK_results = function(data,chosen_variable){
     pivot_wider(names_from = MK_results_id, values_from = MK_results) %>%
     mutate(direction = case_when(Slope <0 ~ "negative",
                                  .default = "positive")) %>%
+    left_join(yeardat) %>%
     group_by(direction) %>%
     mutate(bins = chop_equally(Slope,
                              groups = 3))%>%
+    mutate(begin_flow = (Intercept + (Slope * minYear)),
+           end_flow = (Intercept + (Slope * maxYear))) %>%
+    mutate(per_change = (((end_flow - begin_flow)/begin_flow))/range*100) %>%
     ungroup() %>%
     mutate(trend_sig = fcase(
       abs(Tau) <= 0.05 , "No Trend",
@@ -58,16 +73,16 @@ calculate_MK_results = function(data,chosen_variable){
       bins %in% c(levels(bins)[5],levels(bins)[6]) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Later"
     ),
     magnitude_fixed = fcase(
-            Slope < -0.10 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 10% earlier",
-            between(Slope, -0.10, -0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "5 - 10% earlier",
-            between(Slope, -0.05, 0.05) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 5% change",
-            between(Slope, 0.05, 0.10) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "5 - 10% later",
-            Slope > 0.10 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 10% later",
-            Slope < -0.10 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 10% decrease",
-            between(Slope, -0.10, -0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "5 - 10% decrease",
-            between(Slope, -0.05, 0.05) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 5% change",
-            between(Slope, 0.05, 0.10) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "5 - 10% increase",
-            Slope > 0.10 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 10% increase"
+            per_change < -0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.25 days earlier per year",
+            between(per_change, -0.25, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.25 days earlier per year",
+            between(per_change, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 0.1 days change per year",
+            between(per_change, 0.1, 0.25) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.25 days later per year",
+            per_change > 0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.25 days later per year",
+            per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% decrease per year",
+            between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% decrease per year",
+            between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 0.1% change per year",
+            between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% increase per year",
+            per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% increase per year"
     ),
     significant = case_when(P_value <=0.05~ 1,
                             .default = 0.1))
@@ -148,6 +163,9 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
     }
 
     if(round(unique(slopes$P_value),2)<=0.05) {
+      print(slopes$SlopePreds)
+      print(slopes$Year)
+      print(slopes$per_change)
       plot +
         geom_line(aes(y = SlopePreds, x = Year),
                   colour = 'darkblue',
