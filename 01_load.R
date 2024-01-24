@@ -57,13 +57,15 @@ daily_station_data <- hydat_daily_all %>%
             Ann_Mean = mean(Value, na.rm = TRUE),
             perc_daily_missing = na / 365 * 100)
 
-# Identify years that have any missing data
-percent_missing_10 = daily_station_data %>%
-  filter(perc_daily_missing > 0)
 
+threshold = 30
+
+# Identify years that have any missing data
+percent_missing_30 = daily_station_data %>%
+  filter(perc_daily_missing >= threshold)
 
 stations_filt <- daily_station_data |>
-  filter(perc_daily_missing == 0) %>%
+  filter(perc_daily_missing < threshold) %>%
   group_by(STATION_NUMBER) %>%
   summarise(n_years = n(),
             incomplete_years = sum(na > 0),
