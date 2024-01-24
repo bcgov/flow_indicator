@@ -174,11 +174,11 @@ server <- function(input, output, session) {
                magnitude = factor(magnitude, levels = c("Earlier",
                                                         "Minimal Change",
                                                         "Later")),
-               magnitude_fixed = factor(magnitude_fixed, levels = c("> 10% earlier",
-                                                                    "5 - 10% earlier",
-                                                                    "< 5% change",
-                                                                    "5 - 10% later",
-                                                                    "> 10% later")))
+               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.25 days earlier per year",
+                                                                    "0.1 - 0.25 days earlier per year",
+                                                                    "< 0.1 days change per year",
+                                                                    "0.1 - 0.25 days later per year",
+                                                                    "> 0.25 days later per year")))
     } else {
       dat %>%
 
@@ -192,11 +192,11 @@ server <- function(input, output, session) {
                                                         "Minimal Change",
                                                         "Increase",
                                                         "Strong Increase")),
-               magnitude_fixed = factor(magnitude_fixed, levels = c("> 10% decrease",
-                                                                    "5 - 10% decrease",
-                                                                    "< 5% change",
-                                                                    "5 - 10% increase",
-                                                                    "> 10% increase")))
+               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.5% decrease per year",
+                                                                    "0.1 - 0.5% decrease per year",
+                                                                    "< 0.1% change per year",
+                                                                    "0.1 - 0.5% increase per year",
+                                                                    "> 0.5% increase per year")))
     }
   })
 
@@ -208,7 +208,8 @@ server <- function(input, output, session) {
     flow_dat_with_mk() %>%
       filter(STATION_NUMBER == click_station()) %>%
       left_join(mk_results()) %>%
-      mutate(SlopePreds = Intercept+Slope*Year)
+      mutate(SlopePreds = Intercept+Slope*Year,
+             per_change = (((Intercept + Slope * max(Year))-(Intercept + Slope*min(Year)))/(Intercept + Slope * min(Year)))/(max(Year)-min(Year))*100)
   })
 
   # Watch for a click on the leaflet map. Once clicked...
@@ -338,20 +339,20 @@ server <- function(input, output, session) {
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
-                  levels = c("> 10% earlier",
-                             "5 - 10% earlier",
-                             "< 5% change",
-                             "5 - 10% later",
-                             "> 10% later"),
+                  levels = c("> 0.25 days earlier per year",
+                             "0.1 - 0.25 days earlier per year",
+                             "< 0.1 days change per year",
+                             "0.1 - 0.25 days later per year",
+                             "> 0.25 days later per year"),
                   ordered = T)
     } else {
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
-                  levels = c("> 10% decrease",
-                             "5 - 10% decrease",
-                             "< 5% change",
-                             "5 - 10% increase",
-                             "> 10% increase"),
+                  levels = c("> 0.5% decrease per year",
+                             "0.1 - 0.5% decrease per year",
+                             "< 0.1% change per year",
+                             "0.1 - 0.5% increase per year",
+                             "> 0.5% increase per year"),
                   ordered = T)
     }
   })
@@ -418,6 +419,12 @@ server <- function(input, output, session) {
                   highlightOptions = highlightOptions(color = "black", weight = 2,
                                                       bringToFront = FALSE)
       ) %>%
+      addMarkers(icon = makeIcon(
+                   iconUrl = "http://leafletjs.com/docs/images/leaf-green.png",
+                   iconWidth = 1, iconHeight = 1
+                 ),
+                 data = stations_sf_with_trend(),
+                 group = 'STATION_NAME') %>%
       addCircleMarkers(layerId = ~STATION_NUMBER,
                        color = 'black',
                        fillColor = ~mypal3()(magnitude_fixed),
@@ -426,12 +433,20 @@ server <- function(input, output, session) {
                        fillOpacity = ~significant,
                        label = ~paste0(STATION_NAME, " (",STATION_NUMBER,") - ",HYD_STATUS),
                        data = stations_sf_with_trend()) %>%
+
       removeControl("legend") %>%
       addLegend(pal = mypal3(),
                 values = ~magnitude_fixed,
                 title = 'Mann-Kendall Trend Result',
                 data = stations_sf_with_trend(),
-                layerId = 'legend')
+                layerId = 'legend')%>%
+      addSearchFeatures(
+        targetGroups = 'STATION_NAME',
+        options = searchFeaturesOptions(
+          zoom=12, openPopup = TRUE, firstTipSubmit = TRUE,
+          autoCollapse = TRUE, hideMarkerOnCollapse = TRUE ,
+          position = "bottomright"))
+
   })
 }
 
