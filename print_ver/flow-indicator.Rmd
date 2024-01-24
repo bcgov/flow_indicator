@@ -122,3 +122,28 @@ freshet_bar
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 date_low_bar
 ```
+
+
+# Flow analysis
+
+## Timing of yearly data
+- Water Year = October - October
+- Low Flow Year = April to April
+- Summer low flow = March - October
+
+## Filtering procedures
+
+1) Missing data (no mention of if value is estimated in hydat dataset)
+
+- Calculate percentage of days with an NA for each station and each year (perc_daily_missing). Identify "incomplete years", which is a year with > 1 missing value. 
+Remove any years with missing data (even if just a single day)
+
+- Remove stations with less than 10 years of data and stations that did not have data in 2019.
+
+- Identified gaps in data and removed data prior to big data gaps (this could be improved).
+
+2) Duplicated
+- 121 stations are duplicated i.e. more than one station on a river. Used filter table to remove upstream stations (52 of 121 stations removed)
+
+3) Regulated
+- Regulated stations identified and filtered based on degree of regulation (21 stations removed)
