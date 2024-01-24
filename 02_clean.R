@@ -17,16 +17,33 @@ library(sf)
 
 ### Load in data that was accessed in the '01_load.R' script.
 hydat_daily_all = read_rds('./data/hydat_daily_all.rds')
-stations_filt_list = read_rds("./data/stations_filt_list.rds")
-stations_filt = read_rds("./data/stations_filt_no_missing.rds")
+# stations_filt_list = read_rds("./data/stations_filt_list.rds")
+# stations_filt = read_rds("./data/stations_filt_no_missing.rds")
 daily_station_data = read_rds("./data/daily_station_data.rds")
+station_year = read_rds("./data/station_year.rds")
 
-# There are three main filtering/cleaning stages --------------------------
-# 1. Removing stations on the same river
-# 2. Removing regulated rivers
-# 3. Removing stations with large data gaps
+# There are five main filtering/cleaning stages --------------------------
+# 1. Remove station-years with missing data (based on threshold value)
+# 2. Identifying (adding filter option) downstream and upstream stations on the same river
+# 3. Removing regulated rivers
+# 4. Removing stations with large data gaps
+# 5. Removing stations with less than 10 years of data
 
-# 1. Filtering out stations on the same river --------
+# 1. Remove years with missing data (based on threshold value) --------
+
+# Set threshold
+threshold = 30
+
+# Identify years that have any missing data and merge with station_year
+percent_missing_30 = daily_station_data %>%
+  filter(perc_daily_missing >= threshold) %>%
+  mutate(missing_dat = 1) %>%
+  select(STATION_NUMBER, Year, missing_dat)
+
+station_year_filters = station_year %>%
+  left_join(percent_missing_30)
+
+# 2. Identifying downstream and upstream stations on the same river --------
 
 ## manual check for multiple stations on same river (choosing most downstream station)
 ## filter if station names
@@ -334,9 +351,8 @@ stns_ann_data <- hydat_daily_all %>%
 
 stns_ann <- unique(stns_ann_data$STATION_NUMBER)
 
-# ggplot(stns_ann_data, aes(Year,STATION_NUMBER, colour = Ann_Mean))+
-#   geom_point()
-# plotly::ggplotly()
+ggplot(stns_ann_data, aes(wYear,STATION_NUMBER, colour = Ann_Mean))+
+  geom_point()
 
 
 # # Remove stations with large recent gaps
@@ -356,6 +372,61 @@ stns_ann <- unique(stns_ann_data$STATION_NUMBER)
 # all the unique station numbers). A map function is nice here because
 # we are using one table ('stations_filt') to filter a second table
 # ('stns_ann_data')
+
+## Andrew attempt at pulling out data gaps (decision = if > 10 year gap, remove all previous data)
+# First, invert data nd do cumsum based on NAs
+test = stns_ann_data %>%
+  arrange(STATION_NUMBER, -wYear) %>%
+  mutate(NAs = case_when(is.na(Ann_Mean) ~ 1,
+                         .default = 0)) %>%
+  group_by(STATION_NUMBER) %>%
+  mutate(cumulative_na = cumsum(NAs)) %>%
+  mutate(gap_10 = case_when(sum(cumulative_na==10)>0~ 0,
+                            .default = 1)) %>%
+  # filter(!(is.na(Ann_Mean))) %>%
+  filter(!(gap_10 == 0 & cumulative_na > 0))
+
+test2 = test %>%
+  filter(gap_10 == 0)
+
+test = stns_ann_data %>%
+  arrange(STATION_NUMBER, -wYear) %>%
+  mutate(NAs = case_when(is.na(Ann_Mean) ~ 1,
+                         .default = 0),
+         NAs2 = case_when(is.na(Ann_Mean) ~ 1,
+                          .default = NA)) %>%
+  group_by(STATION_NUMBER, grp = cumsum(is.na(NAs2))) %>%
+  mutate(cum_sum = cumsum(NAs))%>%
+  ungroup() %>%
+  group_by(STATION_NUMBER) %>%
+  mutate(gap_10 = case_when(sum(cum_sum==10)>0~ 0,
+                            .default = 1)) %>%
+  # filter(!(is.na(Ann_Mean))) %>%
+  # filter(!(gap_10 == 0 & cum_sum > 0))
+  mutate(rn = row_number())
+
+gappy_dat = test %>%
+  filter(gap_10 == 0)
+
+clean_dat = test %>%
+  filter(gap_10 == 1)
+
+rn_10 = gappy_dat %>%
+  group_by(STATION_NUMBER) %>%
+  filter(cum_sum == 10) %>%
+  select(STATION_NUMBER, rn2 = rn)
+
+gappy_dat_clean = gappy_dat %>%
+  left_join(rn_10) %>%
+  group_by(STATION_NUMBER) %>%
+  filter(rn %in% seq(1:unique(rn2))) %>%
+  filter(!is.na(Ann_Mean))
+
+stns_ann_data_clean = bind_rows(clean_dat, gappy_dat_clean)
+
+ggplot(test3, aes(wYear,STATION_NUMBER, colour = Ann_Mean))+
+  geom_point()
+
 
 stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
 
