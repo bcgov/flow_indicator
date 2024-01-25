@@ -18,16 +18,15 @@ library(data.table)
 library(tidyhydat)
 library(sf)
 
-if(!exists("final_stations_summary")){final_stations_summary = read_csv('data/finalstns.csv')}
-if(!exists("stn_ann_data2")){filtered_ann_dat = read_csv('data/filtered_annual_data.csv')}
-if(!exists("station_year")){station_year = read_csv('data/station_year.csv')}
+if(!exists("final_station_summary")){final_station_summary = read_csv('data/finalstns.csv')}
+if(!exists("filtered_station_year")){filtered_station_year = read_csv('data/finalstnyr.csv')}
 
 
 # If no /www folder (used for the shiny app, and also for static results PDF)
 if(!dir.exists('app/www')) dir.create('app/www')
 
 # Pull out the stations to keep from the loading script.
-stations_to_keep = final_stations_summary %>%
+stations_to_keep = final_station_summary %>%
   # filter(keep == TRUE) %>%
   pull(STATION_NUMBER)
 
@@ -51,89 +50,48 @@ flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
   mutate(Month = lubridate::month(Date))
 
 #Restrict by station_year list (this will remove years with missing data)
-flow_dat = flow_dat %>%
-  filter(paste0(STATION_NUMBER, wYear) %in% paste0(station_year$STATION_NUMBER,station_year$wYear))
-
-# n_years_decade = flow_dat %>%
-#   mutate(decade = floor(Year/10)*10) %>%
-#   group_by(STATION_NUMBER, decade)  %>%
-#   filter(decade<2020) %>%
-#   summarise(n_years = length(unique(wYear)))
-#
-# test_filter = flow_dat  %>%
-#   mutate(decade = floor(wYear/10)*10) %>%
-#   group_by(STATION_NUMBER, decade) %>%
-#   summarise(n_years = length(unique(wYear))) %>%
-#   mutate(n_decades = length(unique(decade)),
-#          span = (max(decade)+10 - min(decade))/10,
-#          diff = span - n_decades)
-#
-# test = flow_dat %>%
-#   mutate(decade = floor(Year/10)*10) %>%
-#   select(STATION_NUMBER, Year, decade) %>%
-#   distinct() %>%
-#   group_by(STATION_NUMBER) %>%
-#   complete(Year = min(Year):max(Year)) %>%
-#   mutate(include = case_when(is.na(decade)~ 0,
-#                              .default = 1)) %>%
-#   mutate(cumsum = cumsum(include))
-#
-# ggplot(test) +
-#   geom_line(aes(x = Year, y = cumsum, col = STATION_NUMBER)) +
-#   theme(legend.position = "none")
-#
-#  test = test %>%
-#   group_by(STATION_NUMBER, cumsum) %>%
-#   mutate(n = n()) %>%
-#   filter(n<10)
-#
-#  test.plot = test %>%
-#   ggplot() +
-#   geom_line(aes(x = Year, y = cumsum, col = STATION_NUMBER)) +
-#   theme(legend.position = "none")
-#
-#
-# test.plot
-
-# flow_dat_filtered = flow_dat %>%
-#   left_join(test, by = c("STATION_NUMBER", "Year")) %>%
-#   filter(!is.na(cumsum))
-
-
-
-# Take out big data gaps. This map function cycles through our station numbers,
-# identifying the new start year, if any (e.g. a station might have one year of
-# data in 1956, but then lack many years of data until 1973; this function would trim
-# away all data up to 1973).
-# Produces dataset of ~ 4.7 million rows
-
-flow_dat = unique(flow_dat$STATION_NUMBER) %>%
-  map( ~ {
-    year_for_trimming = unique(final_stations_summary[final_stations_summary$STATION_NUMBER == .x,]$Min_Year)
-
-    station_dat = flow_dat %>%
-      filter(STATION_NUMBER == .x)
-
-    filtered_dat = station_dat %>%
-      filter(wYear >= year_for_trimming)
-
-    filtered_dat
-  }) %>%
-  bind_rows() %>%
+flow_dat_filtered_filtered = flow_dat_filtered %>%
+  filter(paste0(STATION_NUMBER, wYear) %in% paste0(filtered_station_year$STATION_NUMBER,filtered_station_year$Year)) %>%
   mutate(wDoY = case_when(month(Date) >= 10 ~ yday(Date) - yday(paste0(year(Date),"-09-30")),
-                         month(Date) < 10 ~ yday(Date) + (365 - yday(paste0(year(Date),"-09-30")))),
+                          month(Date) < 10 ~ yday(Date) + (365 - yday(paste0(year(Date),"-09-30")))),
          lfDoY = case_when(month(Date) >= 4 ~ yday(Date) - yday(paste0(year(Date),"-03-31")),
                            month(Date) < 4 ~ yday(Date) + (365 - yday(paste0(year(Date),"-03-31")))))
 
+# # Take out big data gaps. This map function cycles through our station numbers,
+# # identifying the new start year, if any (e.g. a station might have one year of
+# # data in 1956, but then lack many years of data until 1973; this function would trim
+# # away all data up to 1973).
+# # Produces dataset of ~ 4.7 million rows
+#
+# flow_dat_filtered = unique(flow_dat_filtered$STATION_NUMBER) %>%
+#   map( ~ {
+#     year_for_trimming = unique(final_stations_summary[final_stations_summary$STATION_NUMBER == .x,]$Min_Year)
+#
+#     station_dat = flow_dat_filtered %>%
+#       filter(STATION_NUMBER == .x)
+#
+#     filtered_dat = station_dat %>%
+#       filter(wYear >= year_for_trimming)
+#
+#     filtered_dat
+#   }) %>%
+#   bind_rows() %>%
+
+
 # Annual Values =========================================================
-annual_mean_dat = flow_dat %>%
+annual_mean_dat = flow_dat_filtered_filtered %>%
   group_by(wYear,STATION_NUMBER) %>%
   summarise(Average = mean(Value)) %>%
   ungroup() %>%
   rename(Year = wYear)
 
+# Check data gaps are gone
+ggplot(annual_mean_dat, aes(Year,STATION_NUMBER, colour = Average))+
+  geom_point()
+
+
 # Timing of freshet (i.e. date by which 50% of total annual flow has passed)
-flow_timing_dat = flow_dat %>%
+flow_timing_dat = flow_dat_filtered_filtered %>%
   group_by(STATION_NUMBER,wYear) %>%
   mutate(RowNumber = row_number(),
          TotalFlow = sum(Value),
@@ -155,13 +113,13 @@ flow_timing_dat = flow_dat %>%
 # 7-day Summer Low flow (flow value, day of year, Date)
 # Note: this is SUMMER low flow (i.e. May - October)
 
-low_high_flow_dat_7day = stations_to_keep %>% map( ~ {
+low_high_flow_dat_filtered_7day = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
 
   # Grab daily flows for the station of interest in this iteration...
-  daily_flows = flow_dat |>
+  daily_flows = flow_dat_filtered |>
     filter(STATION_NUMBER ==.x)
     # group_by(STATION_NUMBER,Year) |#>
     # mutate(my_row = row_number()) |>
@@ -236,13 +194,13 @@ low_high_flow_dat_7day = stations_to_keep %>% map( ~ {
 }) %>%
   bind_rows()
 
-low_high_flow_dat_3day = stations_to_keep %>% map( ~ {
+low_high_flow_dat_filtered_3day = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
 
   # Grab daily flows for the station of interest in this iteration...
-  daily_flows = flow_dat |>
+  daily_flows = flow_dat_filtered |>
     filter(STATION_NUMBER ==.x)
   # group_by(STATION_NUMBER,Year) |#>
   # mutate(my_row = row_number()) |>
@@ -317,21 +275,23 @@ low_high_flow_dat_3day = stations_to_keep %>% map( ~ {
 }) %>%
   bind_rows()
 
-annual_flow_dat = annual_mean_dat  |>
+annual_flow_dat_filtered = annual_mean_dat  |>
   left_join(flow_timing_dat) |>
-  left_join(low_high_flow_dat_7day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
-  left_join(low_high_flow_dat_3day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
+  left_join(low_high_flow_dat_filtered_7day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
+  left_join(low_high_flow_dat_filtered_3day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
   dplyr::select(-ends_with("_Date"))
 
 #Recalibrate values that are just beyond April 1 (set 1 month buffer)
-annual_flow_dat = annual_flow_dat %>%
-  mutate(Min_7_Day_DoY = case_when(Min_7_Day_DoY < 30 ~ 365 + Min_7_Day_DoY,
+buffer = 60
+
+annual_flow_dat_filtered = annual_flow_dat_filtered %>%
+  mutate(Min_7_Day_DoY = case_when(Min_7_Day_DoY < buffer ~ 365 + Min_7_Day_DoY,
                                    .default = Min_7_Day_DoY),
-         Min_3_Day_DoY = case_when(Min_3_Day_DoY < 30 ~ 365 + Min_3_Day_DoY,
+         Min_3_Day_DoY = case_when(Min_3_Day_DoY < buffer ~ 365 + Min_3_Day_DoY,
                                    .default = Min_3_Day_DoY),
-         Max_3_Day_DoY = case_when(Max_3_Day_DoY < 30 ~ 365 + Max_3_Day_DoY,
+         Max_3_Day_DoY = case_when(Max_3_Day_DoY < buffer ~ 365 + Max_3_Day_DoY,
                                    .default = Max_3_Day_DoY),
-         Max_7_Day_DoY = case_when(Max_7_Day_DoY < 30 ~ 365 + Max_7_Day_DoY,
+         Max_7_Day_DoY = case_when(Max_7_Day_DoY < buffer ~ 365 + Max_7_Day_DoY,
                                    .default = Max_7_Day_DoY))
 
 
@@ -344,12 +304,12 @@ annual_flow_dat = annual_flow_dat %>%
 ###     a. 50% quantiles (percentiles?) of normal flow
 ###     b. 90% quantiles (percentiles?) of normal flow
 
-monthly_mean_dat = flow_dat |>
+monthly_mean_dat = flow_dat_filtered |>
   group_by(wYear,Month,STATION_NUMBER) |>
   reframe(median_flow = median(Value,na.rm=T)) %>%
   rename(Year = wYear)
 
-monthly_quantiles_dat = flow_dat %>%
+monthly_quantiles_dat = flow_dat_filtered %>%
   group_by(Month,STATION_NUMBER) %>%
   reframe(percentiles = list(quantile(Value, probs = c(0.05,0.25,0.50,0.75,0.95)))) %>%
   unnest_wider(percentiles) |>
@@ -358,13 +318,13 @@ monthly_quantiles_dat = flow_dat %>%
                 seventyfive_perc = `75%`, ninetyfive_perc = `95%`)
 
 # Find the 7-day low flows per month.
-monthly_7day_lowflow_dat = stations_to_keep %>% map( ~ {
+monthly_7day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
 
   # Grab daily flows for the station of interest in this iteration...
-  daily_flows = flow_dat |>
+  daily_flows = flow_dat_filtered |>
     filter(STATION_NUMBER == .x) |>
     group_by(STATION_NUMBER,wYear,Month) |>
     ungroup() %>%
@@ -398,13 +358,13 @@ monthly_7day_lowflow_dat = stations_to_keep %>% map( ~ {
 }) %>%
   bind_rows()
 
-monthly_3day_lowflow_dat = stations_to_keep %>% map( ~ {
+monthly_3day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
 
   # Grab daily flows for the station of interest in this iteration...
-  daily_flows = flow_dat |>
+  daily_flows = flow_dat_filtered |>
     filter(STATION_NUMBER == .x) |>
     group_by(STATION_NUMBER,wYear,Month) |>
     ungroup() %>%
@@ -442,11 +402,11 @@ monthly_3day_lowflow_dat = stations_to_keep %>% map( ~ {
 ## 1. Average flow + low flow (metrics for the app).
 ## 2. Average flow + quantiles (needed for hydrograph)
 
-monthly_flow_dat = monthly_mean_dat |>
-  left_join(monthly_7day_lowflow_dat,
+monthly_flow_dat_filtered = monthly_mean_dat |>
+  left_join(monthly_7day_lowflow_dat_filtered,
             by = join_by(STATION_NUMBER, Year, Month))|>
               dplyr::select(-Min_7_Day_DoY) |>
-  left_join(monthly_3day_lowflow_dat,
+  left_join(monthly_3day_lowflow_dat_filtered,
             by = join_by(STATION_NUMBER, Year, Month)) |>
               dplyr::select(-Min_3_Day_DoY) |>
   mutate(Month = month.abb[Month]) |>
@@ -456,15 +416,15 @@ monthly_flow_dat = monthly_mean_dat |>
 hydrograph_dat = monthly_quantiles_dat |>
   mutate(Month = month.abb[Month])
 
-saveRDS(annual_flow_dat, 'app/www/annual_flow_dat.rds')
+saveRDS(annual_flow_dat_filtered, 'app/www/annual_flow_dat.rds')
 saveRDS(hydrograph_dat, 'app/www/hydrograph_dat.rds')
-saveRDS(monthly_flow_dat,'app/www/monthly_flow_dat.rds')
+saveRDS(monthly_flow_dat_filtered,'app/www/monthly_flow_dat.rds')
 
 # # =====================================
 # # Combine annual and monthly data, let's see if that works better.
 # # Split table by data type: numeric or date. Question: do we need the date vars??
 #
-# dat_combo = annual_flow_dat %>%
+# dat_combo = annual_flow_dat_filtered %>%
 #   # mutate(Month = 'All') %>%
 #   left_join(monthly_mean_dat)
 #
@@ -483,16 +443,18 @@ saveRDS(monthly_flow_dat,'app/www/monthly_flow_dat.rds')
 #          Max_7_Day_DoY_halfyear_max = abs(Min_7_Day_DoY - 182))
 #
 # # Write out dataset at this point - data wide, unsummarised.
-# write_csv(dat_combo_num,'app/www/combined_flow_dat2.csv')
+# write_csv(dat_combo_num,'app/www/combined_flow_dat_filtered2.csv')
 
 # Get station locations
-stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat$STATION_NUMBER)) %>%
+stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat_filtered$STATION_NUMBER)) %>%
 
   mutate(STATION_NAME = stringr::str_to_title(STATION_NAME),
-         HYD_STATUS = stringr::str_to_title(HYD_STATUS)) %>%
+         HYD_STATUS = stringr::str_to_title(HYD_STATUS),
+         keep = case_when(is.na(keep) ~ FALSE,
+                          .default = TRUE)) %>%
   st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326) %>%
   dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS) %>%
-  left_join(final_stations_summary)
+  left_join(final_station_summary)
 
 #Hydrologic Zones
 hydrozones = read_sf('data/HYDZ_HYDROLOGICZONE_SP/HYD_BC_H_Z_polygon.shp') %>%
