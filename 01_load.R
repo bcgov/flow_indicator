@@ -54,7 +54,9 @@ daily_station_data <- hydat_daily_all %>%
   group_by(STATION_NUMBER, Year) %>%
   summarise(na = sum(is.na(Value)),
             Ann_Mean = mean(Value, na.rm = TRUE),
-            perc_daily_missing = na / 365 * 100)
+            perc_daily_missing = na / 365 * 100) %>%
+  left_join(hy_stations(), by = "STATION_NUMBER") %>%
+  left_join(hy_stn_regulation(), by = "STATION_NUMBER")
 
 
 #Create complete station-year df
@@ -66,18 +68,14 @@ stations = unique(daily_station_data$STATION_NUMBER)
 station_year = expand.grid(stations, years) %>%
   select("STATION_NUMBER" = "Var1", "Year" = "Var2")# this will then be joined with each step of filtering (new column with keep/discard based on filter)
 
-# stations_filt <- daily_station_data |>
-#   mutate(missing_data = case_when(perc_daily_missing >=30 ~ 0,
-#                                   .default = 1)) %>%
-#   group_by(STATION_NUMBER) %>%
-#   summarise(n_years = n(),
-#             incomplete_years = sum(na > 0),
-#             year_min = min(Year),
-#             year_max = max(Year)) %>%
-#   mutate(min_data = case_when(year_max >= year_filt | n_years >= n_years_filt ~ 1,
-#          .default = 0)) %>%
-#   left_join(hy_stations(), by = "STATION_NUMBER") %>%
-#   left_join(hy_stn_regulation(), by = "STATION_NUMBER")
+station_summary <- daily_station_data |>
+  group_by(STATION_NUMBER) %>%
+  summarise(n_years = n(),
+            incomplete_years = sum(na > 0),
+            year_min = min(Year),
+            year_max = max(Year)) %>%
+  left_join(hy_stations(), by = "STATION_NUMBER") %>%
+  left_join(hy_stn_regulation(), by = "STATION_NUMBER")
 
 # stations_filt_list <- unique(stations_filt$STATION_NUMBER)
 
@@ -86,3 +84,4 @@ saveRDS(daily_station_data, file = 'data/daily_station_data.rds')
 # saveRDS(stations_filt_list, file = 'data/stations_filt_list.rds')
 # saveRDS(stations_filt, file = 'data/stations_filt_no_missing.rds')
 saveRDS(station_year, file = 'data/station_year.rds')
+saveRDS(station_summary, file = 'data/station_summary.rds')
