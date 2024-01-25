@@ -21,7 +21,7 @@ calculate_bins = function(data, chosen_variable){
 calculate_MK_results = function(data,chosen_variable){
   library(santoku)
 
-  # data = annual_flow_dat %>%
+  # data = annual_flow_dat_filtered %>%
   #   dplyr::select(STATION_NUMBER,Year,values = !!sym("DoY_50pct_TotalQ")) |>
   #   filter(!is.na(values))
 
@@ -31,7 +31,7 @@ calculate_MK_results = function(data,chosen_variable){
               maxYear = max(Year),
               range = max(Year) - min(Year))
 
-  data %>%
+ data %>%
     add_count(STATION_NUMBER, name = 'number_records') |>
     filter(number_records > 3) |>
     group_by(STATION_NUMBER) %>%
@@ -49,7 +49,8 @@ calculate_MK_results = function(data,chosen_variable){
                              groups = 3))%>%
     mutate(begin_flow = (Intercept + (Slope * minYear)),
            end_flow = (Intercept + (Slope * maxYear))) %>%
-    mutate(per_change = (((end_flow - begin_flow)/begin_flow))/range*100) %>%
+    mutate(per_change = (((end_flow - begin_flow)/begin_flow))/range*100,
+           change_timing =  (end_flow - begin_flow)/range) %>%
     ungroup() %>%
     mutate(trend_sig = fcase(
       abs(Tau) <= 0.05 , "No Trend",
@@ -73,11 +74,11 @@ calculate_MK_results = function(data,chosen_variable){
       bins %in% c(levels(bins)[5],levels(bins)[6]) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Later"
     ),
     magnitude_fixed = fcase(
-            per_change < -0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.25 days earlier per year",
-            between(per_change, -0.25, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.25 days earlier per year",
-            between(per_change, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 0.1 days change per year",
-            between(per_change, 0.1, 0.25) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.25 days later per year",
-            per_change > 0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.25 days later per year",
+            change_timing < -0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.25 days earlier per year",
+            between(change_timing, -0.25, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.25 days earlier per year",
+            between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 0.1 days change per year",
+            between(change_timing, 0.1, 0.25) & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.25 days later per year",
+            change_timing > 0.25 & chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.25 days later per year",
             per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% decrease per year",
             between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% decrease per year",
             between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ','Min_7_Day_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 0.1% change per year",
