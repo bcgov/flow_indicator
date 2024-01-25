@@ -17,10 +17,11 @@ library(sf)
 
 ### Load in data that was accessed in the '01_load.R' script.
 hydat_daily_all = read_rds('./data/hydat_daily_all.rds')
-# stations_filt_list = read_rds("./data/stations_filt_list.rds")
-# stations_filt = read_rds("./data/stations_filt_no_missing.rds")
+stations_filt_list = read_rds("./data/stations_filt_list.rds")
+stations_filt = read_rds("./data/stations_filt_no_missing.rds")
 daily_station_data = read_rds("./data/daily_station_data.rds")
 station_year = read_rds("./data/station_year.rds")
+station_summary = read_rds("./data/station_summary.rds")
 
 # There are five main filtering/cleaning stages --------------------------
 # 1. Remove station-years with missing data (based on threshold value)
@@ -36,7 +37,7 @@ threshold = 30
 
 # Identify years that have any missing data and merge with station_year
 percent_missing_30 = daily_station_data %>%
-  filter(perc_daily_missing >= threshold) %>%
+  filter(perc_daily_missing < threshold) %>%
   mutate(missing_dat = 1) %>%
   select(STATION_NUMBER, Year, missing_dat)
 
@@ -47,11 +48,11 @@ station_year_filters = station_year %>%
 
 ## manual check for multiple stations on same river (choosing most downstream station)
 ## filter if station names
-check_dup_all <- stations_filt %>%
+check_dup_all <- station_summary %>%
   mutate(Name = word(STATION_NAME,1,2))%>%
   select(STATION_NUMBER, Name, STATION_NAME, DRAINAGE_AREA_GROSS, LATITUDE, LONGITUDE)
 
-check_dup_stations <- stations_filt |>
+check_dup_stations <- station_summary |>
   dplyr::mutate(Name = word(STATION_NAME,1,2)) |>
   # See how many rows each name has in the dataset.
   add_count(Name) |>
@@ -201,24 +202,28 @@ check_drainage_rule <- check_dup_stations |>
 stns_dup_keep <- stns_dup_table %>%
   filter(STATION_KEEP) %>%
   pull(STATION_NUMBER)
+
 # Duplicated streams to remove
 stn_dup_remove <- check_dup_stations %>%
   filter(!STATION_NUMBER %in% stns_dup_keep) %>%
   pull(STATION_NUMBER)
 
 # Remove the duplicated streams
-stations_filt <- stations_filt %>%
-  mutate(keep_dup = case_when(STATION_NUMBER %in% stn_dup_remove ~ FALSE,
-                              .default = TRUE)) #%>%
+station_summary <- station_summary %>%
+  mutate(keep_dup = case_when(STATION_NUMBER %in% stn_dup_remove ~ NA,
+                              .default = 1)) #%>%
  # filter(keep_dup)
 
+# Add to station_year_filter df
+station_year_filters = station_year_filters %>%
+  left_join(station_summary %>% select(STATION_NUMBER, keep_dup))
 
 # Filtering out stations that are regulated by dams -----------------------
 
 ####### Check for station regulation (plot data and see (first pass))
 
 # Filter for regulated stations
-check_reg <- stations_filt %>%
+check_reg <- station_summary %>%
   filter(REGULATED != FALSE) %>%
   select(STATION_NUMBER, STATION_NAME, "Year_from", "Year_to")
 
@@ -322,12 +327,13 @@ check_reg_results <- tibble::tribble(
 stn_reg_keep <- check_reg_results %>%
   filter(REG_KEEP) %>%
   pull(STATION_NUMBER)
+
 stn_reg_remove <- check_reg_results %>%
   filter(!REG_KEEP) %>%
   pull(STATION_NUMBER)
 
 # Filter and add years of regulated to filter
-stations_filt <- stations_filt %>%
+station_summary <- station_summary %>%
   select(-Year_to, -Year_from) %>%
   mutate(keep_reg = case_when(STATION_NUMBER %in% stn_reg_remove~ FALSE,
                               .default = TRUE)) %>%
@@ -335,23 +341,27 @@ stations_filt <- stations_filt %>%
   left_join(check_reg_results %>%
               select(-Year_from_REG, -STATION_NAME), by = "STATION_NUMBER")
 
+# Add column to station_year
+station_year_filters = station_year_filters %>%
+  mutate(keep_reg = case_when(STATION_NUMBER %in% stn_reg_remove ~ NA,
+                              .default = 1))
 
 # Filtering out stations with large data gaps -----------------------------
 
-###### Year filtering
-n_years_filt = 10
-
+#First, fill in missing years with NAs using station_year df
 stns_ann_data <- hydat_daily_all %>%
-  filter(STATION_NUMBER %in% unique(stations_filt$STATION_NUMBER)) %>%
+  filter(STATION_NUMBER %in% unique(station_summary$STATION_NUMBER)) %>%
   group_by(STATION_NUMBER, wYear) %>%
   summarise(Ann_Mean = mean(Value, na.rm = FALSE)) %>%
   group_by(STATION_NUMBER) %>%
-  filter(sum(!is.na(Ann_Mean)) >= n_years_filt) |>
   ungroup()
+
+stns_ann_data = station_year_filters %>%
+  left_join(stns_ann_data, by = join_by(STATION_NUMBER, Year == wYear))
 
 stns_ann <- unique(stns_ann_data$STATION_NUMBER)
 
-ggplot(stns_ann_data, aes(wYear,STATION_NUMBER, colour = Ann_Mean))+
+ggplot(stns_ann_data %>% filter(!is.na(Ann_Mean)), aes(Year,STATION_NUMBER, colour = Ann_Mean))+
   geom_point()
 
 
@@ -374,32 +384,21 @@ ggplot(stns_ann_data, aes(wYear,STATION_NUMBER, colour = Ann_Mean))+
 # ('stns_ann_data')
 
 ## Andrew attempt at pulling out data gaps (decision = if > 10 year gap, remove all previous data)
-# First, invert data nd do cumsum based on NAs
-test = stns_ann_data %>%
-  arrange(STATION_NUMBER, -wYear) %>%
-  mutate(NAs = case_when(is.na(Ann_Mean) ~ 1,
-                         .default = 0)) %>%
-  group_by(STATION_NUMBER) %>%
-  mutate(cumulative_na = cumsum(NAs)) %>%
-  mutate(gap_10 = case_when(sum(cumulative_na==10)>0~ 0,
-                            .default = 1)) %>%
-  # filter(!(is.na(Ann_Mean))) %>%
-  filter(!(gap_10 == 0 & cumulative_na > 0))
+# First, invert data and do cumsum based on NAs
 
-test2 = test %>%
-  filter(gap_10 == 0)
+threshold_gap = 5
 
 test = stns_ann_data %>%
-  arrange(STATION_NUMBER, -wYear) %>%
-  mutate(NAs = case_when(is.na(Ann_Mean) ~ 1,
+  arrange(STATION_NUMBER, -Year) %>%
+  mutate(NAs = case_when(is.na(Ann_Mean) ~ 1, # for cumulative sum
                          .default = 0),
-         NAs2 = case_when(is.na(Ann_Mean) ~ 1,
+         NAs2 = case_when(is.na(Ann_Mean) ~ 1, # for grouping (resetting when hits non-NA)
                           .default = NA)) %>%
   group_by(STATION_NUMBER, grp = cumsum(is.na(NAs2))) %>%
   mutate(cum_sum = cumsum(NAs))%>%
   ungroup() %>%
   group_by(STATION_NUMBER) %>%
-  mutate(gap_10 = case_when(sum(cum_sum==10)>0~ 0,
+  mutate(gap_10 = case_when(sum(cum_sum==threshold_gap)>0~ 0,
                             .default = 1)) %>%
   # filter(!(is.na(Ann_Mean))) %>%
   # filter(!(gap_10 == 0 & cum_sum > 0))
@@ -413,7 +412,7 @@ clean_dat = test %>%
 
 rn_10 = gappy_dat %>%
   group_by(STATION_NUMBER) %>%
-  filter(cum_sum == 10) %>%
+  filter(cum_sum == threshold_gap) %>%
   select(STATION_NUMBER, rn2 = rn)
 
 gappy_dat_clean = gappy_dat %>%
@@ -422,38 +421,42 @@ gappy_dat_clean = gappy_dat %>%
   filter(rn %in% seq(1:unique(rn2))) %>%
   filter(!is.na(Ann_Mean))
 
-stns_ann_data_clean = bind_rows(clean_dat, gappy_dat_clean)
+stns_ann_data_clean = bind_rows(clean_dat, gappy_dat_clean) %>%
+  mutate(year_gaps = 1)
 
-ggplot(test3, aes(wYear,STATION_NUMBER, colour = Ann_Mean))+
+ggplot(stns_ann_data_clean, aes(Year,STATION_NUMBER, colour = Ann_Mean))+
   geom_point()
 
+station_year_filters = station_year_filters %>%
+  left_join(stns_ann_data_clean %>% select(STATION_NUMBER, Year, year_gaps), by = join_by(STATION_NUMBER, Year)) %>%
+  distinct()
 
-stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
-
-  stn_yr_from <- stations_filt %>%
-    dplyr::filter(STATION_NUMBER == .x) %>%
-    dplyr::pull(Year_from)
-
-  # Nothing but NA for 'Year_from'? (could be worth investigating why)
-  # Use the first year of data instead.
-  if(is.na(stn_yr_from)){
-    stn_yr_from = stations_filt |>
-      filter(STATION_NUMBER == .x) |>
-      dplyr::select(year_min)
-  }
-
-  stns_ann_data %>%
-    dplyr::filter(STATION_NUMBER == .x,
-           wYear >= stn_yr_from) |>
-    dplyr::mutate(Ann_Mean_na_as_0 = tidyr::replace_na(Ann_Mean, 0)) |>
-    dplyr::mutate(sum_up_to_row = cumsum(Ann_Mean_na_as_0)) |>
-    dplyr::filter(sum_up_to_row > 0) |>
-    dplyr::select(-Ann_Mean_na_as_0, -sum_up_to_row)
-}) |>
-  dplyr::bind_rows() |>
-  # Reapply the n years filter number once we've trimmed out big data gaps!
-  dplyr::filter(sum(!is.na(Ann_Mean)) >= n_years_filt) %>%
-  left_join(stations_filt %>% select(STATION_NUMBER, keep_dup))
+# stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
+#
+#   stn_yr_from <- stations_filt %>%
+#     dplyr::filter(STATION_NUMBER == .x) %>%
+#     dplyr::pull(Year_from)
+#
+#   # Nothing but NA for 'Year_from'? (could be worth investigating why)
+#   # Use the first year of data instead.
+#   if(is.na(stn_yr_from)){
+#     stn_yr_from = stations_filt |>
+#       filter(STATION_NUMBER == .x) |>
+#       dplyr::select(year_min)
+#   }
+#
+#   stns_ann_data %>%
+#     dplyr::filter(STATION_NUMBER == .x,
+#            wYear >= stn_yr_from) |>
+#     dplyr::mutate(Ann_Mean_na_as_0 = tidyr::replace_na(Ann_Mean, 0)) |>
+#     dplyr::mutate(sum_up_to_row = cumsum(Ann_Mean_na_as_0)) |>
+#     dplyr::filter(sum_up_to_row > 0) |>
+#     dplyr::select(-Ann_Mean_na_as_0, -sum_up_to_row)
+# }) |>
+#   dplyr::bind_rows() |>
+#   # Reapply the n years filter number once we've trimmed out big data gaps!
+#   dplyr::filter(sum(!is.na(Ann_Mean)) >= n_years_filt) %>%
+#   left_join(stations_filt %>% select(STATION_NUMBER, keep_dup))
 
 # # Modify the earliest permissible years for stations in stations_filt, based on
 # # the stns_ann_data2 table calculated above.
@@ -471,23 +474,40 @@ stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
 # mapfilt4 <- sf::st_as_sf(stations_filt %>% select(STATION_NUMBER, LONGITUDE, LATITUDE), coords = c("LONGITUDE", "LATITUDE"),crs = 4326)
 # mapview::mapview(mapfilt4)
 
-final_stations_summary <- stns_ann_data2 %>%
-  filter(!is.na(Ann_Mean)) %>%
+# Remove stations with less than 10 years of data
+small_ss = station_year_filters %>%
+  filter(!(is.na(missing_dat) | is.na(year_gaps) | is.na(keep_reg))) %>%
   group_by(STATION_NUMBER) %>%
-  summarise(N_Years = n(),
-            Min_Year = min(wYear),
-            Max_Year = max(wYear),
+  mutate(keep_small = case_when(n() < 10 ~ NA,
+                                .default = 1)) %>%
+  select(STATION_NUMBER, Year, keep_small)
+
+station_year_filters = station_year_filters %>%
+  left_join(small_ss)
+
+# Create filtered df (keep upstream stations)
+filtered_station_year = station_year_filters %>%
+  filter(!(is.na(missing_dat) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small)))
+
+final_stations = unique(filtered_station_year$STATION_NUMBER)
+
+final_station_summary = filtered_station_year %>%
+  group_by(STATION_NUMBER) %>%
+  summarise(N_years = n(),
+            Min_Year = min(Year),
+            Max_Year = max(Year),
             Total_Years = Max_Year - Min_Year +1,
             keep = unique(keep_dup))
 
-station_year = stns_ann_data2 %>%
-  select(STATION_NUMBER, wYear)
+# extra_stations = final_station_summary %>%
+#   filter(!(STATION_NUMBER %in% final_stations_summary$STATION_NUMBER))
+# These seem to be being removed by the map function creating stn_ann_data2 due to
+# stn_yr_from being NA
 
-write.csv(final_stations_summary, "data/finalstns.csv", row.names = F)
-
-write.csv(stns_ann_data2, 'data/filtered_annual_data.csv', row.names = F)
-
-write.csv(station_year, 'data/station_year.csv', row.names = F)
+write.csv(final_station_summary, "data/finalstns.csv", row.names = F)
+write.csv(filtered_station_year, "data/finalstnyr.csv", row.names = F)
+#
+# write.csv(station_year, 'data/station_year.csv', row.names = F)
 
 # # Get station spatial files.
 # stations_for_spatial_table = tidyhydat::hy_stations(station_number =  final_stations_summary$STATION_NUMBER) |>
