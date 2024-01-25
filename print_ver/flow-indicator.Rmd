@@ -136,7 +136,7 @@ date_low_bar
 1) Missing data (no mention of if value is estimated in hydat dataset)
 
 - Calculate percentage of days with an NA for each station and each year (perc_daily_missing). Identify "incomplete years", which is a year with > 1 missing value. 
-Remove any years with missing data (even if just a single day)
+Remove any years with missing data (even if just a single day) that totals more than 30%.
 
 - Remove stations with less than 10 years of data and stations that did not have data in 2019.
 
