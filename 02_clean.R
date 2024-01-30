@@ -36,13 +36,13 @@ station_summary = read_rds("./data/station_summary.rds")
 threshold = 30
 
 # Identify years that have any missing data and merge with station_year
-percent_missing_30 = daily_station_data %>%
+percent_missing = daily_station_data %>%
   filter(perc_daily_missing < threshold) %>%
   mutate(missing_dat = 1) %>%
   select(STATION_NUMBER, Year, missing_dat)
 
 station_year_filters = station_year %>%
-  left_join(percent_missing_30)
+  left_join(percent_missing)
 
 # 2. Identifying downstream and upstream stations on the same river --------
 
@@ -364,31 +364,12 @@ stns_ann <- unique(stns_ann_data$STATION_NUMBER)
 ggplot(stns_ann_data %>% filter(!is.na(Ann_Mean)), aes(Year,STATION_NUMBER, colour = Ann_Mean))+
   geom_point()
 
-
-# # Remove stations with large recent gaps
-# # add years to filter from old gappy data
-# stations_filt4 <- stations_filt %>%
-#   filter(!STATION_NUMBER %in% remove_custom$STATION_NUMBER) %>%
-#   left_join(dates_custom, by = "STATION_NUMBER") %>%
-#   mutate(Year_from = ifelse(is.na(Year_from), Year_from_OLD, Year_from),
-#          Year_from = ifelse(is.na(Year_from), year_min, Year_from)) %>%
-#   select(-Year_from_OLD)
-
-
-# For each station, filter out big data gaps. Also,
-# filter out NA rows early on in each dataset. This section is coded
-# using the {purrr} package's "map" function, which carries out
-# a chunk of code for each element in a list (in this case,
-# all the unique station numbers). A map function is nice here because
-# we are using one table ('stations_filt') to filter a second table
-# ('stns_ann_data')
-
 ## Andrew attempt at pulling out data gaps (decision = if > 10 year gap, remove all previous data)
 # First, invert data and do cumsum based on NAs
 
 threshold_gap = 5
 
-test = stns_ann_data %>%
+dat = stns_ann_data %>%
   arrange(STATION_NUMBER, -Year) %>%
   mutate(NAs = case_when(is.na(Ann_Mean) ~ 1, # for cumulative sum
                          .default = 0),
@@ -398,25 +379,25 @@ test = stns_ann_data %>%
   mutate(cum_sum = cumsum(NAs))%>%
   ungroup() %>%
   group_by(STATION_NUMBER) %>%
-  mutate(gap_10 = case_when(sum(cum_sum==threshold_gap)>0~ 0,
+  mutate(gap = case_when(sum(cum_sum==threshold_gap)>0~ 0,
                             .default = 1)) %>%
-  # filter(!(is.na(Ann_Mean))) %>%
-  # filter(!(gap_10 == 0 & cum_sum > 0))
   mutate(rn = row_number())
 
-gappy_dat = test %>%
-  filter(gap_10 == 0)
+gappy_dat = dat %>%
+  filter(gap == 0)
 
-clean_dat = test %>%
-  filter(gap_10 == 1)
+clean_dat = dat %>%
+  filter(gap == 1)
 
-rn_10 = gappy_dat %>%
+#remove any data that is beyond the threshold of missing data
+rown = gappy_dat %>%
   group_by(STATION_NUMBER) %>%
   filter(cum_sum == threshold_gap) %>%
   select(STATION_NUMBER, rn2 = rn)
 
+# remove rows between the first missing data and threshold number
 gappy_dat_clean = gappy_dat %>%
-  left_join(rn_10) %>%
+  left_join(rown) %>%
   group_by(STATION_NUMBER) %>%
   filter(rn %in% seq(1:unique(rn2))) %>%
   filter(!is.na(Ann_Mean))
