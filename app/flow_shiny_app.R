@@ -32,6 +32,8 @@ ui = shiny::fluidPage(
     '',
     class = 'my_bc_button'
   ),
+  bsTooltip(id = "abs_button",
+            title = "Reset Map"),
   titlePanel("Flow Indicator"),
   map_abs_panel,
   trend_select_abs_panel
@@ -42,12 +44,12 @@ server <- function(input, output, session) {
   source(file.path('Load_Filter_Data.R'), local = T)$value
   source(file.path('Render_UI_elements.R'), local = T)$value
 
-  date_vars = c("Min_7_Day_DoY","Max_7_Day_DoY","Min_3_Day_DoY","Max_3_Day_DoY","DoY_50pct_TotalQ")
+  date_vars = c("Min_7_Day_summer_DoY","Max_3_Day_DoY","DoY_50pct_TotalQ")
 
   recent_stations = annual_flow_dat %>%
     group_by(STATION_NUMBER) %>%
     summarise(minYear = min(Year)) %>%
-    filter(minYear>=1990) %>%
+    filter(minYear>=1992) %>%
     pull(STATION_NUMBER)
 
   upstream_stations = stations_sf %>%
@@ -59,21 +61,16 @@ server <- function(input, output, session) {
     if(input$time_scale == 'Monthly'){
       updateSelectizeInput(inputId = 'user_var_choice',
                            choices = c('Average Flow' = 'Average',
-                                       "Low Flow (7-day)" = "Min_7_Day",
-                                       "Low Flow (3-day)" = "Min_3_Day")
+                                       "Low Summer Flow (7-day)" = "Min_7_Day_summer")
       )
     }
     if(input$time_scale == 'Annual'){
       updateSelectizeInput(inputId = 'user_var_choice',
                            choices = c('Average Flow' = 'Average',
                                        'Date of Freshet' = 'DoY_50pct_TotalQ',
-                                       'Low Flow (7-day)' = 'Min_7_Day',
-                                       'Low Flow (3-day)' = 'Min_3_Day',
-                                       'Date of Low Flow (7-day)' = 'Min_7_Day_DoY',
-                                       'Date of Low Flow (3-day)' = 'Min_3_Day_DoY',
-                                       'Peak Flow (7-day)' = 'Max_7_Day',
+                                       'Low Summer Flow (7-day)' = 'Min_7_Day_summer',
+                                       'Date of Low Summer Flow (7-day)' = 'Min_7_Day_summer_DoY',
                                        'Peak Flow (3-day)' = 'Max_3_Day',
-                                       'Date of Peak Flow (7-day)' = 'Max_7_Day_DoY',
                                        'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY')
       )
     }
@@ -81,6 +78,26 @@ server <- function(input, output, session) {
 
   #New BC Button
   observeEvent(input$abs_button, {
+    zoom = input$leafmap_zoom
+    lat = input$leafmap_center[2]
+    lon = input$leafmap_center[1]
+
+    # Change region_rv() to 'All'
+    if(hydro_rv() != 'All'| zoom != 5 | lat != 50 | lon != -130){
+      hydro_rv('All')
+
+      # Update map to BC zoom (customizable)
+      leafletProxy('leafmap') |>
+        set_bc_view()
+
+      updateSelectInput(session = session,
+                        'hydrozone_choice',
+                        selected = 'All')
+    }
+  })
+
+  #Reset button
+  observeEvent(input$reset_inputs, {
     zoom = input$leafmap_zoom
     lat = input$leafmap_center[2]
     lon = input$leafmap_center[1]
@@ -171,14 +188,14 @@ server <- function(input, output, session) {
                                                         'No Trend',
                                                         'Non-Significant Trend Later',
                                                         'Significant Trend Later')),
-               magnitude = factor(magnitude, levels = c("Earlier",
-                                                        "Minimal Change",
-                                                        "Later")),
-               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.2 days earlier per year",
-                                                                    "0.1 - 0.2 days earlier per year",
-                                                                    "< 0.1 days change per year",
-                                                                    "0.1 - 0.2 days later per year",
-                                                                    "> 0.2 days later per year")))
+               # magnitude = factor(magnitude, levels = c("Earlier",
+               #                                          "Minimal Change",
+               #                                          "Later")),
+               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.2 days earlier",
+                                                                    "0.1 - 0.2 days earlier",
+                                                                    "< 0.1 days change",
+                                                                    "0.1 - 0.2 days later",
+                                                                    "> 0.2 days later")))
     } else {
       dat %>%
 
@@ -187,16 +204,16 @@ server <- function(input, output, session) {
                                                         'No Trend',
                                                         'Non-Significant Trend Up',
                                                         'Significant Trend Up')),
-               magnitude = factor(magnitude, levels = c("Strong Decrease",
-                                                        "Decrease",
-                                                        "Minimal Change",
-                                                        "Increase",
-                                                        "Strong Increase")),
-               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.5% decrease per year",
-                                                                    "0.1 - 0.5% decrease per year",
-                                                                    "< 0.1% change per year",
-                                                                    "0.1 - 0.5% increase per year",
-                                                                    "> 0.5% increase per year")))
+               # magnitude = factor(magnitude, levels = c("Strong Decrease",
+               #                                          "Decrease",
+               #                                          "Minimal Change",
+               #                                          "Increase",
+               #                                          "Strong Increase")),
+               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.5% decrease",
+                                                                    "0.1 - 0.5% decrease",
+                                                                    "< 0.1% change",
+                                                                    "0.1 - 0.5% increase",
+                                                                    "> 0.5% increase")))
     }
   })
 
@@ -340,20 +357,20 @@ server <- function(input, output, session) {
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
-                  levels = c("> 0.2 days earlier per year",
-                             "0.1 - 0.2 days earlier per year",
-                             "< 0.1 days change per year",
-                             "0.1 - 0.2 days later per year",
-                             "> 0.2 days later per year"),
+                  levels = c("> 0.2 days earlier",
+                             "0.1 - 0.2 days earlier",
+                             "< 0.1 days change",
+                             "0.1 - 0.2 days later",
+                             "> 0.2 days later"),
                   ordered = T)
     } else {
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
-                  levels = c("> 0.5% decrease per year",
-                             "0.1 - 0.5% decrease per year",
-                             "< 0.1% change per year",
-                             "0.1 - 0.5% increase per year",
-                             "> 0.5% increase per year"),
+                  levels = c("> 0.5% decrease",
+                             "0.1 - 0.5% decrease",
+                             "< 0.1% change",
+                             "0.1 - 0.5% increase",
+                             "> 0.5% increase"),
                   ordered = T)
     }
   })
@@ -438,7 +455,7 @@ server <- function(input, output, session) {
       removeControl("legend") %>%
       addLegend(pal = mypal3(),
                 values = ~magnitude_fixed,
-                title = 'Mann-Kendall Trend Result',
+                title = 'Annual Change',
                 data = stations_sf_with_trend(),
                 layerId = 'legend')#%>%
       # addSearchFeatures(
