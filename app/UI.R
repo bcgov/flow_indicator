@@ -10,10 +10,12 @@ library(data.table)
 library(tidyverse)
 library(ggtext)
 library(shinyjs)
+library(shinyBS)
 
 # Trend selection options
 trend_select_options_tab = wellPanel(
   fluidRow(
+    column(width= 8,
     selectizeInput(inputId = 'hydrozone_choice',
                    label = 'Hydrologic Zone',
                    choice = c('All',
@@ -47,6 +49,10 @@ trend_select_options_tab = wellPanel(
                               "Upper Kootenay Basin",
                               "Central Kootenay Basin")
     )
+    ),
+    column( width = 2,
+  actionButton("reset_inputs","Reset")),
+  column(width = 2),
   ),
   fluidRow(
     column(width = 6,
@@ -65,12 +71,8 @@ trend_select_options_tab = wellPanel(
                  choices = c('Average Flow' = 'Average',
                              'Date of Freshet' = 'DoY_50pct_TotalQ',
                              'Low Flow (7-day)' = 'Min_7_Day',
-                             'Low Flow (3-day)' = 'Min_3_Day',
                              'Date of Low Flow (7-day)' = 'Min_7_Day_DoY',
-                             'Date of Low Flow (3-day)' = 'Min_3_Day_DoY',
-                             'Peak Flow (7-day)' = 'Max_7_Day',
                              'Peak Flow (3-day)' = 'Max_3_Day',
-                             'Date of Peak Flow (7-day)' = 'Max_7_Day_DoY',
                              'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY'),
                  selected = 'Mean',
                  width = '100%'),
@@ -80,7 +82,7 @@ trend_select_options_tab = wellPanel(
                         label = 'Timespan for Trend Analysis',
                         choices = c(
                           # 'Recent (2010 - 2022)' = '2010+',
-                                    'Three decades (1990 - 2022)' = '1990+',
+                                    'Three decades (1992 - 2022)' = '1990+',
                                     'All available years' = 'all'),
                         selected = 'all',
                         inline = F)
