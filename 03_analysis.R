@@ -40,80 +40,65 @@ stations_to_keep = final_station_summary %>%
 # Note: this includes 'gappy' data we identified in script 1.
 # ~5 million rows, 7 columns.
 flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
-  mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
-                           month(Date) < 10 ~ year(Date) + 1),
-         lfYear = case_when(month(Date) >=4 ~ year(Date),
-                            month(Date) < 4 ~ year(Date) - 1),
-         Year = year(Date)) %>%
+  mutate(Year = case_when(month(Date) >= 10 ~ year(Date),
+                           month(Date) < 10 ~ year(Date) - 1)) %>%
   filter(Parameter == 'Flow') %>%
   filter(!is.na(Value)) %>%
   mutate(Month = lubridate::month(Date))
 
 #Restrict by station_year list (this will remove years with missing data)
-flow_dat_filtered_filtered = flow_dat_filtered %>%
-  filter(paste0(STATION_NUMBER, wYear) %in% paste0(filtered_station_year$STATION_NUMBER,filtered_station_year$Year)) %>%
-  mutate(wDoY = case_when(month(Date) >= 10 ~ yday(Date) - yday(paste0(year(Date),"-09-30")),
-                          month(Date) < 10 ~ yday(Date) + (365 - yday(paste0(year(Date),"-09-30")))),
-         lfDoY = case_when(month(Date) >= 4 ~ yday(Date) - yday(paste0(year(Date),"-03-31")),
-                           month(Date) < 4 ~ yday(Date) + (365 - yday(paste0(year(Date),"-03-31")))))
-
-# # Take out big data gaps. This map function cycles through our station numbers,
-# # identifying the new start year, if any (e.g. a station might have one year of
-# # data in 1956, but then lack many years of data until 1973; this function would trim
-# # away all data up to 1973).
-# # Produces dataset of ~ 4.7 million rows
-#
-# flow_dat_filtered = unique(flow_dat_filtered$STATION_NUMBER) %>%
-#   map( ~ {
-#     year_for_trimming = unique(final_stations_summary[final_stations_summary$STATION_NUMBER == .x,]$Min_Year)
-#
-#     station_dat = flow_dat_filtered %>%
-#       filter(STATION_NUMBER == .x)
-#
-#     filtered_dat = station_dat %>%
-#       filter(wYear >= year_for_trimming)
-#
-#     filtered_dat
-#   }) %>%
-#   bind_rows() %>%
-
+flow_dat_filtered = flow_dat %>%
+  filter(paste0(STATION_NUMBER, Year) %in% paste0(filtered_station_year$STATION_NUMBER,filtered_station_year$Year)) %>%
+  mutate(DoY = case_when(month(Date) >= 10 ~ yday(Date) - yday(paste0(year(Date),"-09-30")),
+                          month(Date) < 10 ~ yday(Date) + (365 - yday(paste0(year(Date),"-09-30")))))
 
 # Annual Values =========================================================
-annual_mean_dat = flow_dat_filtered_filtered %>%
-  group_by(wYear,STATION_NUMBER) %>%
+annual_mean_dat = flow_dat %>%
+  filter(paste0(STATION_NUMBER, Year) %in% paste0(filtered_station_year$STATION_NUMBER,filtered_station_year$Year)) %>%
+  group_by(Year,STATION_NUMBER) %>%
   summarise(Average = mean(Value)) %>%
-  ungroup() %>%
-  rename(Year = wYear)
+  ungroup()%>%
+  filter(Year > 1915) # remove some random early year that looks to not have been removed by gap code (no idea why!)
 
 # Check data gaps are gone
-ggplot(annual_mean_dat, aes(Year,STATION_NUMBER, colour = Average))+
+ggplot(annual_mean_dat, aes(Year,STATION_NUMBER, colour = Average)) +
   geom_point()
 
 
 # Timing of freshet (i.e. date by which 50% of total annual flow has passed)
-flow_timing_dat = flow_dat_filtered_filtered %>%
-  group_by(STATION_NUMBER,wYear) %>%
+flow_timing_dat = flow_dat_filtered %>%
+  filter(paste0(STATION_NUMBER, Year) %in% paste0(filtered_station_year$STATION_NUMBER,filtered_station_year$Year)) %>%
+  group_by(STATION_NUMBER, Year) %>%
   mutate(RowNumber = row_number(),
          TotalFlow = sum(Value),
          FlowToDate = cumsum(Value)) %>%
   filter(FlowToDate > TotalFlow/2) %>%
   slice(1) %>%
-  mutate(DoY_50pct_TotalQ = wDoY,
+  mutate(DoY_50pct_TotalQ = DoY,
          Date = Date) %>%
-  # rename('Date_50pct_TotalQ' = Date) %>%
   ungroup() %>%
   dplyr::select(STATION_NUMBER,
-                Year = wYear,DoY_50pct_TotalQ,
+                Year = Year,DoY_50pct_TotalQ,
                 Date
   )
 
-# Create change column and then calculate cumulative change
+#plot freshet results
+dir.create(file.path("./pngs"), showWarnings = FALSE)
 
+unique(flow_timing_dat$STATION_NUMBER) %>%
+  map ( ~ {
+    dir.create(file.path(paste0("./pngs/",.x)), showWarnings = FALSE)
+    flow_timing_dat %>%
+      filter(STATION_NUMBER == .x) %>%
+    ggplot() +
+      geom_point(aes(x = Year, y = DoY_50pct_TotalQ))
+      ggsave(filename = paste0("./pngs/",.x,"/",.x,".png"))
+  })
 
 # 7-day Summer Low flow (flow value, day of year, Date)
 # Note: this is SUMMER low flow (i.e. May - October)
 
-low_high_flow_dat_filtered_7day = stations_to_keep %>% map( ~ {
+low_flow_dat_filtered_7day = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
@@ -143,58 +128,56 @@ low_high_flow_dat_filtered_7day = stations_to_keep %>% map( ~ {
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
     filter(flow_7_Day != lead(flow_7_Day) & between(Month, 3, 10)) %>%
-    group_by(lfYear) %>%
+    group_by(Year) %>%
     slice_min(flow_7_Day) %>%
-    group_by(lfYear,flow_7_Day) %>%
+    group_by(Year,flow_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_7_Day_summer_DoY = lfDoY,
-                  Min_7_Day_summer_Date = Date, Min_7_summer_Day = flow_7_Day, -wYear, -Year)%>%
-    dplyr::select(-wDoY)
+    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_7_Day_summer_DoY = DoY,
+                  Min_7_Day_summer_Date = Date, Min_7_Day_summer = flow_7_Day)
 
   summer_low_flows = min_7_day_dat %>%
-    dplyr::select(STATION_NUMBER, Year = lfYear, everything())
+    dplyr::select(STATION_NUMBER, Year, everything())
 
   min_7_day_dat = daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
     filter(flow_7_Day != lead(flow_7_Day)) %>%
-    group_by(lfYear) %>%
+    group_by(Year) %>%
     slice_min(flow_7_Day) %>%
-    group_by(lfYear,flow_7_Day) %>%
+    group_by(Year,flow_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_7_Day_DoY = lfDoY,
-                  Min_7_Day_Date = Date, Min_7_Day = flow_7_Day, -wYear, -Year)%>%
-    dplyr::select(-wDoY)
+    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_7_Day_DoY = DoY,
+                  Min_7_Day_Date = Date, Min_7_Day = flow_7_Day)
 
   low_flows = min_7_day_dat %>%
-    dplyr::select(STATION_NUMBER, Year = lfYear, everything()) %>%
+    dplyr::select(STATION_NUMBER, Year, everything()) %>%
     left_join(summer_low_flows, by = join_by(STATION_NUMBER, Year))
 
-  # Find Peak flows (7-day average flows, could be any time of year)
-  max_7_day_dat = daily_flows_dt %>%
-    as_tibble() %>%
-    # Missing data can produce identical minimum flow values.
-    # Keep only the latest record for each such duplication.
-    group_by(wYear) %>%
-    slice_max(flow_7_Day) %>%
-    group_by(wYear,flow_7_Day) %>%
-    slice(1) %>%
-    ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Month,
-                  Max_7_Day_DoY = wDoY, Max_7_Day_Date = Date,
-                  Max_7_Day = flow_7_Day, -lfYear, -Year)%>%
-    dplyr::select(- lfDoY, Year = wYear)
-
-  low_flows %>%
-    left_join(max_7_day_dat,
-              by = join_by(STATION_NUMBER, Year))
+  # # Find Peak flows (7-day average flows, could be any time of year)
+  # max_7_day_dat = daily_flows_dt %>%
+  #   as_tibble() %>%
+  #   # Missing data can produce identical minimum flow values.
+  #   # Keep only the latest record for each such duplication.
+  #   group_by(wYear) %>%
+  #   slice_max(flow_7_Day) %>%
+  #   group_by(wYear,flow_7_Day) %>%
+  #   slice(1) %>%
+  #   ungroup() %>%
+  #   dplyr::select(-Parameter,-Value,-Symbol, -Month,
+  #                 Max_7_Day_DoY = wDoY, Max_7_Day_Date = Date,
+  #                 Max_7_Day = flow_7_Day, -lfYear, -Year)%>%
+  #   dplyr::select(- lfDoY, Year = wYear)
+  #
+  # low_flows %>%
+  #   left_join(max_7_day_dat,
+  #             by = join_by(STATION_NUMBER, Year))
 }) %>%
   bind_rows()
 
-low_high_flow_dat_filtered_3day = stations_to_keep %>% map( ~ {
+high_flow_dat_filtered_3day = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
@@ -219,81 +202,142 @@ low_high_flow_dat_filtered_3day = stations_to_keep %>% map( ~ {
   # daily_flows_dt_summer = daily_flows_dt %>%
   #  filter(Month %in% c(5:9))
 
-  min_3_day_dat = daily_flows_dt %>%
-    as_tibble() %>%
-    # Missing data can produce identical minimum flow values.
-    # Keep only the latest record for each such duplication.
-    filter(flow_3_Day != lead(flow_3_Day) & between(Month, 3, 10)) %>%
-    group_by(lfYear) %>%
-    slice_min(flow_3_Day) %>%
-    group_by(lfYear,flow_3_Day) %>%
-    slice(1) %>%
-    ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_3_summer_Day_DoY = lfDoY,
-                  Min_3_Day_summer_Date = Date, Min_3_summer_Day = flow_3_Day, -wYear, -Year)%>%
-    dplyr::select(-wDoY)
-
-  summer_low_flows = min_3_day_dat %>%
-    dplyr::select(STATION_NUMBER, Year = lfYear, everything())
-
-  min_3_day_dat = daily_flows_dt %>%
-    as_tibble() %>%
-    # Missing data can produce identical minimum flow values.
-    # Keep only the latest record for each such duplication.
-    filter(flow_3_Day != lead(flow_3_Day)) %>%
-    group_by(lfYear) %>%
-    slice_min(flow_3_Day) %>%
-    group_by(lfYear,flow_3_Day) %>%
-    slice(1) %>%
-    ungroup() %>%
-    dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_3_Day_DoY = lfDoY,
-                  Min_3_Day_Date = Date, Min_3_Day = flow_3_Day, -wYear, -Year)%>%
-    dplyr::select(-wDoY)
-
-  low_flows = min_3_day_dat %>%
-    dplyr::select(STATION_NUMBER, Year = lfYear, everything()) %>%
-    left_join(summer_low_flows, by = join_by(STATION_NUMBER, Year))
+  # min_3_day_dat = daily_flows_dt %>%
+  #   as_tibble() %>%
+  #   # Missing data can produce identical minimum flow values.
+  #   # Keep only the latest record for each such duplication.
+  #   filter(flow_3_Day != lead(flow_3_Day) & between(Month, 4, 10)) %>%
+  #   group_by(lfYear) %>%
+  #   slice_min(flow_3_Day) %>%
+  #   group_by(lfYear,flow_3_Day) %>%
+  #   slice(1) %>%
+  #   ungroup() %>%
+  #   dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_3_summer_Day_DoY = lfDoY,
+  #                 Min_3_Day_summer_Date = Date, Min_3_summer_Day = flow_3_Day, -wYear, -Year)%>%
+  #   dplyr::select(-wDoY)
+  #
+  # summer_low_flows = min_3_day_dat %>%
+  #   dplyr::select(STATION_NUMBER, Year = lfYear, everything())
+  #
+  # min_3_day_dat = daily_flows_dt %>%
+  #   as_tibble() %>%
+  #   # Missing data can produce identical minimum flow values.
+  #   # Keep only the latest record for each such duplication.
+  #   filter(flow_3_Day != lead(flow_3_Day)) %>%
+  #   group_by(lfYear) %>%
+  #   slice_min(flow_3_Day) %>%
+  #   group_by(lfYear,flow_3_Day) %>%
+  #   slice(1) %>%
+  #   ungroup() %>%
+  #   dplyr::select(-Parameter,-Value,-Symbol, -Month, Min_3_Day_DoY = lfDoY,
+  #                 Min_3_Day_Date = Date, Min_3_Day = flow_3_Day, -wYear, -Year)%>%
+  #   dplyr::select(-wDoY)
+  #
+  # low_flows = min_3_day_dat %>%
+  #   dplyr::select(STATION_NUMBER, Year = lfYear, everything()) %>%
+  #   left_join(summer_low_flows, by = join_by(STATION_NUMBER, Year))
 
   # Find Peak flows (7-day average flows, could be any time of year)
   max_3_day_dat = daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
-    group_by(wYear) %>%
+    group_by(Year) %>%
     slice_max(flow_3_Day) %>%
-    group_by(wYear,flow_3_Day) %>%
+    group_by(Year,flow_3_Day) %>%
     slice(1) %>%
     ungroup() %>%
     dplyr::select(-Parameter,-Value,-Symbol, -Month,
-                  Max_3_Day_DoY = wDoY, Max_3_Day_Date = Date,
-                  Max_3_Day = flow_3_Day, -lfYear, -Year)%>%
-    dplyr::select(- lfDoY, Year = wYear)
+                  Max_3_Day_DoY = DoY, Max_3_Day_Date = Date,
+                  Max_3_Day = flow_3_Day)
 
-  low_flows %>%
-    left_join(max_3_day_dat,
-              by = join_by(STATION_NUMBER, Year))
+  # low_flows %>%
+  #   left_join(max_3_day_dat,
+  #             by = join_by(STATION_NUMBER, Year))
 }) %>%
   bind_rows()
 
+# Do same for low and high flow as for freshet
+unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
+  map ( ~ {
+    low_flow_dat_filtered_7day %>%
+      filter(STATION_NUMBER == .x) %>%
+      ggplot() +
+      geom_point(aes(x = Year, y = Min_7_Day_DoY))
+    ggsave(filename = paste0("./pngs/",.x,"/",.x,"_lf_7day.png"))
+  })
+
+# unique(low_high_flow_dat_filtered_7day$STATION_NUMBER) %>%
+#   map ( ~ {
+#     low_high_flow_dat_filtered_7day %>%
+#       filter(STATION_NUMBER == .x) %>%
+#       ggplot() +
+#       geom_point(aes(x = Year, y = Max_7_Day_DoY))
+#     ggsave(filename = paste0("./pngs/",.x,"_hf.png"))
+#   })
+
+# unique(low_high_flow_dat_filtered_3day$STATION_NUMBER) %>%
+#   map ( ~ {
+#     low_high_flow_dat_filtered_3day %>%
+#       filter(STATION_NUMBER == .x) %>%
+#       ggplot() +
+#       geom_point(aes(x = Year, y = Min_3_Day_DoY))
+#     ggsave(filename = paste0("./pngs/",.x,"_lf_3day.png"))
+#   })
+
+unique(high_flow_dat_filtered_3day$STATION_NUMBER) %>%
+  map ( ~ {
+    high_flow_dat_filtered_3day %>%
+      filter(STATION_NUMBER == .x) %>%
+      ggplot() +
+      geom_point(aes(x = Year, y = Max_3_Day_DoY))
+    ggsave(filename = paste0("./pngs/",.x,"/",.x,"_hf_3day.png"))
+  })
+
 annual_flow_dat_filtered = annual_mean_dat  |>
   left_join(flow_timing_dat) |>
-  left_join(low_high_flow_dat_filtered_7day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
-  left_join(low_high_flow_dat_filtered_3day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
+  left_join(low_flow_dat_filtered_7day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
+  left_join(high_flow_dat_filtered_3day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
   dplyr::select(-ends_with("_Date"))
 
-#Recalibrate values that are just beyond April 1 (set 1 month buffer)
-buffer = 60
+#Try new timing approach
+# annual_flow_dat_dates = annual_mean_dat  |>
+#   left_join(flow_timing_dat) |>
+#   left_join(low_high_flow_dat_filtered_7day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
+#   left_join(low_high_flow_dat_filtered_3day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
+#   select(STATION_NUMBER, Year, ends_with("Date"))
+#
+# test = annual_flow_dat_filtered %>%
+#   group_by(STATION_NUMBER) %>%
+#   mutate(Freshet_tmp =
+#     median_date = max())
+
+#Recalibrate values that are just beyond April 1 (set buffer)
+buffer = 30
 
 annual_flow_dat_filtered = annual_flow_dat_filtered %>%
   mutate(Min_7_Day_DoY = case_when(Min_7_Day_DoY < buffer ~ 365 + Min_7_Day_DoY,
                                    .default = Min_7_Day_DoY),
-         Min_3_Day_DoY = case_when(Min_3_Day_DoY < buffer ~ 365 + Min_3_Day_DoY,
-                                   .default = Min_3_Day_DoY),
          Max_3_Day_DoY = case_when(Max_3_Day_DoY < buffer ~ 365 + Max_3_Day_DoY,
-                                   .default = Max_3_Day_DoY),
-         Max_7_Day_DoY = case_when(Max_7_Day_DoY < buffer ~ 365 + Max_7_Day_DoY,
-                                   .default = Max_7_Day_DoY))
+                                   .default = Max_3_Day_DoY))
 
+unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
+  map ( ~ {
+    annual_flow_dat_filtered %>%
+      filter(STATION_NUMBER == .x) %>%
+      ggplot() +
+      geom_point(aes(x = Year, y = Min_7_Day_DoY))
+    ggsave(filename = paste0("./pngs/",.x,"/",.x,"_lf_",buffer,".png"))
+  })
+
+unique(high_flow_dat_filtered_3day$STATION_NUMBER) %>%
+  map ( ~ {
+    annual_flow_dat_filtered %>%
+      filter(STATION_NUMBER == .x) %>%
+      ggplot() +
+      geom_point(aes(x = Year, y = Max_3_Day_DoY))
+    ggsave(filename = paste0("./pngs/",.x,"/",.x,"_hf_",buffer, ".png"))
+  })
 
 # Monthly Values =========================================================
 
@@ -304,10 +348,12 @@ annual_flow_dat_filtered = annual_flow_dat_filtered %>%
 ###     a. 50% quantiles (percentiles?) of normal flow
 ###     b. 90% quantiles (percentiles?) of normal flow
 
-monthly_mean_dat = flow_dat_filtered |>
-  group_by(wYear,Month,STATION_NUMBER) |>
-  reframe(median_flow = median(Value,na.rm=T)) %>%
-  rename(Year = wYear)
+monthly_mean_dat_filtered = flow_dat_filtered %>%
+  group_by(Year,Month,STATION_NUMBER) %>%
+  mutate(perc_na = ((days_in_month(Month)-n())/days_in_month(Month))*100) %>%
+  filter(perc_na<30) %>%
+reframe(median_flow = median(Value,na.rm=T)) %>%
+rename(Year = Year)
 
 monthly_quantiles_dat = flow_dat_filtered %>%
   group_by(Month,STATION_NUMBER) %>%
@@ -326,9 +372,8 @@ monthly_7day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
   # Grab daily flows for the station of interest in this iteration...
   daily_flows = flow_dat_filtered |>
     filter(STATION_NUMBER == .x) |>
-    group_by(STATION_NUMBER,wYear,Month) |>
-    ungroup() %>%
-    select(-lfDoY)
+    group_by(STATION_NUMBER,Year,Month) |>
+    ungroup()
 
   # Use {data.table} package to convert our dataframe into a data.table object
   daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year','Month'))
@@ -344,17 +389,17 @@ monthly_7day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
     filter(flow_7_Day != lead(flow_7_Day)) %>%
-    group_by(wYear,Month) %>%
+    group_by(Year,Month) %>%
     slice_min(flow_7_Day) %>%
-    group_by(wYear,Month,flow_7_Day) %>%
+    group_by(Year,Month,flow_7_Day) %>%
     slice(1) %>%
     ungroup() %>%
     dplyr::select(-Parameter,-Value,-Symbol,
-                  Min_7_Day_DoY = wDoY, Min_7_Day_Date = Date,
-                  Min_7_Day = flow_7_Day, -Year, -lfYear)
+                  Min_7_Day_DoY = DoY, Min_7_Day_Date = Date,
+                  Min_7_Day = flow_7_Day)
 
   min_7_day_dat %>%
-    dplyr::select(STATION_NUMBER, Year = wYear, Month, everything())
+    dplyr::select(STATION_NUMBER, Month, everything())
 }) %>%
   bind_rows()
 
@@ -366,9 +411,8 @@ monthly_3day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
   # Grab daily flows for the station of interest in this iteration...
   daily_flows = flow_dat_filtered |>
     filter(STATION_NUMBER == .x) |>
-    group_by(STATION_NUMBER,wYear,Month) |>
-    ungroup() %>%
-    select(-lfDoY)
+    group_by(STATION_NUMBER,Year,Month) |>
+    ungroup()
 
   # Use {data.table} package to convert our dataframe into a data.table object
   daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','Year','Month'))
@@ -384,17 +428,17 @@ monthly_3day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
     filter(flow_3_Day != lead(flow_3_Day)) %>%
-    group_by(wYear,Month) %>%
+    group_by(Year,Month) %>%
     slice_min(flow_3_Day) %>%
-    group_by(wYear,Month,flow_3_Day) %>%
+    group_by(Year,Month,flow_3_Day) %>%
     slice(1) %>%
     ungroup() %>%
     dplyr::select(-Parameter,-Value,-Symbol,
-                  Min_3_Day_DoY = wDoY, Min_3_Day_Date = Date,
-                  Min_3_Day = flow_3_Day, -Year, -lfYear)
+                  Min_3_Day_DoY = DoY, Min_3_Day_Date = Date,
+                  Min_3_Day = flow_3_Day)
 
   min_3_day_dat %>%
-    dplyr::select(STATION_NUMBER, Year = wYear, Month, everything())
+    dplyr::select(STATION_NUMBER, Month, everything())
 }) %>%
   bind_rows()
 
@@ -402,7 +446,7 @@ monthly_3day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
 ## 1. Average flow + low flow (metrics for the app).
 ## 2. Average flow + quantiles (needed for hydrograph)
 
-monthly_flow_dat_filtered = monthly_mean_dat |>
+monthly_flow_dat_filtered = monthly_mean_dat_filtered |>
   left_join(monthly_7day_lowflow_dat_filtered,
             by = join_by(STATION_NUMBER, Year, Month))|>
               dplyr::select(-Min_7_Day_DoY) |>
