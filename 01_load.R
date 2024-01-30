@@ -45,16 +45,17 @@ hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
 hydat_daily_all = hydat_daily_all %>%
   mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
-                               month(Date) < 10 ~ year(Date) - 1),
-         lfYear = case_when(month(Date) >=4 ~ year(Date),
-                            month(Date) < 4 ~ year(Date +1)),
-         Year = year(Date))
+                           month(Date) < 10 ~ year(Date) - 1))
 
 daily_station_data <- hydat_daily_all %>%
-  group_by(STATION_NUMBER, Year) %>%
-  summarise(na = sum(is.na(Value)),
-            Ann_Mean = mean(Value, na.rm = TRUE),
-            perc_daily_missing = na / 365 * 100) %>%
+  group_by(STATION_NUMBER, wYear) %>%
+  summarise(Ann_Mean = mean(Value, na.rm = TRUE),
+            n = n(),
+            ndays = max(yday(as.Date(paste0("31-12-", year(Date)), format = "%d-%m-%Y"))),
+            perc_daily_missing = ((ndays - n) / ndays) * 100) %>%
+  select(STATION_NUMBER, Year = wYear, perc_daily_missing)
+
+daily_station_data = daily_station_data %>%
   left_join(hy_stations(), by = "STATION_NUMBER") %>%
   left_join(hy_stn_regulation(), by = "STATION_NUMBER")
 
@@ -71,7 +72,7 @@ station_year = expand.grid(stations, years) %>%
 station_summary <- daily_station_data |>
   group_by(STATION_NUMBER) %>%
   summarise(n_years = n(),
-            incomplete_years = sum(na > 0),
+            incomplete_years = sum(perc_daily_missing>0),
             year_min = min(Year),
             year_max = max(Year)) %>%
   left_join(hy_stations(), by = "STATION_NUMBER") %>%

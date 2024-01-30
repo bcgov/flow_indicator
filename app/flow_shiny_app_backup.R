@@ -144,7 +144,7 @@ server <- function(input, output, session) {
     if(input$recent == FALSE){
       dat = dat %>%
         filter(!(STATION_NUMBER %in% recent_stations))
-}
+    }
     else{
       dat = dat
     }
@@ -174,11 +174,11 @@ server <- function(input, output, session) {
                magnitude = factor(magnitude, levels = c("Earlier",
                                                         "Minimal Change",
                                                         "Later")),
-               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.2 days earlier per year",
-                                                                    "0.1 - 0.2 days earlier per year",
+               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.25 days earlier per year",
+                                                                    "0.1 - 0.25 days earlier per year",
                                                                     "< 0.1 days change per year",
-                                                                    "0.1 - 0.2 days later per year",
-                                                                    "> 0.2 days later per year")))
+                                                                    "0.1 - 0.25 days later per year",
+                                                                    "> 0.25 days later per year")))
     } else {
       dat %>%
 
@@ -227,7 +227,7 @@ server <- function(input, output, session) {
   date_choice_label = reactive({
     switch(input$time_scale,
            Annual = 'Based on Data from: Entire year',
-           Monthly = paste0('Based on Data from: ',month.name[match(input$month_selector,month.abb)])
+           Monthly = paste0('Based on Data from: ',month.name[as.numeric(input$time_selector)])
     )
   })
 
@@ -237,8 +237,7 @@ server <- function(input, output, session) {
                       clicked_station = click_station(),
                       stations_shapefile = stations_sf,
                       slopes = senslope_dat(),
-                      caption_label = date_choice_label(),
-                      user_period_choice = input$user_period_choice)
+                      caption_label = date_choice_label())
   })
 
   output$myhydrograph = renderPlot({
@@ -340,11 +339,11 @@ server <- function(input, output, session) {
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
-                  levels = c("> 0.2 days earlier per year",
-                             "0.1 - 0.2 days earlier per year",
+                  levels = c("> 0.25 days earlier per year",
+                             "0.1 - 0.25 days earlier per year",
                              "< 0.1 days change per year",
-                             "0.1 - 0.2 days later per year",
-                             "> 0.2 days later per year"),
+                             "0.1 - 0.25 days later per year",
+                             "> 0.25 days later per year"),
                   ordered = T)
     } else {
       colorFactor(palette = 'RdBu',
@@ -383,7 +382,7 @@ server <- function(input, output, session) {
 
   output$leafmap <- renderLeaflet({
 
-   map = leaflet() %>%
+    map = leaflet() %>%
       addProviderTiles(providers$CartoDB,group = "CartoDB") %>%
       addTiles(group = 'Streets') %>%
       addProviderTiles(providers$Stamen.Terrain, group = "Terrain") %>%
@@ -397,10 +396,10 @@ server <- function(input, output, session) {
       map %>%
         set_bc_view()
     }
-   else{
-     map %>%
-       fitBounds(as.numeric(boundary_data()$xmin)-1, as.numeric(boundary_data()$ymin)-1, as.numeric(boundary_data()$xmax)+1, as.numeric(boundary_data()$ymax)+1)
-   }
+    else{
+      map %>%
+        fitBounds(as.numeric(boundary_data()$xmin)-1, as.numeric(boundary_data()$ymin)-1, as.numeric(boundary_data()$xmax)+1, as.numeric(boundary_data()$ymax)+1)
+    }
   })
 
   observe({
@@ -420,12 +419,12 @@ server <- function(input, output, session) {
                   highlightOptions = highlightOptions(color = "black", weight = 2,
                                                       bringToFront = FALSE)
       ) %>%
-      # addMarkers(icon = makeIcon(
-      #              iconUrl = "http://leafletjs.com/docs/images/leaf-green.png",
-      #              iconWidth = 1, iconHeight = 1
-      #            ),
-      #            data = stations_sf_with_trend(),
-      #            group = 'STATION_NAME') %>%
+      addMarkers(icon = makeIcon(
+        iconUrl = "http://leafletjs.com/docs/images/leaf-green.png",
+        iconWidth = 1, iconHeight = 1
+      ),
+      data = stations_sf_with_trend(),
+      group = 'STATION_NAME') %>%
       addCircleMarkers(layerId = ~STATION_NUMBER,
                        color = 'black',
                        fillColor = ~mypal3()(magnitude_fixed),
@@ -440,13 +439,13 @@ server <- function(input, output, session) {
                 values = ~magnitude_fixed,
                 title = 'Mann-Kendall Trend Result',
                 data = stations_sf_with_trend(),
-                layerId = 'legend')#%>%
-      # addSearchFeatures(
-      #   targetGroups = 'STATION_NAME',
-      #   options = searchFeaturesOptions(
-      #     zoom=12, openPopup = TRUE, firstTipSubmit = TRUE,
-      #     autoCollapse = TRUE, hideMarkerOnCollapse = TRUE ,
-      #     position = "bottomright"))
+                layerId = 'legend')%>%
+      addSearchFeatures(
+        targetGroups = 'STATION_NAME',
+        options = searchFeaturesOptions(
+          zoom=12, openPopup = TRUE, firstTipSubmit = TRUE,
+          autoCollapse = TRUE, hideMarkerOnCollapse = TRUE ,
+          position = "bottomright"))
 
   })
 }
