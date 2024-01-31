@@ -50,9 +50,11 @@ trend_select_options_tab = wellPanel(
                               "Central Kootenay Basin")
     )
     ),
-    column( width = 2,
+    div(style = "margin-top:2.5rem;",
+        column(
+      width = 2,
   actionButton("reset_inputs","Reset")),
-  column(width = 2),
+  column(width = 2)),
   ),
   fluidRow(
     column(width = 6,
@@ -81,7 +83,6 @@ trend_select_options_tab = wellPanel(
            radioButtons(inputId = 'user_period_choice',
                         label = 'Timespan for Trend Analysis',
                         choices = c(
-                          # 'Recent (2010 - 2022)' = '2010+',
                                     'Three decades (1992 - 2022)' = '1990+',
                                     'All available years' = 'all'),
                         selected = 'all',
@@ -97,10 +98,6 @@ trend_select_options_tab = wellPanel(
     )
   )
 )
-
-# station_plot_tab = wellPanel(
-#   plotOutput('myplot', height = 300)
-# )
 
 flow_metric_plot_tab = card(
   card_body(
