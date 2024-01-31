@@ -114,7 +114,7 @@ hydrograph_plot_tab = card(
 # Absolute Panel with trend selection.
 trend_select_abs_panel = absolutePanel(
   id = 'trend_selector',
-  top = 200, left = 10, width = 450, #height = 800,
+  top = 400, left = 10, width = 450, #height = 800,
   draggable = F,
   tabsetPanel(
     id = 'tabset',
@@ -132,7 +132,7 @@ map_abs_panel = absolutePanel(
     style="padding: 8px; border-bottom: 1px solid #CCC; background: #FFFFEE;",
     fluidRow(
       leafletOutput('leafmap',
-                    height = '650px')
+                    height = '99vh')
     )
   )
 )
