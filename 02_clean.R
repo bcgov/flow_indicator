@@ -33,16 +33,22 @@ station_summary = read_rds("./data/station_summary.rds")
 # 1. Remove years with missing data (based on threshold value) --------
 
 # Set threshold
-threshold = 30
+threshold = 10
 
-# Identify years that have any missing data and merge with station_year
-percent_missing = daily_station_data %>%
-  filter(perc_daily_missing < threshold) %>%
-  mutate(missing_dat = 1) %>%
-  select(STATION_NUMBER, Year, missing_dat)
+# Identify years that have any missing data and merge with station_year for both water and low flow years
+percent_missing_wYear = daily_station_data %>%
+  filter(perc_daily_missing_wYear < threshold) %>%
+  mutate(missing_dat_wYear = 1) %>%
+  select(STATION_NUMBER, Year, missing_dat_wYear)
+
+percent_missing_lfYear = daily_station_data %>%
+  filter(perc_daily_missing_lfYear < threshold) %>%
+  mutate(missing_dat_lfYear = 1) %>%
+  select(STATION_NUMBER, Year, missing_dat_lfYear)
 
 station_year_filters = station_year %>%
-  left_join(percent_missing)
+  left_join(percent_missing_wYear) %>%
+  left_join(percent_missing_lfYear)
 
 # 2. Identifying downstream and upstream stations on the same river --------
 
@@ -348,7 +354,7 @@ station_year_filters = station_year_filters %>%
 
 # Filtering out stations with large data gaps -----------------------------
 
-#First, fill in missing years with NAs using station_year df
+#First, fill in missing years with NAs using station_year df (use wYear for this)
 stns_ann_data <- hydat_daily_all %>%
   filter(STATION_NUMBER %in% unique(station_summary$STATION_NUMBER)) %>%
   group_by(STATION_NUMBER, wYear) %>%
@@ -412,67 +418,32 @@ station_year_filters = station_year_filters %>%
   left_join(stns_ann_data_clean %>% select(STATION_NUMBER, Year, year_gaps), by = join_by(STATION_NUMBER, Year)) %>%
   distinct()
 
-# stns_ann_data2 = purrr::map(unique(stations_filt$STATION_NUMBER), ~ {
-#
-#   stn_yr_from <- stations_filt %>%
-#     dplyr::filter(STATION_NUMBER == .x) %>%
-#     dplyr::pull(Year_from)
-#
-#   # Nothing but NA for 'Year_from'? (could be worth investigating why)
-#   # Use the first year of data instead.
-#   if(is.na(stn_yr_from)){
-#     stn_yr_from = stations_filt |>
-#       filter(STATION_NUMBER == .x) |>
-#       dplyr::select(year_min)
-#   }
-#
-#   stns_ann_data %>%
-#     dplyr::filter(STATION_NUMBER == .x,
-#            wYear >= stn_yr_from) |>
-#     dplyr::mutate(Ann_Mean_na_as_0 = tidyr::replace_na(Ann_Mean, 0)) |>
-#     dplyr::mutate(sum_up_to_row = cumsum(Ann_Mean_na_as_0)) |>
-#     dplyr::filter(sum_up_to_row > 0) |>
-#     dplyr::select(-Ann_Mean_na_as_0, -sum_up_to_row)
-# }) |>
-#   dplyr::bind_rows() |>
-#   # Reapply the n years filter number once we've trimmed out big data gaps!
-#   dplyr::filter(sum(!is.na(Ann_Mean)) >= n_years_filt) %>%
-#   left_join(stations_filt %>% select(STATION_NUMBER, keep_dup))
-
-# # Modify the earliest permissible years for stations in stations_filt, based on
-# # the stns_ann_data2 table calculated above.
-# stations_filt = stations_filt |>
-#   left_join(
-#     stns_ann_data2 |>
-#       group_by(STATION_NUMBER) |>
-#       summarise(min_year = min(Year))
-#   ) |>
-#   mutate(year_min = min_year) |>
-#   mutate(n_years = year_max - year_min) |>
-#   dplyr::select(-min_year)
-
-# # Convert to spatial file and check out interim results.
-# mapfilt4 <- sf::st_as_sf(stations_filt %>% select(STATION_NUMBER, LONGITUDE, LATITUDE), coords = c("LONGITUDE", "LATITUDE"),crs = 4326)
-# mapview::mapview(mapfilt4)
-
-# Remove stations with less than 10 years of data
-small_ss = station_year_filters %>%
-  filter(!(is.na(missing_dat) | is.na(year_gaps) | is.na(keep_reg))) %>%
+# Remove stations with less than 10 years of data for each water and low flow year
+small_ss_wYear = station_year_filters %>%
+  filter(!(is.na(missing_dat_wYear) | is.na(year_gaps) | is.na(keep_reg))) %>%
   group_by(STATION_NUMBER) %>%
-  mutate(keep_small = case_when(n() < 10 ~ NA,
+  mutate(keep_small_wYear = case_when(n() < 10 ~ NA,
                                 .default = 1)) %>%
-  select(STATION_NUMBER, Year, keep_small)
+  select(STATION_NUMBER, Year, keep_small_wYear)
+
+small_ss_lfYear = station_year_filters %>%
+  filter(!(is.na(missing_dat_lfYear) | is.na(year_gaps) | is.na(keep_reg))) %>%
+  group_by(STATION_NUMBER) %>%
+  mutate(keep_small_lfYear = case_when(n() < 10 ~ NA,
+                                      .default = 1)) %>%
+  select(STATION_NUMBER, Year, keep_small_lfYear)
 
 station_year_filters = station_year_filters %>%
-  left_join(small_ss)
+  left_join(small_ss_wYear) %>%
+  left_join(small_ss_lfYear)
 
-# Create filtered df (keep upstream stations)
-filtered_station_year = station_year_filters %>%
-  filter(!(is.na(missing_dat) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small)))
+# Create filtered df (keep upstream stations) - water year
+filtered_station_year_wYear = station_year_filters %>%
+  filter(!(is.na(missing_dat_wYear) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small_wYear)))
 
-final_stations = unique(filtered_station_year$STATION_NUMBER)
+final_stations_wYear = unique(filtered_station_year_wYear$STATION_NUMBER)
 
-final_station_summary = filtered_station_year %>%
+final_station_summary_wYear = filtered_station_year_wYear %>%
   group_by(STATION_NUMBER) %>%
   summarise(N_years = n(),
             Min_Year = min(Year),
@@ -480,21 +451,22 @@ final_station_summary = filtered_station_year %>%
             Total_Years = Max_Year - Min_Year +1,
             keep = unique(keep_dup))
 
-# extra_stations = final_station_summary %>%
-#   filter(!(STATION_NUMBER %in% final_stations_summary$STATION_NUMBER))
-# These seem to be being removed by the map function creating stn_ann_data2 due to
-# stn_yr_from being NA
+# Create filtered df (keep upstream stations) - low flow year
+filtered_station_year_lfYear = station_year_filters %>%
+  filter(!(is.na(missing_dat_lfYear) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small_lfYear)))
 
-write.csv(final_station_summary, "data/finalstns.csv", row.names = F)
-write.csv(filtered_station_year, "data/finalstnyr.csv", row.names = F)
-#
-# write.csv(station_year, 'data/station_year.csv', row.names = F)
+final_stations_lfYear = unique(filtered_station_year_lfYear$STATION_NUMBER)
 
-# # Get station spatial files.
-# stations_for_spatial_table = tidyhydat::hy_stations(station_number =  final_stations_summary$STATION_NUMBER) |>
-#   tidyr::as_tibble() |>
-#   sf::st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326)
-#
-# # Write to app's www folder.
-# sf::write_sf(stations_for_spatial_table,
-#              'app/www/stations.gpkg')
+final_station_summary_lfYear = filtered_station_year_lfYear %>%
+  group_by(STATION_NUMBER) %>%
+  summarise(N_years = n(),
+            Min_Year = min(Year),
+            Max_Year = max(Year),
+            Total_Years = Max_Year - Min_Year +1,
+            keep = unique(keep_dup))
+
+write.csv(final_station_summary_wYear, "data/finalstns_wYear.csv", row.names = F)
+write.csv(final_station_summary_lfYear, "data/finalstns_lfYear.csv", row.names = F)
+write.csv(filtered_station_year_wYear, "data/finalstnyr_wYear.csv", row.names = F)
+write.csv(filtered_station_year_lfYear, "data/finalstnyr_lfYear.csv", row.names = F)
+
