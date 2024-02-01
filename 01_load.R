@@ -45,20 +45,37 @@ hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
 hydat_daily_all = hydat_daily_all %>%
   mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
-                           month(Date) < 10 ~ year(Date) - 1))
+                           month(Date) < 10 ~ year(Date) - 1),
+         lfYear = case_when(month(Date) >= 4 ~ year(Date),
+                            month(Date) < 4 ~ year(Date) - 1))
 
-daily_station_data <- hydat_daily_all %>%
+#create daily station data for water year
+
+daily_station_data_wYear <- hydat_daily_all %>%
   group_by(STATION_NUMBER, wYear) %>%
   summarise(Ann_Mean = mean(Value, na.rm = TRUE),
             n = n(),
             ndays = max(yday(as.Date(paste0("31-12-", year(Date)), format = "%d-%m-%Y"))),
             perc_daily_missing = ((ndays - n) / ndays) * 100) %>%
-  select(STATION_NUMBER, Year = wYear, perc_daily_missing)
+  select(STATION_NUMBER,
+         Year = wYear,
+         perc_daily_missing_wYear = perc_daily_missing)
 
-daily_station_data = daily_station_data %>%
+# Do the same for low flow year
+daily_station_data_lfYear <- hydat_daily_all %>%
+  group_by(STATION_NUMBER, lfYear) %>%
+  summarise(Ann_Mean = mean(Value, na.rm = TRUE),
+            n = n(),
+            ndays = max(yday(as.Date(paste0("31-12-", year(Date)), format = "%d-%m-%Y"))),
+            perc_daily_missing = ((ndays - n) / ndays) * 100) %>%
+  select(STATION_NUMBER,
+         Year = lfYear,
+         perc_daily_missing_lfYear = perc_daily_missing)
+
+daily_station_data = daily_station_data_wYear %>%
+  left_join(daily_station_data_lfYear) %>%
   left_join(hy_stations(), by = "STATION_NUMBER") %>%
   left_join(hy_stn_regulation(), by = "STATION_NUMBER")
-
 
 #Create complete station-year df
 minYear = min(daily_station_data$Year)
@@ -72,7 +89,8 @@ station_year = expand.grid(stations, years) %>%
 station_summary <- daily_station_data |>
   group_by(STATION_NUMBER) %>%
   summarise(n_years = n(),
-            incomplete_years = sum(perc_daily_missing>0),
+            incomplete_wYears = sum(perc_daily_missing_wYear>0),
+            incomplete_lfYears = sum(perc_daily_missing_lfYear>0),
             year_min = min(Year),
             year_max = max(Year)) %>%
   left_join(hy_stations(), by = "STATION_NUMBER") %>%
