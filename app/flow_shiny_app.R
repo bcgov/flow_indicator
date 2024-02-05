@@ -44,7 +44,7 @@ server <- function(input, output, session) {
   source(file.path('Load_Filter_Data.R'), local = T)$value
   source(file.path('Render_UI_elements.R'), local = T)$value
 
-  date_vars = c("Min_7_Day_summer_DoY","Max_3_Day_DoY","DoY_50pct_TotalQ")
+  date_vars = c("Min_7_Day_summer_DoY","Max_3_Day_DoY","DoY_50pct_TotalQ", "DoY_90pct_TotalQ", 'R2MAD_DoY')
 
   recent_stations = annual_flow_dat %>%
     group_by(STATION_NUMBER) %>%
@@ -70,6 +70,8 @@ server <- function(input, output, session) {
                                        'Date of Freshet' = 'DoY_50pct_TotalQ',
                                        'Low Summer Flow (7-day)' = 'Min_7_Day_summer',
                                        'Date of Low Summer Flow (7-day)' = 'Min_7_Day_summer_DoY',
+                                       'Date of 90% Annual Flow' = 'DoY_90pct_TotalQ',
+                                       'Return to MAD' = 'R2MAD_DoY',
                                        'Peak Flow (3-day)' = 'Max_3_Day',
                                        'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY')
       )
