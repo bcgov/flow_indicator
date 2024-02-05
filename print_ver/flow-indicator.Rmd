@@ -59,7 +59,7 @@ theme_set(theme_classic() +
 label.colour <- "black" 
 colour.scale <- brewer.pal(3,"Blues")
 
-annual_flow_dat = readRDS(here("app/www","annual_flow_dat_buffer30.rds"))
+annual_flow_dat = readRDS(here("app/www","annual_flow_dat.rds"))
 stations_sf = st_read(here("app/www","stations.gpkg"))
 
 load(here("print_ver/out","figures.Rdata"))
@@ -128,8 +128,7 @@ date_low_bar
 
 ## Timing of yearly data
 - Water Year = October - October
-- Low Flow Year = April to April
-- Summer low flow = March - October
+- Summer low flow = May - October
 
 ## Filtering procedures
 
