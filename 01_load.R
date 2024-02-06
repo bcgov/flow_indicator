@@ -29,10 +29,6 @@ if(!dir.exists('app/www')) dir.create('app/www')
 # Complete step for first time users or if data is out-of-date
 # tidyhydat::download_hydat()
 
-## Filter stations for last n years of data, minimum number of years
-year_filt <- year(Sys.Date())-5 # to select stations that are active within the last 5 years
-n_years_filt <- 10 # stations must have a minimum of 10 yrs for trending
-
 ## Get all BC stations with "flow"
 stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
                                  filter(Parameter == "Flow") %>%
