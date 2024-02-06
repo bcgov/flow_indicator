@@ -74,7 +74,7 @@ annual_mean_dat = flow_dat_filtered_wYear %>%
   rename(Year = wYear)
 
 # Check data gaps are gone
-ggplot(annual_mean_dat, aes(wYear,STATION_NUMBER, colour = Average)) +
+ggplot(annual_mean_dat, aes(Year,STATION_NUMBER, colour = Average)) +
   geom_point()
 
 
@@ -145,7 +145,7 @@ unique(flow_timing_dat$STATION_NUMBER) %>%
   })
 
 # Try using same approach as with freshet but a higher percentage of flow (may not work due to the huge variability between years of speed of snowmelt)
-low_perc = 0.9
+low_perc = 0.8
 
 low_flow_timing_dat = flow_dat_filtered_lfYear %>%
   filter(paste0(STATION_NUMBER, lfYear) %in% paste0(filtered_station_year_lfYear$STATION_NUMBER,filtered_station_year_lfYear$Year)) %>%
@@ -632,6 +632,36 @@ stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat_fil
 hydrozones = read_sf('data/HYDZ_HYDROLOGICZONE_SP/HYD_BC_H_Z_polygon.shp') %>%
   st_transform(crs = st_crs(stations_sf)) %>%
   mutate(HYDZN_NAME = str_to_title(HYDZN_NAME))
+
+# Add grouping variable
+hydrozones = hydrozones %>%
+  mutate(region = case_when(HYDZN_NAME %in% c("Northern Interior Plains",
+                                              "Southern Interior Plains",
+                                              "Northern Rocky Mountains",
+                                              "Southern Rocky Mountain Foothills",
+                                              "Mcgregor Basin") ~ "North-East",
+                            HYDZN_NAME %in% c("Upper Fraser Basin",
+                                              "Northern Columbia Mountains",
+                                              "Upper Columbia Basin",
+                                              "Upper Kootenay Basin",
+                                              "Central Kootenay Basin",
+                                              "Lower Kootenay Basin",
+                                              "Lower Columbia Basin",
+                                              "Southern Quesnel Highland") ~ "South-East",
+                            HYDZN_NAME %in% c("Okanagan Highland",
+                                              "Southern Thompson Plateau",
+                                              "Eastern South Coast Mountains",
+                                              "Central South Coast Mountains",
+                                              "Western South Coast Mountains",
+                                              "Fraser Plateau",
+                                              "Northern Thompson Plateau") ~ "South-West",
+                            HYDZN_NAME %in% c("Nechako Plateau",
+                                              "Northern Central Uplands",
+                                              "Stikine Plateau",
+                                              "Northern Coast Mountains",
+                                              "Southern Hazelton Mountains",
+                                              "Central Coast Mountains") ~ "North-West",
+                            .default = "Island"))
 
 write_sf(hydrozones, 'app/www/hydrozones.gpkg')
 
