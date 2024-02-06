@@ -31,7 +31,7 @@ calculate_MK_results = function(data,chosen_variable){
               maxYear = max(Year),
               range = max(Year) - min(Year))
 
- data %>%
+  data %>%
     add_count(STATION_NUMBER, name = 'number_records') |>
     filter(number_records > 3) |>
     group_by(STATION_NUMBER) %>%
@@ -46,79 +46,84 @@ calculate_MK_results = function(data,chosen_variable){
     left_join(yeardat) %>%
     group_by(direction) %>%
     mutate(bins = chop_equally(Slope,
-                             groups = 3))%>%
+                               groups = 3))%>%
     mutate(begin_flow = (Intercept + (Slope * minYear)+0.00000001),
            end_flow = (Intercept + (Slope * maxYear)+0.00000001)) %>%
     mutate(per_change = (((end_flow - begin_flow)/begin_flow))/range*100,
            change_timing =  (end_flow - begin_flow)/range) %>%
     ungroup() %>%
-    mutate(trend_sig = fcase(
-      abs(Tau) <= 0.05 , "No Trend",
-      Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Earlier",
-      Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Earlier",
-      Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Later",
-      Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Later",
-      Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Down",
-      Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Down",
-      Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Up",
-      Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Up"
-    ),
-    magnitude = fcase(
-      bins == levels(bins)[1] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Strong Decrease",
-      bins == levels(bins)[2] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Decrease",
-      bins %in% c(levels(bins)[3],levels(bins)[4]) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Minimal Change",
-      bins == levels(bins)[5] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Increase",
-      bins == levels(bins)[6] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Strong Increase",
-      bins %in% c(levels(bins)[1],levels(bins)[2]) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Earlier",
-      bins %in% c(levels(bins)[3],levels(bins)[4]) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Minimal Change",
-      bins %in% c(levels(bins)[5],levels(bins)[6]) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Later"
-    ),
-    magnitude_fixed = fcase(
-            change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.2 days earlier",
-            between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.2 days earlier",
-            between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 0.1 days change",
-            between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.2 days later",
-            change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.2 days later",
-            per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% decrease",
-            between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% decrease",
-            between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 0.1% change",
-            between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% increase",
-            per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% increase"
-    ),
-    significant = case_when(P_value <=0.05~ 1,
-                            .default = 0.1),
-    color = fcase(
-      change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'),"#CA0020",
-      between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F4A582",
-      between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F7F7F7",
-      between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#92C5DE",
-      change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#0571B0",
-      per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#CA0020",
-      between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F4A582",
-      between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F7F7F7",
-      between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#92C5DE",
-      per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#0571B0")
+    mutate(
+      trend_sig = fcase(
+        abs(Tau) <= 0.05 , "No Trend",
+        Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Earlier",
+        Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Earlier",
+        Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Later",
+        Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Later",
+        Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Down",
+        Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Down",
+        Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Up",
+        Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Up"
+      ),
+      # magnitude = fcase(
+      #   bins == levels(bins)[1] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Strong Decrease",
+      #   bins == levels(bins)[2] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Decrease",
+      #   bins %in% c(levels(bins)[3],levels(bins)[4]) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Minimal Change",
+      #   bins == levels(bins)[5] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Increase",
+      #   bins == levels(bins)[6] & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Strong Increase",
+      #   bins %in% c(levels(bins)[1],levels(bins)[2]) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Earlier",
+      #   bins %in% c(levels(bins)[3],levels(bins)[4]) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Minimal Change",
+      #   bins %in% c(levels(bins)[5],levels(bins)[6]) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Later"
+      # ),
+      magnitude_fixed = fcase(
+        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.2 days earlier",
+        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.2 days earlier",
+        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 0.1 days change",
+        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.2 days later",
+        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.2 days later",
+        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% decrease",
+        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% decrease",
+        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 0.1% change",
+        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% increase",
+        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% increase"
+      ),
+      significant = case_when(P_value <=0.05~ 1,
+                              .default = 0.1),
+      color = fcase(
+        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'),"#CA0020",
+        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F4A582",
+        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F7F7F7",
+        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#92C5DE",
+        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#0571B0",
+        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#CA0020",
+        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F4A582",
+        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F7F7F7",
+        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#92C5DE",
+        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#0571B0")
     )
 }
 
 station_flow_plot = function(data,variable_choice,clicked_station,stations_shapefile,slopes,caption_label, user_period_choice){
 
-  label.frame = data.frame(varname = c('Average',
-                                       'DoY_50pct_TotalQ',
-                                       'DoY_90pct_TotalQ',
-                                       'R2MAD_DoY',
-                                       'Min_7_Day_summer',
-                                       'Min_7_Day_summer_DoY',
-                                       'Max_3_Day',
-                                       'Max_3_Day_DoY'),
-                           labels = c('Average Flow',
-                                      'Date of 50% Annual Flow',
-                                      'Date of 90% Annual Flow',
-                                      'Return to MAD',
-                                      'Minimum Summer Flow (7day)',
-                                      'Date of Minimum Summer Flow (7day)',
-                                      'Maximum Flow (3day)',
-                                      'Date of Maximum Flow (3day)'))
+  label.frame = data.frame(varname = c(
+    'Average',
+    'DoY_50pct_TotalQ',
+    # 'DoY_90pct_TotalQ',
+    'R2MAD_DoY',
+    'Min_7_Day_summer',
+    # 'Min_7_Day_summer_DoY',
+    'Max_3_Day'
+    # 'Max_3_Day_DoY'
+  ),
+  labels = c(
+    'Average Flow',
+    'Date of 50% Annual Flow',
+    # 'Date of 90% Annual Flow',
+    'Return to MAD',
+    'Minimum Summer Flow (7day)',
+    # 'Date of Minimum Summer Flow (7day)',
+    'Maximum Flow (3day)'
+    # 'Date of Maximum Flow (3day)'
+  ))
 
   if(clicked_station == 'no_selection'){
     ggplot() +
@@ -127,11 +132,27 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
   } else {
 
     plot_units = fcase(
-      variable_choice %in% c('Average','Total_Volume_m3','Min_7_Day_summer','Max_3_Day') , '(m<sup>3</sup>/second)',
-      variable_choice %in% c('DoY_50pct_TotalQ','DoY_90pct_TotalQ','R2MAD_DoY', 'Min_7_Day_summer_DoY', 'Max_3_Day_DoY'), " "
+      variable_choice %in% c('Average',
+                             'Min_7_Day_summer',
+                             'Max_3_Day'
+      ) ,
+      '(m<sup>3</sup>/second)',
+      variable_choice %in% c(
+        'DoY_50pct_TotalQ',
+        # 'DoY_90pct_TotalQ',
+        'R2MAD_DoY'
+        # 'Min_7_Day_summer_DoY',
+        # 'Max_3_Day_DoY'
+      ), " "
     )
 
-    if(variable_choice %in% c('DoY_50pct_TotalQ','DoY_90pct_TotalQ','R2MAD_DoY', 'Min_7_Day_summer_DoY', 'Max_3_Day_DoY')){
+    if(variable_choice %in% c(
+      'DoY_50pct_TotalQ',
+      # 'DoY_90pct_TotalQ',
+      'R2MAD_DoY'
+      # 'Min_7_Day_summer_DoY',
+      # 'Max_3_Day_DoY'
+    )){
       y_labs = data.frame()
     }
 
@@ -144,7 +165,7 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
                   st_drop_geometry() %>%
                   dplyr::select(STATION_NUMBER,STATION_NAME))
 
-      plot = ggplot(plot_dat) +
+    plot = ggplot(plot_dat) +
       geom_point(aes(y = values, x = Year))  +
       labs(title = paste0(station_name," (",unique(clicked_station),")"),
            subtitle = paste0(unique(slopes$trend_sig),
@@ -153,39 +174,92 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
            caption = caption_label) +
       labs(y = paste(label.frame[label.frame$varname == variable_choice,]$labels,plot_units,sep = " ")) +
       # scale_x_continuous(breaks = scales::pretty_breaks()) +
-        expand_limits(x = 1990) +
-        scale_x_continuous(breaks = seq(1990, 2020, by = 10),
-                           labels = seq(1990, 2020, by = 10)) +
-      theme_minimal() +
+      expand_limits(x = 1990) +
+      scale_x_continuous(breaks = seq(1990, 2020, by = 10),
+                         labels = seq(1990, 2020, by = 10))
+    theme_minimal() +
       theme(axis.title.y = element_markdown(size = 14),
             axis.title.x = element_text(size = 14),
             axis.text = element_text(size = 11))
 
 
-    if(variable_choice %in% c('DoY_50pct_TotalQ','DoY_90pct_TotalQ','R2MAD_DoY', 'Min_7_Day_summer_DoY', 'Max_3_Day_DoY')){
-      plot = plot +
-        scale_y_continuous(breaks = c(min(plot_dat$values), max(plot_dat$values)),#,
-                           # # labels = c("Earlier", "Later"))
-                           labels = c(as.Date(min(plot_dat$values), origin = "2000-04-01"),
-                                      as.Date(max(plot_dat$values), origin = "2000-04-01")))
+    if(variable_choice %in% c(
+      'DoY_50pct_TotalQ'
+      # 'DoY_90pct_TotalQ',
+
+      # 'Min_7_Day_summer_DoY',
+      # 'Max_3_Day_DoY'
+    )){
+
+      plot_dat = data %>%
+        ungroup() %>%
+        filter(STATION_NUMBER == clicked_station) %>%
+        left_join(stations_shapefile %>%
+                    st_drop_geometry() %>%
+                    dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
+        mutate(values = as.Date(values, origin = "2000-10-01"))
+
+      plot = ggplot(plot_dat) +
+        geom_point(aes(y = values, x = Year))  +
+        labs(title = paste0(station_name," (",unique(clicked_station),")"),
+             subtitle = paste0(unique(slopes$trend_sig),
+                               " (Sen slope:",round(slopes$Slope,3),
+                               ", p-value ~ ",round(unique(slopes$P_value),2),")"),
+             caption = caption_label) +
+        labs(y = paste(label.frame[label.frame$varname == variable_choice,]$labels,plot_units,sep = " ")) +
+        # scale_x_continuous(breaks = scales::pretty_breaks()) +
+        expand_limits(x = 1990) +
+        scale_x_continuous(breaks = seq(1990, 2020, by = 10),
+                           labels = seq(1990, 2020, by = 10))
+      theme_minimal() +
+        theme(axis.title.y = element_markdown(size = 14),
+              axis.title.x = element_text(size = 14),
+              axis.text = element_text(size = 11)) +
+        scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
+    }
+    if(variable_choice %in% c(
+      'R2MAD_DoY'
+    )){
+      plot_dat = data %>%
+        ungroup() %>%
+        filter(STATION_NUMBER == clicked_station) %>%
+        left_join(stations_shapefile %>%
+                    st_drop_geometry() %>%
+                    dplyr::select(STATION_NUMBER,STATION_NAME)) %>%
+        mutate(values = as.Date(values, origin = "2000-04,-01"))
+
+      plot = ggplot(plot_dat) +
+        geom_point(aes(y = values, x = Year))  +
+        labs(title = paste0(station_name," (",unique(clicked_station),")"),
+             subtitle = paste0(unique(slopes$trend_sig),
+                               " (Sen slope:",round(slopes$Slope,3),
+                               ", p-value ~ ",round(unique(slopes$P_value),2),")"),
+             caption = caption_label) +
+        labs(y = paste(label.frame[label.frame$varname == variable_choice,]$labels,plot_units,sep = " ")) +
+        # scale_x_continuous(breaks = scales::pretty_breaks()) +
+        expand_limits(x = 1990) +
+        scale_x_continuous(breaks = seq(1990, 2020, by = 10),
+                           labels = seq(1990, 2020, by = 10))
+      theme_minimal() +
+        theme(axis.title.y = element_markdown(size = 14),
+              axis.title.x = element_text(size = 14),
+              axis.text = element_text(size = 11)) +
+        scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
     }
     else{
       plot = plot
     }
 
-      if(user_period_choice == 'all'){
-        plot = plot +  expand_limits(x = 1900) +
-          scale_x_continuous(breaks = seq(1920, 2020, by = 20),
-                             labels = seq(1920, 2020, by = 20))
-      }
-      else {
-        plot = plot
-      }
+    if(user_period_choice == 'all'){
+      plot = plot +  expand_limits(x = 1900) +
+        scale_x_continuous(breaks = seq(1920, 2020, by = 20),
+                           labels = seq(1920, 2020, by = 20))
+    }
+    else {
+      plot = plot
+    }
     if(round(unique(slopes$P_value),2)<=0.05) {
-      # print(slopes$SlopePreds)
-      # print(slopes$Year)
-      # print(slopes$per_change)
-      # print(slopes$color)
+
       plot +
         geom_line(aes(y = SlopePreds, x = Year, colour = color),
                   linetype = 1,
@@ -195,7 +269,7 @@ station_flow_plot = function(data,variable_choice,clicked_station,stations_shape
         scale_color_identity()
     }
     else{
-    plot
+      plot
     }
 
   }
