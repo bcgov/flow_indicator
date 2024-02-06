@@ -58,7 +58,7 @@ server <- function(input, output, session) {
     pull(STATION_NUMBER)
 
   upstream_stations = stations_sf %>%
-    filter(keep == FALSE) %>%
+    filter(is.na(keep)) %>%
     pull(STATION_NUMBER)
 
   # Update month selector to show months, if user picks month time-scale
