@@ -16,6 +16,7 @@ library(data.table)
 library(tidyhydat)
 library(sf)
 library(cowplot)
+library(envreportutils)
 
 #Load data
 if(!exists("hydrozones")){hydrozones = st_read('app/www/hydrozones.gpkg')}
@@ -48,7 +49,7 @@ nw.poly = hydrozones %>%
   geom_sf() +
   geom_sf(data = hydrozones %>% filter(region == "North-West"), fill = "darkgreen")
 
-Island.poly = hydrozones %>%
+island.poly = hydrozones %>%
   ggplot() +
   theme_void() +
   geom_sf() +
@@ -132,7 +133,7 @@ mk_annual = calculate_MK_results(annual_flow_dat, chosen_variable = "Average")  
 mk_peak = calculate_MK_results(annual_flow_dat, chosen_variable = "Max_3_Day")  %>%
   left_join(stations, by = "STATION_NUMBER")
 
-mk_Low = calculate_MK_results(annual_flow_dat, chosen_variable = "Min_7_Day_summer")  %>%
+mk_low = calculate_MK_results(annual_flow_dat, chosen_variable = "Min_7_Day_summer")  %>%
   left_join(stations, by = "STATION_NUMBER")
 
 mk_freshet = calculate_MK_results(annual_flow_dat, chosen_variable = "DoY_50pct_TotalQ")  %>%
@@ -159,7 +160,7 @@ colour.scale.date <- c("> 0.2 days later"="#2171b5",
 
 # combine above into single doc
 mk_results_all = bind_rows(mk_annual,
-                           mk_Low,
+                           mk_low,
                            mk_peak,
                            mk_freshet,
                            mk_date_low) %>%
@@ -227,7 +228,7 @@ legend = get_legend(
   mk_magnitude +
     guides(color = guide_legend(nrow = 1)) +
     theme(legend.position = "bottom",
-          legend.justification="center",
+          legend.justification="right",
           legend.title = element_blank())
 )
 
@@ -389,12 +390,12 @@ p5 = Island %>%
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
+  # theme(axis.line.x = element_blank(),
+  #       axis.text.x = element_blank(),
+  #       axis.title.x = element_blank(),
+  #       axis.ticks.x = element_blank()) +
   ylim(0, max(annual_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(Island.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
+  annotation_custom(grob = ggplotGrob(island.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
 
 annual_bar_plot = plot_grid(p1,p2,p3,p4,p5, ncol = 1,
                             align = "v")
@@ -412,132 +413,724 @@ dev.off()
 
 # - Peak Flow
 
-peak_bar = mk_annual %>%
+peak_bar = mk_peak %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 10% increase",
-                                                         "5 - 10% increase",
-                                                         "< 5% change",
-                                                         "5 - 10% decrease",
-                                                         "> 10% decrease",
-                                                         "No significant trend"
-  ))) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+                                                          "0.1 - 0.5% increase",
+                                                          "< 0.1% change",
+                                                          "0.1 - 0.5% decrease",
+                                                          "> 0.5% decrease",
+                                                          "No significant trend"))) %>%
   group_by(HYDZN_NAME) %>%
   mutate(n_stations = n()) %>%
   group_by(HYDZN_NAME, magnitude_fixed) %>%
   summarise(n = n(),
-            n_stations = unique(n_stations)) %>%
-  mutate(percent = n/n_stations) %>%
+            n_stations = unique(n_stations),
+            region = unique(region)) %>%
+  mutate(percent = n/n_stations)
+
+
+# Try plotting each region "separately and combining in facet grid
+ne = peak_bar %>%
+  filter(region == "North-East")
+
+p1 = ne  %>%
   ggplot() +
-  ggtitle("Maximum Annual Flow (3 day window)") +
-  geom_col(aes(x = fct_reorder(HYDZN_NAME,n_stations) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
-  xlab("Hydrologic Zone") +
+  xlab("") +
   ylab("Number of stations") +
   labs(fill = "Magnitude of change") +
   coord_flip() +
-  theme_classic()
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(ne.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
 
-svg_px("./print_ver/out/figs/peak_bar.svg", width = 800, height = 600)
-plot(peak_bar)
+p1
+
+se = peak_bar %>%
+  filter(region == "South-East")
+
+p2 = se %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(se.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+
+
+p2
+
+sw = peak_bar %>%
+  filter(region == "South-West")
+
+p3 = sw %>%
+  filter(region == "South-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(sw.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+
+
+p3
+
+nw = peak_bar %>%
+  filter(region == "North-West")
+
+p4 = nw %>%
+  filter(region == "North-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(nw.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+
+
+p4
+
+Island = peak_bar %>%
+  filter(region == "Island")
+
+p5 = Island %>%
+  filter(region == "Island") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  # theme(axis.line.x = element_blank(),
+  #       axis.text.x = element_blank(),
+  #       axis.title.x = element_blank(),
+  #       axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(island.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+
+peak_bar_plot = plot_grid(p1,p2,p3,p4,p5, ncol = 1,
+                            align = "v")
+
+peak_bar_plot = plot_grid(peak_bar_plot,
+                            legend,
+                            ncol = 1,
+                            rel_heights = c(1,0.1))
+
+peak_bar_plot
+
+svg_px("./print_ver/out/figs/peak_bar.svg", width = 600, height = 600)
+plot(peak_bar_plot)
 dev.off()
 
 # - Low Flow
 
-  low_bar = mk_annual %>%
-    mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
-                                       .default = magnitude_fixed)) %>%
-    mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 10% increase",
-                                                           "5 - 10% increase",
-                                                           "< 5% change",
-                                                           "5 - 10% decrease",
-                                                           "> 10% decrease",
-                                                           "No significant trend"
-    ))) %>%
-    group_by(HYDZN_NAME) %>%
-    mutate(n_stations = n()) %>%
-    group_by(HYDZN_NAME, magnitude_fixed) %>%
-    summarise(n = n(),
-              n_stations = unique(n_stations)) %>%
-    mutate(percent = n/n_stations) %>%
-    ggplot() +
-    ggtitle("Minimum Annual Flow (7 day window)") +
-    geom_col(aes(x = fct_reorder(HYDZN_NAME, n_stations) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-    scale_fill_manual(values = colour.scale) +
-    xlab("Hydrologic Zone") +
-    ylab("Number of stations") +
-    labs(fill = "Magnitude of change") +
-    coord_flip() +
-    theme_classic()
+low_bar = mk_low %>%
+  mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+                                                          "0.1 - 0.5% increase",
+                                                          "< 0.1% change",
+                                                          "0.1 - 0.5% decrease",
+                                                          "> 0.5% decrease",
+                                                          "No significant trend"))) %>%
+  group_by(HYDZN_NAME) %>%
+  mutate(n_stations = n()) %>%
+  group_by(HYDZN_NAME, magnitude_fixed) %>%
+  summarise(n = n(),
+            n_stations = unique(n_stations),
+            region = unique(region)) %>%
+  mutate(percent = n/n_stations)
 
-  svg_px("./print_ver/out/figs/low_bar.svg", width = 800, height = 600)
-  plot(low_bar)
-  dev.off()
+
+# Try plotting each region "separately and combining in facet grid
+ne = low_bar %>%
+  filter(region == "North-East")
+
+p1 = ne  %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(ne.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+p1
+
+se = low_bar %>%
+  filter(region == "South-East")
+
+p2 = se %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(se.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+
+p2
+
+sw = low_bar %>%
+  filter(region == "South-West")
+
+p3 = sw %>%
+  filter(region == "South-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(sw.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+
+p3
+
+nw = low_bar %>%
+  filter(region == "North-West")
+
+p4 = nw %>%
+  filter(region == "North-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(nw.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+
+p4
+
+Island = low_bar %>%
+  filter(region == "Island")
+
+p5 = Island %>%
+  filter(region == "Island") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  # theme(axis.line.x = element_blank(),
+  #       axis.text.x = element_blank(),
+  #       axis.title.x = element_blank(),
+  #       axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(island.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+low_bar_plot = plot_grid(p1,p2,p3,p4,p5, ncol = 1,
+                            align = "v")
+
+low_bar_plot = plot_grid(low_bar_plot,
+                            legend,
+                            ncol = 1,
+                            rel_heights = c(1,0.1))
+
+low_bar_plot
+
+svg_px("./print_ver/out/figs/low_bar.svg", width = 600, height = 600)
+plot(low_bar_plot)
+dev.off()
 
   #Metrics - Timing of Flow
+legend_timing = get_legend(
+  mk_timing +
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom",
+          legend.justification="right",
+          legend.title = element_blank())
+)
+
   # Date of Freshet
 
 freshet_bar = mk_freshet %>%
-    mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
-                                       .default = magnitude_fixed)) %>%
-    mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 10% later",
-                                                           "5 - 10% later",
-                                                           "< 5% change",
-                                                           "5 - 10% earlier",
-                                                           "> 10% earlier",
-                                                           "No significant trend"
-    ))) %>%
-    group_by(HYDZN_NAME) %>%
-    mutate(n_stations = n()) %>%
-    group_by(HYDZN_NAME, magnitude_fixed) %>%
-    summarise(n = n(),
-              n_stations = unique(n_stations)) %>%
-    mutate(percent = n/n_stations) %>%
-    ggplot() +
-    ggtitle("Change in Date of Freshet") +
-    geom_col(aes(x = fct_reorder(HYDZN_NAME,n_stations) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-    scale_fill_manual(values = colour.scale.date) +
-    xlab("Hydrologic Zone") +
-    ylab("Number of stations") +
-    labs(fill = "Magnitude of change") +
-    coord_flip() +
-    theme_classic()
+  mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.2 days earlier",
+                                                          "0.1 - 0.2 days earlier",
+                                                          "< 0.1 days change",
+                                                          "0.1 - 0.2 days later",
+                                                          "> 0.2 days later",
+                                                          "No significant trend"))) %>%
+  group_by(HYDZN_NAME) %>%
+  mutate(n_stations = n()) %>%
+  group_by(HYDZN_NAME, magnitude_fixed) %>%
+  summarise(n = n(),
+            n_stations = unique(n_stations),
+            region = unique(region)) %>%
+  mutate(percent = n/n_stations)
 
-  svg_px("./print_ver/out/figs/freshet_bar.svg", width = 800, height = 600)
-  plot(freshet_bar)
-  dev.off()
+
+# Try plotting each region "separately and combining in facet grid
+ne = freshet_bar %>%
+  filter(region == "North-East")
+
+p1 = ne  %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(ne.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+p1
+
+se = freshet_bar %>%
+  filter(region == "South-East")
+
+p2 = se %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(se.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+
+p2
+
+sw = freshet_bar %>%
+  filter(region == "South-West")
+
+p3 = sw %>%
+  filter(region == "South-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(sw.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+
+p3
+
+nw = freshet_bar %>%
+  filter(region == "North-West")
+
+p4 = nw %>%
+  filter(region == "North-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(nw.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+
+p4
+
+Island = freshet_bar %>%
+  filter(region == "Island")
+
+p5 = Island %>%
+  filter(region == "Island") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  # theme(axis.line.x = element_blank(),
+  #       axis.text.x = element_blank(),
+  #       axis.title.x = element_blank(),
+  #       axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(island.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+freshet_bar_plot = plot_grid(p1,p2,p3,p4,p5, ncol = 1,
+                            align = "v")
+
+freshet_bar_plot = plot_grid(freshet_bar_plot,
+                            legend_timing,
+                            ncol = 1,
+                            rel_heights = c(1,0.1))
+
+freshet_bar_plot
+
+svg_px("./print_ver/out/figs/freshet_bar.svg", width = 600, height = 600)
+plot(freshet_bar_plot)
+dev.off()
 
   # Date of Low Flow
 
-  date_low_bar = mk_date_low %>%
-    mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
-                                       .default = magnitude_fixed)) %>%
-    mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 10% later",
-                                                            "5 - 10% later",
-                                                            "< 5% change",
-                                                            "5 - 10% earlier",
-                                                            "> 10% earlier",
-                                                            "No significant trend"
-    ))) %>%
-    group_by(HYDZN_NAME) %>%
-    mutate(n_stations = n()) %>%
-    group_by(HYDZN_NAME, magnitude_fixed) %>%
-    summarise(n = n(),
-              n_stations = unique(n_stations)) %>%
-    mutate(percent = n/n_stations) %>%
-    ggplot() +
-    ggtitle("Change in Date of Low Flow") +
-    geom_col(aes(x = fct_reorder(HYDZN_NAME,n_stations) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-    scale_fill_manual(values = colour.scale.date) +
-    xlab("Hydrologic Zone") +
-    ylab("Number of stations") +
-    labs(fill = "Magnitude of change") +
-    coord_flip() +
-    theme_classic()
+date_low_bar = mk_date_low %>%
+  mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.2 days earlier",
+                                                          "0.1 - 0.2 days earlier",
+                                                          "< 0.1 days change",
+                                                          "0.1 - 0.2 days later",
+                                                          "> 0.2 days later",
+                                                          "No significant trend"))) %>%
+  group_by(HYDZN_NAME) %>%
+  mutate(n_stations = n()) %>%
+  group_by(HYDZN_NAME, magnitude_fixed) %>%
+  summarise(n = n(),
+            n_stations = unique(n_stations),
+            region = unique(region)) %>%
+  mutate(percent = n/n_stations)
 
-  svg_px("./print_ver/out/figs/date_low_bar.svg", width = 800, height = 600)
-  plot(date_low_bar)
-  dev.off()
+
+# Try plotting each region "separately and combining in facet grid
+ne = date_low_bar %>%
+  filter(region == "North-East")
+
+p1 = ne  %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(ne.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+p1
+
+se = date_low_bar %>%
+  filter(region == "South-East")
+
+p2 = se %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(se.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+
+p2
+
+sw = date_low_bar %>%
+  filter(region == "South-West")
+
+p3 = sw %>%
+  filter(region == "South-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(sw.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+
+p3
+
+nw = date_low_bar %>%
+  filter(region == "North-West")
+
+p4 = nw %>%
+  filter(region == "North-West") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(nw.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+
+p4
+
+Island = date_low_bar %>%
+  filter(region == "Island")
+
+p5 = Island %>%
+  filter(region == "Island") %>%
+  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
+  #                                                         "0.1 - 0.5% increase",
+  #                                                         "< 0.1% change",
+  #                                                         "0.1 - 0.5% decrease",
+  #                                                         "> 0.5% decrease",
+  #                                                         "No significant trend"))) %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  labs(fill = "Magnitude of change") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  # theme(axis.line.x = element_blank(),
+  #       axis.text.x = element_blank(),
+  #       axis.title.x = element_blank(),
+  #       axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations)+ 10) +
+  annotation_custom(grob = ggplotGrob(island.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+date_low_bar_plot = plot_grid(p1,p2,p3,p4,p5, ncol = 1,
+                             align = "v")
+
+date_low_bar_plot = plot_grid(date_low_bar_plot,
+                             legend_timing,
+                             ncol = 1,
+                             rel_heights = c(1,0.1))
+
+date_low_bar_plot
+
+svg_px("./print_ver/out/figs/date_low_bar.svg", width = 600, height = 600)
+plot(date_low_bar_plot)
+dev.off()
 
   # Write ecoprovinces -
 #to do: do we need ecoprovs?? KARLY
@@ -546,4 +1139,4 @@ freshet_bar = mk_freshet %>%
 #   st_simplify(dTolerance = 1000)
 # sf::write_sf(ecoprovs, 'app/www/ecoprovinces.gpkg')
 
-save(mk_all, annual_bar, low_bar, peak_bar, freshet_bar, date_low_bar,  file = "print_ver/out/figures.RData")
+save(mk_all, annual_bar_plot, low_bar_plot, peak_bar_plot, freshet_bar_plot, date_low_bar_plot,  file = "print_ver/out/figures.RData")
