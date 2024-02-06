@@ -217,8 +217,7 @@ stn_dup_remove <- check_dup_stations %>%
 # Remove the duplicated streams
 station_summary <- station_summary %>%
   mutate(keep_dup = case_when(STATION_NUMBER %in% stn_dup_remove ~ NA,
-                              .default = 1)) #%>%
- # filter(keep_dup)
+                              .default = 1))
 
 # Add to station_year_filter df
 station_year_filters = station_year_filters %>%
@@ -437,9 +436,20 @@ station_year_filters = station_year_filters %>%
   left_join(small_ss_wYear) %>%
   left_join(small_ss_lfYear)
 
+# Remove stations that do not have data within last 5 years
+recent_years_threshold = year(Sys.Date()) - 5
+
+recent_years = station_year_filters %>%
+  group_by(STATION_NUMBER) %>%
+  mutate(recent_years = case_when(max(Year)>=recent_years_threshold ~ 1,
+                                  .default = NA))
+
+station_year_filters = station_year_filters %>%
+  left_join(recent_years)
+
 # Create filtered df (keep upstream stations) - water year
 filtered_station_year_wYear = station_year_filters %>%
-  filter(!(is.na(missing_dat_wYear) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small_wYear)))
+  filter(!(is.na(missing_dat_wYear) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small_wYear) |is.na(recent_years)))
 
 final_stations_wYear = unique(filtered_station_year_wYear$STATION_NUMBER)
 
@@ -453,7 +463,7 @@ final_station_summary_wYear = filtered_station_year_wYear %>%
 
 # Create filtered df (keep upstream stations) - low flow year
 filtered_station_year_lfYear = station_year_filters %>%
-  filter(!(is.na(missing_dat_lfYear) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small_lfYear)))
+  filter(!(is.na(missing_dat_lfYear) | is.na(year_gaps) | is.na(keep_reg) | is.na(keep_small_lfYear|is.na(recent_years))))
 
 final_stations_lfYear = unique(filtered_station_year_lfYear$STATION_NUMBER)
 
