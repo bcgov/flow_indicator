@@ -18,8 +18,8 @@ library(data.table)
 library(tidyhydat)
 library(sf)
 
-if(!exists("final_station_summary_wYear")){final_station_summary = read_csv('data/finalstns_wYear.csv')}
-if(!exists("final_station_summary_lfYear")){final_station_summary = read_csv('data/finalstns_lfYear.csv')}
+if(!exists("final_station_summary_wYear")){final_station_summary_wYear = read_csv('data/finalstns_wYear.csv')}
+if(!exists("final_station_summary_lfYear")){final_station_summary_lfYear = read_csv('data/finalstns_lfYear.csv')}
 if(!exists("filtered_station_year_wYear")){filtered_station_year_wYear = read_csv('data/finalstnyr_wYear.csv')}
 if(!exists("filtered_station_year_lfYear")){filtered_station_year_lfYear = read_csv('data/finalstnyr_lfYear.csv')}
 
@@ -28,7 +28,7 @@ if(!exists("filtered_station_year_lfYear")){filtered_station_year_lfYear = read_
 if(!dir.exists('app/www')) dir.create('app/www')
 
 # Pull out the stations to keep from the loading script.
-stations_to_keep = final_station_summary %>%
+stations_to_keep = final_station_summary_wYear %>%
   # filter(keep == TRUE) %>%
   pull(STATION_NUMBER)
 
@@ -100,7 +100,7 @@ flow_timing_dat = flow_dat_filtered_wYear %>%
 # This is a form of low flow so will use the low flow years
 
 # Set threshold
-mad_threshold = 0.5
+mad_threshold = 1
 
 
 # Lets look at a few stations-years to see where mean annual discharge ends up
@@ -129,20 +129,42 @@ rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
                 Year = lfYear,
                 R2MAD_DoY = DoY
   )
+
+mad_threshold = 0.5
+
+rtn_2_mad_perc2 = flow_dat_filtered_lfYear %>%
+  group_by(STATION_NUMBER) %>%
+  mutate(mad = mean(Value)) %>%
+  mutate(mad_perc = mad * mad_threshold) %>%
+  mutate(below_mad_perc = case_when (Value <= mad_perc ~ 1,
+                                     .default = 0)) %>%
+  group_by(STATION_NUMBER, lfYear) %>%
+  mutate(peak_date = DoY[which.max(Value)]) %>%
+  filter(below_mad_perc == 1 & DoY>peak_date) %>%
+  arrange(Date) %>%
+  slice(1) %>%
+  dplyr::select(STATION_NUMBER,
+                Year = lfYear,
+                R2MAD_DoY_50 = DoY
+  )
+
+rtn_2_mad_perc = rtn_2_mad_perc %>%
+  left_join(rtn_2_mad_perc2)
+
 dir.create(file.path("./pngs"), showWarnings = FALSE)
 
-unique(flow_timing_dat$STATION_NUMBER) %>%
-  map ( ~ {
-    dir.create(file.path(paste0("./pngs/",.x)), showWarnings = FALSE)
-    rtn_2_mad_perc %>%
-      filter(STATION_NUMBER == .x) %>%
-      mutate(Low_flow_Date = as.Date(R2MAD_DoY, origin = "2000-04-01")) %>%
-      ggplot() +
-      geom_point(aes(x = Year, y = Low_flow_Date)) +
-      scale_y_date(date_labels = "%b-%d", breaks = "2 weeks")
-
-    ggsave(filename = paste0("./pngs/",.x,"/",.x,"_test.png"))
-  })
+# unique(flow_timing_dat$STATION_NUMBER) %>%
+#   map ( ~ {
+#     dir.create(file.path(paste0("./pngs/",.x)), showWarnings = FALSE)
+#     rtn_2_mad_perc %>%
+#       filter(STATION_NUMBER == .x) %>%
+#       mutate(Low_flow_Date = as.Date(R2MAD_DoY, origin = "2000-04-01")) %>%
+#       ggplot() +
+#       geom_point(aes(x = Year, y = Low_flow_Date)) +
+#       scale_y_date(date_labels = "%b-%d", breaks = "2 weeks")
+#
+#     ggsave(filename = paste0("./pngs/",.x,"/",.x,"_mad50perc.png"))
+#   })
 
 # Try using same approach as with freshet but a higher percentage of flow (may not work due to the huge variability between years of speed of snowmelt)
 low_perc = 0.8
@@ -165,29 +187,29 @@ low_flow_timing_dat = flow_dat_filtered_lfYear %>%
 
 #plot freshet results
 
-unique(flow_timing_dat$STATION_NUMBER) %>%
-  map ( ~ {
-    dir.create(file.path(paste0("./pngs/",.x)), showWarnings = FALSE)
-    flow_timing_dat %>%
-      filter(STATION_NUMBER == .x) %>%
-      mutate(Freshet_Date = as.Date(DoY_50pct_TotalQ, origin = "2000-10-01")) %>%
-    ggplot() +
-      geom_point(aes(x = Year, y = Freshet_Date))+
-      scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
-      ggsave(filename = paste0("./pngs/",.x,"/",.x,"freshet.png"))
-  })
+# unique(flow_timing_dat$STATION_NUMBER) %>%
+#   map ( ~ {
+#     dir.create(file.path(paste0("./pngs/",.x)), showWarnings = FALSE)
+#     flow_timing_dat %>%
+#       filter(STATION_NUMBER == .x) %>%
+#       mutate(Freshet_Date = as.Date(DoY_50pct_TotalQ, origin = "2000-10-01")) %>%
+#     ggplot() +
+#       geom_point(aes(x = Year, y = Freshet_Date))+
+#       scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
+#       ggsave(filename = paste0("./pngs/",.x,"/",.x,"freshet.png"))
+#   })
 
-unique(low_flow_timing_dat$STATION_NUMBER) %>%
-  map ( ~ {
-    dir.create(file.path(paste0("./pngs/",.x)), showWarnings = FALSE)
-    low_flow_timing_dat %>%
-      filter(STATION_NUMBER == .x) %>%
-      mutate(Low_flow_Date = as.Date(DoY_90pct_TotalQ, origin = "2000-04-01")) %>%
-      ggplot() +
-      geom_point(aes(x = Year, y = Low_flow_Date))+
-      scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
-    ggsave(filename = paste0("./pngs/",.x,"/",.x,"low_flow.png"))
-  })
+# unique(low_flow_timing_dat$STATION_NUMBER) %>%
+#   map ( ~ {
+#     dir.create(file.path(paste0("./pngs/",.x)), showWarnings = FALSE)
+#     low_flow_timing_dat %>%
+#       filter(STATION_NUMBER == .x) %>%
+#       mutate(Low_flow_Date = as.Date(DoY_90pct_TotalQ, origin = "2000-04-01")) %>%
+#       ggplot() +
+#       geom_point(aes(x = Year, y = Low_flow_Date))+
+#       scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
+#     ggsave(filename = paste0("./pngs/",.x,"/",.x,"low_flow.png"))
+#   })
 
 # 7-day Summer Low flow (flow value, day of year, Date)
 # Note: this is SUMMER low flow (i.e. May - October)
@@ -349,16 +371,16 @@ high_flow_dat_filtered_3day = stations_to_keep %>% map( ~ {
   bind_rows()
 
 # Do same for low and high flow as for freshet
-unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
-  map ( ~ {
-    low_flow_dat_filtered_7day %>%
-      filter(STATION_NUMBER == .x) %>%
-      mutate(Low_flow_Date = as.Date(Min_7_Day_DoY, origin = "2000-10-01")) %>%
-      ggplot() +
-      geom_point(aes(x = Year, y = Low_flow_Date))+
-      scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
-    ggsave(filename = paste0("./pngs/",.x,"/",.x,"_lf_7day.png"))
-  })
+# unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
+#   map ( ~ {
+#     low_flow_dat_filtered_7day %>%
+#       filter(STATION_NUMBER == .x) %>%
+#       mutate(Low_flow_Date = as.Date(Min_7_Day_DoY, origin = "2000-10-01")) %>%
+#       ggplot() +
+#       geom_point(aes(x = Year, y = Low_flow_Date))+
+#       scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
+#     ggsave(filename = paste0("./pngs/",.x,"/",.x,"_lf_7day.png"))
+#   })
 
 # unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
 #   map ( ~ {
@@ -373,16 +395,16 @@ unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
 #     ggsave(filename = paste0("./pngs/",.x,"/",.x,"_lf_7day.png"))
 #   })
 
-unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
-  map ( ~ {
-    low_flow_dat_filtered_7day %>%
-      filter(STATION_NUMBER == .x) %>%
-      mutate(Summer_Low_flow_Date = as.Date(Min_7_Day_summer_DoY, origin = "2000-10-01")) %>%
-      ggplot() +
-      geom_point(aes(x = Year, y = Summer_Low_flow_Date))+
-      scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
-    ggsave(filename = paste0("./pngs/",.x,"/",.x,"_lf_7day_july.png"))
-  })
+# unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
+#   map ( ~ {
+#     low_flow_dat_filtered_7day %>%
+#       filter(STATION_NUMBER == .x) %>%
+#       mutate(Summer_Low_flow_Date = as.Date(Min_7_Day_summer_DoY, origin = "2000-10-01")) %>%
+#       ggplot() +
+#       geom_point(aes(x = Year, y = Summer_Low_flow_Date))+
+#       scale_y_date(date_labels = "%b-%d", date_breaks = "2 weeks")
+#     ggsave(filename = paste0("./pngs/",.x,"/",.x,"_lf_7day_july.png"))
+#   })
 
 # unique(low_flow_dat_filtered_7day$STATION_NUMBER) %>%
 #   map ( ~ {
@@ -626,7 +648,7 @@ stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat_fil
                           .default = TRUE)) %>%
   st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326) %>%
   dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS) %>%
-  left_join(final_station_summary)
+  left_join(final_station_summary_wYear)
 
 #Hydrologic Zones
 hydrozones = read_sf('data/HYDZ_HYDROLOGICZONE_SP/HYD_BC_H_Z_polygon.shp') %>%
