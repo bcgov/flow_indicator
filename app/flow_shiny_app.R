@@ -44,7 +44,12 @@ server <- function(input, output, session) {
   source(file.path('Load_Filter_Data.R'), local = T)$value
   source(file.path('Render_UI_elements.R'), local = T)$value
 
-  date_vars = c("Min_7_Day_summer_DoY","Max_3_Day_DoY","DoY_50pct_TotalQ", "DoY_90pct_TotalQ", 'R2MAD_DoY')
+  date_vars = c(
+    # "Min_7_Day_summer_DoY",
+    # "Max_3_Day_DoY",
+    "DoY_50pct_TotalQ",
+    # "DoY_90pct_TotalQ",
+    'R2MAD_DoY')
 
   recent_stations = annual_flow_dat %>%
     group_by(STATION_NUMBER) %>%
@@ -61,19 +66,21 @@ server <- function(input, output, session) {
     if(input$time_scale == 'Monthly'){
       updateSelectizeInput(inputId = 'user_var_choice',
                            choices = c('Average Flow' = 'Average',
-                                       "Low Summer Flow (7-day)" = "Min_7_Day_summer")
+                                       "Low Flow" = "Min_7_Day")
       )
     }
     if(input$time_scale == 'Annual'){
       updateSelectizeInput(inputId = 'user_var_choice',
-                           choices = c('Average Flow' = 'Average',
-                                       'Date of Freshet' = 'DoY_50pct_TotalQ',
-                                       'Low Summer Flow (7-day)' = 'Min_7_Day_summer',
-                                       'Date of Low Summer Flow (7-day)' = 'Min_7_Day_summer_DoY',
-                                       'Date of 90% Annual Flow' = 'DoY_90pct_TotalQ',
-                                       'Return to MAD' = 'R2MAD_DoY',
-                                       'Peak Flow (3-day)' = 'Max_3_Day',
-                                       'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY')
+                           choices = c(
+                             'Average Flow' = 'Average',
+                             'Date of Freshet' = 'DoY_50pct_TotalQ',
+                             'Low Summer Flow' = 'Min_7_Day_summer',
+                             # 'Date of Low Summer Flow (7-day)' = 'Min_7_Day_summer_DoY',
+                             # 'Date of 90% Annual Flow' = 'DoY_90pct_TotalQ',
+                             'Date of Low Flow' = 'R2MAD_DoY',
+                             'Peak Flow' = 'Max_3_Day'
+                             # 'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY'
+                           )
       )
     }
   })
@@ -163,7 +170,7 @@ server <- function(input, output, session) {
     if(input$recent == FALSE){
       dat = dat %>%
         filter(!(STATION_NUMBER %in% recent_stations))
-}
+    }
     else{
       dat = dat
     }
@@ -190,9 +197,6 @@ server <- function(input, output, session) {
                                                         'No Trend',
                                                         'Non-Significant Trend Later',
                                                         'Significant Trend Later')),
-               # magnitude = factor(magnitude, levels = c("Earlier",
-               #                                          "Minimal Change",
-               #                                          "Later")),
                magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.2 days earlier",
                                                                     "0.1 - 0.2 days earlier",
                                                                     "< 0.1 days change",
@@ -206,11 +210,6 @@ server <- function(input, output, session) {
                                                         'No Trend',
                                                         'Non-Significant Trend Up',
                                                         'Significant Trend Up')),
-               # magnitude = factor(magnitude, levels = c("Strong Decrease",
-               #                                          "Decrease",
-               #                                          "Minimal Change",
-               #                                          "Increase",
-               #                                          "Strong Increase")),
                magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.5% decrease",
                                                                     "0.1 - 0.5% decrease",
                                                                     "< 0.1% change",
@@ -267,95 +266,7 @@ server <- function(input, output, session) {
       stations_shapefile = stations_sf)
   })
 
-  # mypal = reactive({
-  #   if(input$user_var_choice %in% date_vars){
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$trend_sig,
-  #                 levels = c("Significant Trend Earlier",
-  #                            'Non-Significant Trend Earlier',
-  #                            'No Trend',
-  #                            'Non-Significant Trend Later',
-  #                            'Significant Trend Later'),
-  #                 ordered = T)
-  #   } else {
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$trend_sig,
-  #                 levels = c("Significant Trend Down",
-  #                            'Non-Significant Trend Down',
-  #                            'No Trend',
-  #                            'Non-Significant Trend Up',
-  #                            'Significant Trend Up'),
-  #                 ordered = T)
-  #   }
-  # })
-
-  #   mypal2 = reactive({
-  #   if(input$user_var_choice %in% date_vars){
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$magnitude,
-  #                 levels = c("> 25% earlier",
-  #                            "5 - 25% earlier",
-  #                            "< 5% change",
-  #                            "5 - 25% later",
-  #                            "> 25% later"),
-  #                 ordered = T)
-  #   } else {
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$magnitude,
-  #                 levels = c("> 25% decrease",
-  #                            "5 - 25% decrease",
-  #                            "< 5% change",
-  #                            "5 - 25% increase",
-  #                            "> 25% increase"),
-  #                 ordered = T)
-  #   }
-  # })
-
-  # mypal2 = reactive({
-  #   if(input$user_var_choice %in% date_vars){
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$magnitude,
-  #                 levels = c("Much Earlier",
-  #                            "Earlier",
-  #                            "Little Earlier",
-  #                            "Little Later",
-  #                            "Later",
-  #                            "Much Later"),
-  #                 ordered = T)
-  #   } else {
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$magnitude,
-  #                 levels = c("Strong Negative",
-  #                            "Negative",
-  #                            "Weak Negative",
-  #                            "Weak Positive",
-  #                            "Positive",
-  #                            "Strong Positive"),
-  #                 ordered = T)
-  #   }
-  # })
-
-  # mypal2 = reactive({
-  #   if(input$user_var_choice %in% date_vars){
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$magnitude,
-  #                 levels = c("Earlier",
-  #                            "Minimal Change",
-  #                            "Later"),
-  #                 ordered = T)
-  #   } else {
-  #     colorFactor(palette = 'RdBu',
-  #                 domain = mk_results()$magnitude,
-  #                 levels = c("Strong Decrease",
-  #                            "Decrease",
-  #                            "Minimal Change",
-  #                            "Increase",
-  #                            "Strong Increase"),
-  #                 ordered = T)
-  #   }
-  # })
-
-  mypal3 = reactive({
+  mypal = reactive({
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
@@ -402,7 +313,7 @@ server <- function(input, output, session) {
 
   output$leafmap <- renderLeaflet({
 
-   map = leaflet() %>%
+    map = leaflet() %>%
       addProviderTiles(providers$CartoDB,group = "CartoDB") %>%
       addTiles(group = 'Streets') %>%
       addProviderTiles(providers$Stamen.Terrain, group = "Terrain") %>%
@@ -416,10 +327,10 @@ server <- function(input, output, session) {
       map %>%
         set_bc_view()
     }
-   else{
-     map %>%
-       fitBounds(as.numeric(boundary_data()$xmin)-1, as.numeric(boundary_data()$ymin)-1, as.numeric(boundary_data()$xmax)+1, as.numeric(boundary_data()$ymax)+1)
-   }
+    else{
+      map %>%
+        fitBounds(as.numeric(boundary_data()$xmin)-1, as.numeric(boundary_data()$ymin)-1, as.numeric(boundary_data()$xmax)+1, as.numeric(boundary_data()$ymax)+1)
+    }
   })
 
   observe({
@@ -447,7 +358,7 @@ server <- function(input, output, session) {
       #            group = 'STATION_NAME') %>%
       addCircleMarkers(layerId = ~STATION_NUMBER,
                        color = 'black',
-                       fillColor = ~mypal3()(magnitude_fixed),
+                       fillColor = ~mypal()(magnitude_fixed),
                        radius = 5,
                        weight = 1,
                        fillOpacity = ~significant,
@@ -455,17 +366,17 @@ server <- function(input, output, session) {
                        data = stations_sf_with_trend()) %>%
 
       removeControl("legend") %>%
-      addLegend(pal = mypal3(),
+      addLegend(pal = mypal(),
                 values = ~magnitude_fixed,
                 title = 'Annual Change',
                 data = stations_sf_with_trend(),
                 layerId = 'legend')#%>%
-      # addSearchFeatures(
-      #   targetGroups = 'STATION_NAME',
-      #   options = searchFeaturesOptions(
-      #     zoom=12, openPopup = TRUE, firstTipSubmit = TRUE,
-      #     autoCollapse = TRUE, hideMarkerOnCollapse = TRUE ,
-      #     position = "bottomright"))
+    # addSearchFeatures(
+    #   targetGroups = 'STATION_NAME',
+    #   options = searchFeaturesOptions(
+    #     zoom=12, openPopup = TRUE, firstTipSubmit = TRUE,
+    #     autoCollapse = TRUE, hideMarkerOnCollapse = TRUE ,
+    #     position = "bottomright"))
 
   })
 }
