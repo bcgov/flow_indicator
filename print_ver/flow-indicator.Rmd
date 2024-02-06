@@ -36,6 +36,7 @@ library(png)
 library(cowplot)
 library(here)
 library(sf)
+library(stringr)
 
 knitr::opts_chunk$set(cache = FALSE)
 
@@ -61,6 +62,40 @@ colour.scale <- brewer.pal(3,"Blues")
 
 annual_flow_dat = readRDS(here("app/www","annual_flow_dat.rds"))
 stations_sf = st_read(here("app/www","stations.gpkg"))
+mk_results_tbl = readRDS("print_ver/out/mk_results_tbl.rds")
+
+stations_sf_filtered = stations_sf %>% 
+  filter(! (is.na(keep)))
+
+# summary table of number of stations in each category
+summary_table_cat = mk_results_tbl %>%
+  filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
+    mutate(category = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  group_by(Var, category) %>%
+  summarise(n = n())
+
+
+summary_table_direction = summary_table_cat %>%
+  mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
+                               str_detect(category, "decrease") | str_detect(category, "earlier") ~ "negative",
+                               .default = "no change")) %>%
+  group_by(Var, direction) %>%
+  summarise(n = sum(n))
+
+#Subset Average
+average_cat = summary_table_cat %>%
+  filter(Var == "Average")
+
+average_direction = summary_table_direction %>%
+  filter(Var == "Average")
+
+#Subset Peak Flow
+peak_cat = summary_table_cat %>%
+  filter(Var == "Peak Flow")
+
+peak_direction = summary_table_direction %>%
+  filter(Var == "Peak Flow")
 
 load(here("print_ver/out","figures.Rdata"))
 ```
@@ -71,32 +106,55 @@ flood risks, and may impact natural systems that rely on natural flow patterns. 
 in summer may reduce the amount of water available for agriculture, hydroelectric power generation,
 industry and communities. Low river flows are also associated with declines in water quality and 
 warmer water temperatures which can threaten the health of aquatic ecosystems. The indicator measures
-several metrics representing river flow at `r nrow(stations_sf)` stations across the Province. These stations
-have been monitored for a minimum of `r min(stations_sf$N_years)` years and a maximum of `r max(stations_sf$N_years)` years between `r min(stations_sf$Min_Year)` and `r max(stations_sf$Max_Year)`.
+several metrics representing river flow at `r nrow(stations_sf_filtered)` stations (`r nrow(stations_sf)` when including upstream stations) 
+across the Province. These stations have been monitored for a minimum of `r min(stations_sf_filtered$N_years)` 
+years and a maximum of `r max(stations_sf_filtered$N_years)` years between `r min(stations_sf_filtered$Min_Year)` and `r max(stations_sf_filtered$Max_Year)`.
+
+## Filtering procedure
+
+To account for variation in monitoring at different stations on different rivers, a set of filtering procedures were implemented to reduce potential for erroneous trend estimations. These included:
+
+- **Data gaps**: Monitoring stations containing gaps of 5 or more years had all annual data preceding the gap removed, to maintain relatively continuous datasets at each station for trend analyses.
+
+- **Recently active**: Stations were required to be active as recently as 2019 for inclusion in the analysis.
+
+- **Minimum sample size**: Only stations with more than 10 years of monitoring data were retained.
+
+- **Regulated Rivers**: A river is defined as regulated if the flow regime has been modified and results in a 10% increase or decrease in flow (REF). For the purpose of this 
+analysis, regulated stations were removed from the analysis (apart from certain instances where flow was deemed close to natural).
+
+- **Upstream stations**: A number of rivers include multiple monitoring stations. In such situations, only the downstream stations are included (although upstream locations can be inspected using the online app).
 
 # Metrics
 
 ## Average annual flow
 
-Average annual flow was calculated within each water year (Octboer - October). The mean daily flow was identified for each station and each year of available data, and
+Average annual flow was calculated within each water year (October - October). The mean daily flow was identified for each station and each year of available data, and
 the trend was estimated. We removed years that had more than 30% daily missing data to avoid potentially biased annual measures of average flow.
+
+## Volume of peak flow and timing of freshet
+
+Volume of peak flow and timing of freshet were calculated using water year (October - October). Volume of peak flow was calculated using a 3-day rolling window, identifying the maximum water volume measured at each station for each year. Freshet is defined as the flood of a river, often due to heavy rain or snow melt. For this analysis, we define date of freshet as the date whereby 50% of river flow for that water year has taken place. 
 
 ## Date and volume of low flow
 
-Timing and volume of 
-## Volume of peak flow and freshet
+Timing and volume of low flows was calculated based on the low flow year (April - April). Volume of low flow was estimated based on a 7-day rolling window across the summer (May - October), and the minimum volume was identified for each year at each station. Timing of low flow was calculated based on the Mean Annual Discharge (MAD; ref). The first date when 50% of MAD was reached after freshet was used as the definition of the beginning of summer low flows. 
 
-Freshet is defined as the flood of a river, often due to heavy rain or snow melt. For this analysis, we define date of freshet as the date whereby 50% of river flow for that water year has taken place. 
+\vspace{.2cm}
 
 ```{r fig.width = 10, fig.height = 8, echo = FALSE}
 mk_all
 ```
 
-The metrics measured at each station can be broken down into two types: change in the magnitude of river flow and change in the timing of river flow. Magnitude of flow across all stations has increase in terms of both low and peak flows. Average annual flow has increased and decreased at certain stations, but in general the pattern seems to be a similar volume of flow. The timing of events related to river flow, such as date of freshet and date of low flow, are happening earlier at a large number of rivers. 
+The metrics measured at each station can be broken down into two types: change in the magnitude of river flow and change in the timing of river flow. Of the `r nrow(stations_sf_filtered)` stations monitored across the Province, `r average_direction$n[average_direction$direction == "positive"]` stations identified increasing flows, of which `r average_cat$n[average_cat$category == "> 0.5% increase"]` were increasing by more than 0.5% per year. In contrast,  `r average_direction$n[average_direction$direction == "negative"]` displayed decreasing flows, while the remaining `r average_direction$n[average_direction$direction == "no change"]` were either less than 0.1% a year or had non-significant trends.
 
-Of the `r nrow(stations_sf)` stations monitored across the Province, 
+Similarly, peak flows trends were almost evenly split between increasing (`r peak_direction$n[peak_direction$direction == "positive"]` stations) and decreasing (`r peak_direction$n[peak_direction$direction == "negative"]` stations), while the vast majority were foudn to have little significant change (`r peak_direction$n[peak_direction$direction == "no change"]` stations).
 
-# Changes in magnitude of river flow
+
+
+# Changes in Volume and Timing by Hydrozones
+
+# Magnitude of river flow
 
 ## Average annual flow
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
@@ -113,7 +171,7 @@ peak_bar_plot
 low_bar_plot
 ```
 
-# Changes in timing of river flow
+# Timing of river flow
 
 ## Date of freshet
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
@@ -124,27 +182,3 @@ freshet_bar_plot
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 date_low_bar_plot
 ```
-
-
-# Flow analysis
-
-## Timing of yearly data
-- Water Year = October - October
-- Summer low flow = May - October
-
-## Filtering procedures
-
-1) Missing data (no mention of if value is estimated in hydat dataset)
-
-- Calculate percentage of days with an NA for each station and each year (perc_daily_missing). Identify "incomplete years", which is a year with > 1 missing value. 
-Remove any years with missing data (even if just a single day) that totals more than 30%.
-
-- Remove stations with less than 10 years of data and stations that did not have data in 2019.
-
-- Identified gaps in data and removed data prior to big data gaps (this could be improved).
-
-2) Duplicated
-- 121 stations are duplicated i.e. more than one station on a river. Used filter table to remove upstream stations (52 of 121 stations removed)
-
-3) Regulated
-- Regulated stations identified and filtered based on degree of regulation (21 stations removed)
