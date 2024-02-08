@@ -137,9 +137,9 @@ in summer may reduce the amount of water available for agriculture, hydroelectri
 industry and communities. Low river flows are also associated with declines in water quality and 
 warmer water temperatures which can threaten the health of aquatic ecosystems. The indicator measures
 several metrics representing river flow at `r nrow(stations_sf_filtered)` stations (`r nrow(stations_sf)`
-when including upstream stations **and stations installed within the last 30 years**) 
-across the Province. These stations have been monitored for a minimum of `r min(stations_sf_filtered$N_years)` 
-years and a maximum of `r max(stations_sf_filtered$N_years)` years between `r min(stations_sf_filtered$Min_Year)` and `r max(stations_sf_filtered$Max_Year)`.
+when including upstream stations) across the Province. These stations have been monitored for a minimum of 
+`r min(stations_sf_filtered$N_years)` years and a maximum of `r max(stations_sf_filtered$N_years)` years 
+between `r min(stations_sf_filtered$Min_Year)` and `r max(stations_sf_filtered$Max_Year)`.
 
 # Description of metrics
 
