@@ -72,11 +72,12 @@ calculate_MK_results = function(data,chosen_variable){
               maxYear = max(Year),
               range = max(Year) - min(Year))
 
-  data %>%
+ data %>%
      filter(!is.na(chosen_variable)) %>%
       dplyr::select(STATION_NUMBER,
                     Year,
                     values = !!sym(chosen_variable)) %>%
+   filter(!is.na(values)) %>%
       add_count(STATION_NUMBER, name = 'number_records') |>
       filter(number_records > 3) |>
       group_by(STATION_NUMBER) %>%
@@ -1197,7 +1198,7 @@ monthly_average_bar_plot = mk_average_monthly %>%
   group_by(magnitude_fixed, Month) %>%
   summarise(n = n()) %>%
   ggplot() +
-  ggtitle("Monthly Median River Flow")+
+  # ggtitle("Monthly Median River Flow")+
   geom_col(aes(x = Month, y = n, fill = magnitude_fixed), col = "black") +
   scale_fill_manual(values = colour.scale) +
   ylab("Number of Stations") +
@@ -1247,7 +1248,7 @@ monthly_low_flow_bar_plot = mk_low_flow_monthly %>%
   group_by(magnitude_fixed, Month) %>%
   summarise(n = n()) %>%
   ggplot() +
-  ggtitle("Monthly Low Flow")+
+  # ggtitle("Monthly Low Flow")+
   geom_col(aes(x = Month, y = n, fill = magnitude_fixed), col = "black") +
   scale_fill_manual(values = colour.scale) +
   ylab("Number of Stations") +
