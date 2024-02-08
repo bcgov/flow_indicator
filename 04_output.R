@@ -23,6 +23,8 @@ if(!exists("hydrozones")){hydrozones = st_read('app/www/hydrozones.gpkg')}
 if(!exists("stations")){stations = st_read('app/www/stations.gpkg')}
 
 if(!exists("annual_flow_dat")){annual_flow_dat = readRDS('app/www/annual_flow_dat.rds')}
+if(!exists("monthly_flow_dat")){monthly_flow_dat = readRDS('app/www/monthly_flow_dat.rds')}
+
 
 # Remove upstream stations (n = 182)
 stations_filt = stations %>%
@@ -1155,6 +1157,109 @@ svg_px("./print_ver/out/figs/date_low_bar.svg", width = 600, height = 600)
 plot(date_low_bar_plot)
 dev.off()
 
+## MONTHLY BREAKDOWN ------------------------------------------------------------------------------------------------------
+
+monthly_flow_dat = monthly_flow_dat %>%
+  filter(STATION_NUMBER %in% stations_filt$STATION_NUMBER)
+
+mk_average_monthly = unique(monthly_flow_dat$Month) %>%
+  map ( ~ {
+    month_dat = monthly_flow_dat %>%
+      filter(Month == .x) %>%
+      calculate_MK_results(chosen_variable = "Average") %>%
+      mutate(Month = .x)
+
+      }) %>%
+  bind_rows()
+
+monthly_average_bar_plot = mk_average_monthly %>%
+  mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 0.5% increase",
+                                                         "0.1 - 0.5% increase",
+                                                         "< 0.1% change",
+                                                         "0.1 - 0.5% decrease",
+                                                         "> 0.5% decrease",
+                                                         "No significant trend")),
+         Month = factor(month.name[match(Month,month.abb)], levels = month.name)) %>%
+  mutate(Month = fct_relevel(Month, "October",
+                             "November",
+                             "December",
+                             "January",
+                             "February",
+                             "March",
+                             "April",
+                             "May",
+                             "June",
+                             "July",
+                             "August",
+                             "September")) %>%
+  group_by(magnitude_fixed, Month) %>%
+  summarise(n = n()) %>%
+  ggplot() +
+  ggtitle("Monthly Median River Flow")+
+  geom_col(aes(x = Month, y = n, fill = magnitude_fixed), col = "black") +
+  scale_fill_manual(values = colour.scale) +
+  ylab("Number of Stations") +
+  xlab("") +
+  theme_classic() +
+  theme(legend.position = "bottom",
+        legend.title = element_blank())
+
+
+svg_px("./print_ver/out/figs/monthly_average_bar_plot.svg", width = 800, height = 600)
+plot(monthly_average_bar_plot)
+dev.off()
+
+mk_low_flow_monthly = unique(monthly_flow_dat$Month) %>%
+  map ( ~ {
+    month_dat = monthly_flow_dat %>%
+      filter(Month == .x) %>%
+      calculate_MK_results(chosen_variable = "Min_7_Day") %>%
+      mutate(Month = .x)
+
+  }) %>%
+  bind_rows()
+
+monthly_low_flow_bar_plot = mk_low_flow_monthly %>%
+  mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 0.5% increase",
+                                                         "0.1 - 0.5% increase",
+                                                         "< 0.1% change",
+                                                         "0.1 - 0.5% decrease",
+                                                         "> 0.5% decrease",
+                                                         "No significant trend")),
+         Month = factor(month.name[match(Month,month.abb)], levels = month.name)) %>%
+  mutate(Month = fct_relevel(Month,
+                             "April",
+                             "May",
+                             "June",
+                             "July",
+                             "August",
+                             "September",
+                             "October",
+                             "November",
+                             "December",
+                             "January",
+                             "February",
+                             "March")) %>%
+  group_by(magnitude_fixed, Month) %>%
+  summarise(n = n()) %>%
+  ggplot() +
+  ggtitle("Monthly Low Flow")+
+  geom_col(aes(x = Month, y = n, fill = magnitude_fixed), col = "black") +
+  scale_fill_manual(values = colour.scale) +
+  ylab("Number of Stations") +
+  xlab("") +
+  theme_classic() +
+  theme(legend.position = "bottom",
+        legend.title = element_blank())
+
+
+svg_px("./print_ver/out/figs/monthly_low_flow_bar_plot.svg", width = 800, height = 600)
+plot(monthly_low_flow_bar_plot)
+dev.off()
   # Write ecoprovinces -
 #to do: do we need ecoprovs?? KARLY
 
@@ -1162,6 +1267,6 @@ dev.off()
 #   st_simplify(dTolerance = 1000)
 # sf::write_sf(ecoprovs, 'app/www/ecoprovinces.gpkg')
 
-save(mk_all, annual_bar_plot, low_bar_plot, peak_bar_plot, freshet_bar_plot, date_low_bar_plot,  file = "print_ver/out/figures.RData")
+save(mk_all, annual_bar_plot, low_bar_plot, peak_bar_plot, freshet_bar_plot, date_low_bar_plot, monthly_average_bar_plot, monthly_low_flow_bar_plot,  file = "print_ver/out/figures.RData")
 
 saveRDS(mk_results_tbl, 'print_ver/out/mk_results_tbl.rds')
