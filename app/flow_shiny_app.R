@@ -49,7 +49,7 @@ server <- function(input, output, session) {
     # "Max_3_Day_DoY",
     "DoY_50pct_TotalQ",
     # "DoY_90pct_TotalQ",
-    'R2MAD_DoY')
+    'R2MAD_DoY_50')
 
   recent_stations = annual_flow_dat %>%
     group_by(STATION_NUMBER) %>%
@@ -77,7 +77,7 @@ server <- function(input, output, session) {
                              'Low Summer Flow' = 'Min_7_Day_summer',
                              # 'Date of Low Summer Flow (7-day)' = 'Min_7_Day_summer_DoY',
                              # 'Date of 90% Annual Flow' = 'DoY_90pct_TotalQ',
-                             'Date of Low Flow' = 'R2MAD_DoY',
+                             'Date of Low Flow' = 'R2MAD_DoY_50',
                              'Peak Flow' = 'Max_3_Day'
                              # 'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY'
                            )
