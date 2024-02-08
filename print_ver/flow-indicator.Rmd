@@ -154,7 +154,7 @@ Volume of peak flow and timing of freshet were calculated using water year (Octo
 
 ## Date and volume of low flow
 
-Timing and volume of low flows was calculated based on the low flow year (April - April). Volume of low flow was estimated based on a 7-day rolling window across the summer (May - October), and the minimum volume was identified for each year at each station. Timing of low flow was calculated based on the Mean Annual Discharge (MAD; ref). The first date when 50% of MAD was reached after freshet was used as the definition of the beginning of summer low flows. 
+Timing and volume of low flows was calculated based on the low flow year^1^ (April - April). Volume of low flow was estimated based on a 7-day rolling window across the summer (May - October), and the minimum volume was identified for each year at each station. Timing of low flow was calculated based on the long-term Mean Annual Discharge (MAD). The first date when 50% of MAD was reached after freshet was used as the definition of the date of low flow. 
 
 \vspace{.2cm}
 
@@ -266,4 +266,4 @@ analysis, regulated stations were removed from the analysis (apart from certain 
 
 ### References
 
-
+- ^1^[Low Flow Year](https://www.epa.gov/hydrowq/definition-and-characteristics-low-flows)
