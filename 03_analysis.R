@@ -17,6 +17,7 @@ library(tidyverse)
 library(data.table)
 library(tidyhydat)
 library(sf)
+library(fasstr)
 
 if(!exists("final_station_summary_wYear")){final_station_summary_wYear = read_csv('data/finalstns_wYear.csv')}
 if(!exists("final_station_summary_lfYear")){final_station_summary_lfYear = read_csv('data/finalstns_lfYear.csv')}
@@ -98,9 +99,6 @@ flow_timing_dat = flow_dat_filtered_wYear %>%
 # Return to 50% Mean Annual Discharge =========================================================
 
 # This is a form of low flow so will use the low flow years
-
-# Set threshold
-# mad_threshold = 1
 #
 #
 # # Lets look at a few stations-years to see where mean annual discharge ends up
@@ -113,30 +111,20 @@ flow_timing_dat = flow_dat_filtered_wYear %>%
 # #   scale_x_continuous(breaks = seq(0,365,40), labels = seq(0,365,40)) +
 # #   geom_hline(aes(yintercept = mad)) +
 # #   geom_hline(aes(yintercept = mad * mad_threshold))
-#
-# rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
-#   group_by(STATION_NUMBER) %>%
-#   mutate(mad = mean(Value)) %>%
-#   mutate(mad_perc = mad * mad_threshold) %>%
-#   mutate(below_mad_perc = case_when (Value <= mad_perc ~ 1,
-#                                       .default = 0)) %>%
-#   group_by(STATION_NUMBER, lfYear) %>%
-#   mutate(peak_date = DoY[which.max(Value)]) %>%
-#   filter(below_mad_perc == 1 & DoY>peak_date) %>%
-#   arrange(Date) %>%
-#   slice(1) %>%
-#   dplyr::select(STATION_NUMBER,
-#                 Year = lfYear,
-#                 R2MAD_DoY = DoY
-#   )
 
-mad_threshold = 0.5
+MAD_station = calc_longterm_mean(flow_dat_filtered_lfYear,
+                                 values = Value,
+                                 groups = STATION_NUMBER,
+                                 percent_MAD = 50)
 
 rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
+  left_join(MAD_station) %>%
   group_by(STATION_NUMBER) %>%
-  mutate(mad = mean(Value)) %>%
-  mutate(mad_perc = mad * mad_threshold) %>%
-  mutate(below_mad_perc = case_when (Value <= mad_perc ~ 1,
+  # mutate(mad_50 = calc_longterm_mean(values = Value,
+  #                                    station_number = STATION_NUMBER,
+  #                                    percent_MAD = 50)) %>% # set MAD percentage here
+  # mutate(mad_perc = mad * mad_threshold) %>%
+  mutate(below_mad_perc = case_when (Value <= '50%MAD' ~ 1,
                                      .default = 0)) %>%
   group_by(STATION_NUMBER, lfYear) %>%
   mutate(peak_date = DoY[which.max(Value)]) %>%
