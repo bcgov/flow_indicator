@@ -92,7 +92,7 @@ trend_select_options_tab = wellPanel(
     ),
     column(width = 5,
            checkboxInput(inputId = 'recent',
-                         label = 'Include recently installed stations (1990+)',
+                         label = 'Include recently installed stations (1992+)',
                          value = FALSE),
            checkboxInput(inputId = 'upstream',
                          label = 'Include upstream stations',
