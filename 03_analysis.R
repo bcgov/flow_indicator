@@ -100,39 +100,39 @@ flow_timing_dat = flow_dat_filtered_wYear %>%
 # This is a form of low flow so will use the low flow years
 
 # Set threshold
-mad_threshold = 1
-
-
-# Lets look at a few stations-years to see where mean annual discharge ends up
-# flow_dat_filtered_lfYear %>%
+# mad_threshold = 1
+#
+#
+# # Lets look at a few stations-years to see where mean annual discharge ends up
+# # flow_dat_filtered_lfYear %>%
+# #   group_by(STATION_NUMBER) %>%
+# #   mutate(mad = mean(Value)) %>%
+# #   filter(STATION_NUMBER == "07EC002" & lfYear == 1980) %>%
+# #   ggplot() +
+# #   geom_point(aes(x = DoY, y = Value)) +
+# #   scale_x_continuous(breaks = seq(0,365,40), labels = seq(0,365,40)) +
+# #   geom_hline(aes(yintercept = mad)) +
+# #   geom_hline(aes(yintercept = mad * mad_threshold))
+#
+# rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
 #   group_by(STATION_NUMBER) %>%
 #   mutate(mad = mean(Value)) %>%
-#   filter(STATION_NUMBER == "07EC002" & lfYear == 1980) %>%
-#   ggplot() +
-#   geom_point(aes(x = DoY, y = Value)) +
-#   scale_x_continuous(breaks = seq(0,365,40), labels = seq(0,365,40)) +
-#   geom_hline(aes(yintercept = mad)) +
-#   geom_hline(aes(yintercept = mad * mad_threshold))
-
-rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
-  group_by(STATION_NUMBER) %>%
-  mutate(mad = mean(Value)) %>%
-  mutate(mad_perc = mad * mad_threshold) %>%
-  mutate(below_mad_perc = case_when (Value <= mad_perc ~ 1,
-                                      .default = 0)) %>%
-  group_by(STATION_NUMBER, lfYear) %>%
-  mutate(peak_date = DoY[which.max(Value)]) %>%
-  filter(below_mad_perc == 1 & DoY>peak_date) %>%
-  arrange(Date) %>%
-  slice(1) %>%
-  dplyr::select(STATION_NUMBER,
-                Year = lfYear,
-                R2MAD_DoY = DoY
-  )
+#   mutate(mad_perc = mad * mad_threshold) %>%
+#   mutate(below_mad_perc = case_when (Value <= mad_perc ~ 1,
+#                                       .default = 0)) %>%
+#   group_by(STATION_NUMBER, lfYear) %>%
+#   mutate(peak_date = DoY[which.max(Value)]) %>%
+#   filter(below_mad_perc == 1 & DoY>peak_date) %>%
+#   arrange(Date) %>%
+#   slice(1) %>%
+#   dplyr::select(STATION_NUMBER,
+#                 Year = lfYear,
+#                 R2MAD_DoY = DoY
+#   )
 
 mad_threshold = 0.5
 
-rtn_2_mad_perc2 = flow_dat_filtered_lfYear %>%
+rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
   group_by(STATION_NUMBER) %>%
   mutate(mad = mean(Value)) %>%
   mutate(mad_perc = mad * mad_threshold) %>%
@@ -148,8 +148,35 @@ rtn_2_mad_perc2 = flow_dat_filtered_lfYear %>%
                 R2MAD_DoY_50 = DoY
   )
 
-rtn_2_mad_perc = rtn_2_mad_perc %>%
-  left_join(rtn_2_mad_perc2)
+#Filter out NAs (i.e. never returned to 50% MAD within that year)
+nas_MADs = annual_mean_dat %>%
+  left_join(rtn_2_mad_perc) %>%
+  filter(is.na(R2MAD_DoY_50))
+
+#Apply above, but ignore requirement for it to happen after freshet
+#Alternatively, apply it to water year instead of low flow year
+# rtn_2_mad_perc2 = flow_dat_filtered_wYear %>%
+#   filter(paste0(STATION_NUMBER,wYear) %in% paste0(nas_MADs$STATION_NUMBER,nas_MADs$Year)) %>%
+#   group_by(STATION_NUMBER) %>%
+#   mutate(mad = mean(Value)) %>%
+#   mutate(mad_perc = mad * mad_threshold) %>%
+#   mutate(below_mad_perc = case_when (Value <= mad_perc ~ 1,
+#                                      .default = 0)) %>%
+#   group_by(STATION_NUMBER, wYear) %>%
+#   mutate(peak_date = DoY[which.max(Value)]) %>%
+#   filter(below_mad_perc == 1& DoY>peak_date) %>%
+#   arrange(Date) %>%
+#   slice(1) %>%
+#   dplyr::select(STATION_NUMBER,
+#                 Year = wYear,
+#                 R2MAD_DoY_50 = DoY
+#   )
+#
+# # Doeasnt really work for a bunch but better than nothing
+# rtn_2_mad_perc = bind_rows(rtn_2_mad_perc, rtn_2_mad_perc2)
+
+# rtn_2_mad_perc = rtn_2_mad_perc %>%
+#   left_join(rtn_2_mad_perc2)
 
 dir.create(file.path("./pngs"), showWarnings = FALSE)
 
@@ -609,6 +636,14 @@ monthly_flow_dat_filtered = monthly_mean_dat_filtered |>
 
 hydrograph_dat = monthly_quantiles_dat |>
   mutate(Month = month.abb[Month])
+
+#calculate Mean Annual Discharge and add to hydrograph data
+hydrograph_dat = flow_dat_filtered_wYear %>%
+  group_by(STATION_NUMBER) %>%
+  mutate(MAD = mean(Value)) %>%
+  dplyr::select(STATION_NUMBER, MAD) %>%
+  distinct() %>%
+  left_join(hydrograph_dat)
 
 saveRDS(annual_flow_dat_filtered, 'app/www/annual_flow_dat.rds')
 saveRDS(hydrograph_dat, 'app/www/hydrograph_dat.rds')
