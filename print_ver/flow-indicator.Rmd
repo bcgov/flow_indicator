@@ -60,12 +60,21 @@ theme_set(theme_classic() +
 label.colour <- "black" 
 colour.scale <- brewer.pal(3,"Blues")
 
+updateDate <- "February 2024"
+
 annual_flow_dat = readRDS(here("app/www","annual_flow_dat.rds"))
 stations_sf = st_read(here("app/www","stations.gpkg"))
 mk_results_tbl = readRDS("print_ver/out/mk_results_tbl.rds")
 
+recent_stations = annual_flow_dat %>%
+  group_by(STATION_NUMBER) %>%
+  summarise(minYear = min(Year)) %>%
+  filter(minYear>=1992) %>%
+  pull(STATION_NUMBER)
+
 stations_sf_filtered = stations_sf %>% 
-  filter(! (is.na(keep)))
+  filter(! (is.na(keep))) #%>%
+  # filter(! STATION_NUMBER %in% recent_stations)
 
 # summary table of number of stations in each category
 summary_table_cat = mk_results_tbl %>%
@@ -97,6 +106,27 @@ peak_cat = summary_table_cat %>%
 peak_direction = summary_table_direction %>%
   filter(Var == "Peak Flow")
 
+#Subset Low Flow
+Low_cat = summary_table_cat %>%
+  filter(Var == "Low Summer Flow")
+
+Low_direction = summary_table_direction %>%
+  filter(Var == "Low Summer Flow")
+
+#Subset Freshet
+freshet_cat = summary_table_cat %>%
+  filter(Var == "Date of Freshet")
+
+freshet_direction = summary_table_direction %>%
+  filter(Var == "Date of Freshet")
+
+#Subset Freshet
+low_date_cat = summary_table_cat %>%
+  filter(Var == "Date of Low Summer Flow")
+
+low_date_direction = summary_table_direction %>%
+  filter(Var == "Date of Low Summer Flow")
+
 load(here("print_ver/out","figures.Rdata"))
 ```
 
@@ -106,26 +136,12 @@ flood risks, and may impact natural systems that rely on natural flow patterns. 
 in summer may reduce the amount of water available for agriculture, hydroelectric power generation,
 industry and communities. Low river flows are also associated with declines in water quality and 
 warmer water temperatures which can threaten the health of aquatic ecosystems. The indicator measures
-several metrics representing river flow at `r nrow(stations_sf_filtered)` stations (`r nrow(stations_sf)` when including upstream stations) 
+several metrics representing river flow at `r nrow(stations_sf_filtered)` stations (`r nrow(stations_sf)`
+when including upstream stations **and stations installed within the last 30 years**) 
 across the Province. These stations have been monitored for a minimum of `r min(stations_sf_filtered$N_years)` 
 years and a maximum of `r max(stations_sf_filtered$N_years)` years between `r min(stations_sf_filtered$Min_Year)` and `r max(stations_sf_filtered$Max_Year)`.
 
-## Filtering procedure
-
-To account for variation in monitoring at different stations on different rivers, a set of filtering procedures were implemented to reduce potential for erroneous trend estimations. These included:
-
-- **Data gaps**: Monitoring stations containing gaps of 5 or more years had all annual data preceding the gap removed, to maintain relatively continuous datasets at each station for trend analyses.
-
-- **Recently active**: Stations were required to be active as recently as 2019 for inclusion in the analysis.
-
-- **Minimum sample size**: Only stations with more than 10 years of monitoring data were retained.
-
-- **Regulated Rivers**: A river is defined as regulated if the flow regime has been modified and results in a 10% increase or decrease in flow (REF). For the purpose of this 
-analysis, regulated stations were removed from the analysis (apart from certain instances where flow was deemed close to natural).
-
-- **Upstream stations**: A number of rivers include multiple monitoring stations. In such situations, only the downstream stations are included (although upstream locations can be inspected using the online app).
-
-# Metrics
+# Description of metrics
 
 ## Average annual flow
 
@@ -142,19 +158,44 @@ Timing and volume of low flows was calculated based on the low flow year (April 
 
 \vspace{.2cm}
 
+# Trend Results
+
 ```{r fig.width = 10, fig.height = 8, echo = FALSE}
 mk_all
 ```
 
+## Flow volume
+
 The metrics measured at each station can be broken down into two types: change in the magnitude of river flow and change in the timing of river flow. Of the `r nrow(stations_sf_filtered)` stations monitored across the Province, `r average_direction$n[average_direction$direction == "positive"]` stations identified increasing flows, of which `r average_cat$n[average_cat$category == "> 0.5% increase"]` were increasing by more than 0.5% per year. In contrast,  `r average_direction$n[average_direction$direction == "negative"]` displayed decreasing flows, while the remaining `r average_direction$n[average_direction$direction == "no change"]` were either less than 0.1% a year or had non-significant trends.
 
-Similarly, peak flows trends were almost evenly split between increasing (`r peak_direction$n[peak_direction$direction == "positive"]` stations) and decreasing (`r peak_direction$n[peak_direction$direction == "negative"]` stations), while the vast majority were foudn to have little significant change (`r peak_direction$n[peak_direction$direction == "no change"]` stations).
+Similarly, peak flows trends were almost evenly split between increasing (`r peak_direction$n[peak_direction$direction == "positive"]` stations) and decreasing (`r peak_direction$n[peak_direction$direction == "negative"]` stations), while the vast majority were found to have little significant change (`r peak_direction$n[peak_direction$direction == "no change"]` stations).
 
+Low summer flow volume has been significantly decreasing over time for a substantial number of rivers. `r Low_direction$n[Low_direction$direction == "negative"]` stations had decreasing summer flows, and `r Low_cat$n[Low_cat$category == "> 0.5% decrease"]` were greater than 0.5% per year.
 
+## Flow timing
 
-# Changes in Volume and Timing by Hydrozones
+Date of freshet has been occurring gradually earlier for a large number of locations. `r freshet_direction$n[freshet_direction$direction == "negative"]` have been trending earlier, and `r freshet_cat$n[freshet_cat$category == "> 0.2 days earlier"]` are occurring 0.2 days earlier per year. Only `r freshet_direction$n[freshet_direction$direction == "positive"]` was trending later, while `r freshet_direction$n[freshet_direction$direction == "no change"] + freshet_cat$n[freshet_cat$category == "< 0.1 days change"]` displayed trends that were less than 0.1 days change or not significant.
 
-# Magnitude of river flow
+The majority of locations did not show significant trends for timing of low flow. Of those that did, more stations had low flows occurring earlier (`r low_date_direction$n[low_date_direction$direction == "negative"]`) than later (`r low_date_direction$n[low_date_direction$direction == "positive"]`).
+
+# Changes in Flow Volume by Month
+
+## Median Monthly flows
+
+```{r fig.width = 10, fig.height=8, echo = FALSE}
+monthly_average_bar_plot
+```
+
+Changes in average river flow across years varies by month. 
+
+## Monthly low flows
+```{r fig.width = 10, fig.height=8, echo = FALSE}
+monthly_low_flow_bar_plot
+```
+
+# Changes in Volume and Timing by Hydrologic Zones
+
+# Flow volume
 
 ## Average annual flow
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
@@ -171,7 +212,7 @@ peak_bar_plot
 low_bar_plot
 ```
 
-# Timing of river flow
+# Flow timing
 
 ## Date of freshet
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
@@ -182,3 +223,47 @@ freshet_bar_plot
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 date_low_bar_plot
 ```
+
+## Useful Links
+
+## Data
+
+The data sets are all sourced from the B.C. Data Catalogue, distributed under the [Open Government Licence - British Columbia](https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61).
+
+-   [Indicator Summary Data: Long-term Trends in Timing and Volume of B/C/s River Flow](https://catalogue.data.gov.bc.ca/dataset/indicator-summary-data-change-in-timing-and-volume-of-river-flow-in-bc-1912-2012-)
+
+- River Flow Stations and daily flow data accessed with ['tidyhydat' R Package](https://cran.r-project.org/web/packages/tidyhydat/index.html)
+
+- [Hydrologic Zones](https://catalogue.data.gov.bc.ca/dataset/bc-hydrologic-zones).
+
+----
+
+Published and Available Online at Environmental Reporting BC (`r updateDate`): <https://www.env.gov.bc.ca/soe/indicators/climate-change/rivers.html0>
+
+Email correspondence to: envreportbc@gov.bc.ca
+
+*Suggested Citation*:  
+Environmental Reporting BC. 2024.  Long-Term Trends in River Flows in B.C. State of Environment Reporting, Ministry of Environment and Climate Change Strategy, British Columbia, Canada.
+
+## Methods
+
+### Filtering procedure
+
+To account for variation in monitoring at different stations on different rivers, a set of filtering procedures were implemented to reduce potential for erroneous trend estimations. These included:
+
+- **Data gaps**: Monitoring stations containing gaps of 5 or more years had all annual data preceding the gap removed, to maintain relatively continuous datasets at each station for trend analyses.
+
+- **Recently active**: Stations were required to be active as recently as 2019 for inclusion in the analysis.
+
+- **Minimum sample size**: Only stations with more than 10 years of monitoring data were retained.
+
+- **Regulated Rivers**: A river is defined as regulated if the flow regime has been modified and results in a 10% increase or decrease in flow (REF). For the purpose of this 
+analysis, regulated stations were removed from the analysis (apart from certain instances where flow was deemed close to natural).
+
+- **Upstream stations**: A number of rivers include multiple monitoring stations. In such situations, only the downstream stations are included (although upstream locations can be inspected using the online app).
+
+- **Recently installed stations**: Stations that have been installed within the last 30 years were...... FINISH
+
+### References
+
+
