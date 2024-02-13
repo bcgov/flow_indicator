@@ -44,9 +44,9 @@ stations_to_keep = final_station_summary_wYear %>%
 # ~5 million rows, 7 columns.
 flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
   mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
-                           .default = year(Date)),
-         lfYear = case_when(month(Date)< 4 ~ year(Date) - 1,
-                            .default = year(Date))) %>%
+                           month(Date) < 10 ~ year(Date) - 1),
+         lfYear = case_when(month(Date) >= 4 ~ year(Date),
+                            month(Date) < 4 ~ year(Date) - 1)) %>%
   filter(Parameter == 'Flow') %>%
   filter(!is.na(Value)) %>%
   mutate(Month = lubridate::month(Date))
