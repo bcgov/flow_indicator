@@ -197,11 +197,11 @@ server <- function(input, output, session) {
                                                         'No Trend',
                                                         'Non-Significant Trend Later',
                                                         'Significant Trend Later')),
-               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.2 days earlier",
-                                                                    "0.1 - 0.2 days earlier",
-                                                                    "< 0.1 days change",
-                                                                    "0.1 - 0.2 days later",
-                                                                    "> 0.2 days later")))
+               magnitude_fixed = factor(magnitude_fixed, levels = c("> 2 days earlier",
+                                                                    "1 - 2 days earlier",
+                                                                    "< 1 days change",
+                                                                    "1 - 2 days later",
+                                                                    "> 2 days later")))
     } else {
       dat %>%
 
@@ -210,11 +210,11 @@ server <- function(input, output, session) {
                                                         'No Trend',
                                                         'Non-Significant Trend Up',
                                                         'Significant Trend Up')),
-               magnitude_fixed = factor(magnitude_fixed, levels = c("> 0.5% decrease",
-                                                                    "0.1 - 0.5% decrease",
-                                                                    "< 0.1% change",
-                                                                    "0.1 - 0.5% increase",
-                                                                    "> 0.5% increase")))
+               magnitude_fixed = factor(magnitude_fixed, levels = c("> 5% decrease",
+                                                                    "1 - 5% decrease",
+                                                                    "< 1% change",
+                                                                    "1 - 5% increase",
+                                                                    "> 5% increase")))
     }
   })
 
@@ -270,20 +270,20 @@ server <- function(input, output, session) {
     if(input$user_var_choice %in% date_vars){
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
-                  levels = c("> 0.2 days earlier",
-                             "0.1 - 0.2 days earlier",
-                             "< 0.1 days change",
-                             "0.1 - 0.2 days later",
-                             "> 0.2 days later"),
+                  levels = c("> 2 days earlier",
+                             "1 - 2 days earlier",
+                             "< 1 days change",
+                             "1 - 2 days later",
+                             "> 2 days later"),
                   ordered = T)
     } else {
       colorFactor(palette = 'RdBu',
                   domain = mk_results()$magnitude_fixed,
-                  levels = c("> 0.5% decrease",
-                             "0.1 - 0.5% decrease",
-                             "< 0.1% change",
-                             "0.1 - 0.5% increase",
-                             "> 0.5% increase"),
+                  levels = c("> 5% decrease",
+                             "1 - 5% decrease",
+                             "< 1% change",
+                             "1 - 5% increase",
+                             "> 5% increase"),
                   ordered = T)
     }
   })
@@ -368,7 +368,7 @@ server <- function(input, output, session) {
       removeControl("legend") %>%
       addLegend(pal = mypal(),
                 values = ~magnitude_fixed,
-                title = 'Annual Change',
+                title = 'Change per decade',
                 data = stations_sf_with_trend(),
                 layerId = 'legend')#%>%
     # addSearchFeatures(
