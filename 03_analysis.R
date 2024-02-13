@@ -120,10 +120,6 @@ MAD_station = calc_longterm_mean(flow_dat_filtered_lfYear,
 rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
   left_join(MAD_station) %>%
   group_by(STATION_NUMBER) %>%
-  # mutate(mad_50 = calc_longterm_mean(values = Value,
-  #                                    station_number = STATION_NUMBER,
-  #                                    percent_MAD = 50)) %>% # set MAD percentage here
-  # mutate(mad_perc = mad * mad_threshold) %>%
   mutate(below_mad_perc = case_when (Value <= '50%MAD' ~ 1,
                                      .default = 0)) %>%
   group_by(STATION_NUMBER, lfYear) %>%
