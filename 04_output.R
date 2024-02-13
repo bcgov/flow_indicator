@@ -109,16 +109,16 @@ calculate_MK_results = function(data,chosen_variable){
         Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Up"
       ),
       magnitude_fixed = fcase(
-        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.2 days earlier",
-        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.2 days earlier",
-        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 0.1 days change",
-        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "0.1 - 0.2 days later",
-        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 0.2 days later",
-        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% decrease",
-        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% decrease",
-        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 0.1% change",
-        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "0.1 - 0.5% increase",
-        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 0.5% increase"
+        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 2 days earlier",
+        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "1 - 2 days earlier",
+        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 1 days change",
+        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "1 - 2 days later",
+        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 2 days later",
+        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 5% decrease",
+        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "1 - 5% decrease",
+        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 1% change",
+        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "1 - 5% increase",
+        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 5% increase"
       ),
       significant = case_when(P_value <=0.05~ 1,
                               .default = 0.1),
@@ -165,19 +165,19 @@ mk_results_tbl = bind_rows(mk_annual,
                            mk_freshet)
 
 ## Plot settings - magnitude of flow
-colour.scale <- c("> 0.5% increase"="#2171b5",
-                  "0.1 - 0.5% increase"="#bdd7e7",
+colour.scale <- c("> 5% increase"="#2171b5",
+                  "1 - 5% increase"="#bdd7e7",
                   "No significant trend" = "grey",
-                  "< 0.1% change" = "white",
-                  "0.1 - 0.5% decrease"="#ff7b7b",
-                  "> 0.5% decrease"="#ff0000")
+                  "< 1% change" = "white",
+                  "1 - 5% decrease"="#ff7b7b",
+                  "> 5% decrease"="#ff0000")
 
 ## Plot settings - Timing of flow
-colour.scale.date <- c("> 0.2 days later"="#2171b5",
-                       "0.1 - 0.2 days later"="#bdd7e7",
-                       "< 0.1 days change" = "white",
-                       "0.1 - 0.2 days earlier"="#ff7b7b",
-                       "> 0.2 days earlier"="#ff0000",
+colour.scale.date <- c("> 2 days later"="#2171b5",
+                       "1 - 2 days later"="#bdd7e7",
+                       "< 1 days change" = "white",
+                       "1 - 2 days earlier"="#ff7b7b",
+                       "> 2 days earlier"="#ff0000",
                        "No significant trend" = "grey")
 
 # combine above into single doc
@@ -200,23 +200,23 @@ mk_magnitude = mk_results_all %>%
                        "Peak flow"))  %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 0.5% increase",
-                                                         "0.1 - 0.5% increase",
-                                                         "< 0.1% change",
-                                                         "0.1 - 0.5% decrease",
-                                                         "> 0.5% decrease",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 5% increase",
+                                                         "1 - 5% increase",
+                                                         "< 1% change",
+                                                         "1 - 5% decrease",
+                                                         "> 5% decrease",
                                                          "No significant trend"))) %>%
   group_by(metric, magnitude_fixed) %>%
   summarise(n = n()) %>%
   ggplot() +
   geom_col(aes(x = metric, y = n, fill = magnitude_fixed), col = "black") +
-  scale_fill_manual(values = colour.scale) +
+  scale_fill_manual(name = "Change per decade",
+                    values = colour.scale) +
   labs(x = "", y = "") +
   coord_flip()+
   theme_classic() +
-  theme(legend.position = "bottom",
-        legend.title = element_blank()) +
-  ggtitle("Magnitude")
+  theme(legend.position = "bottom") +
+  ggtitle("Volume")
 
 mk_timing = mk_results_all %>%
   filter(!metric %in% c("Average Annual flow",
@@ -224,22 +224,22 @@ mk_timing = mk_results_all %>%
                        "Peak flow"))  %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 0.2 days later",
-                                                         "0.1 - 0.2 days later",
-                                                         "< 0.1 days change",
-                                                         "0.1 - 0.2 days earlier",
-                                                         "> 0.2 days earlier",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 2 days later",
+                                                         "1 - 2 days later",
+                                                         "< 1 days change",
+                                                         "1 - 2 days earlier",
+                                                         "> 2 days earlier",
                                                          "No significant trend"))) %>%
   group_by(metric, magnitude_fixed) %>%
   summarise(n = n()) %>%
   ggplot() +
   labs(x = "", y = "Number of Stations") +
   geom_col(aes(x = metric, y = n, fill = magnitude_fixed), col = "black") +
-  scale_fill_manual(values = colour.scale.date) +
+  scale_fill_manual(name = "Change per decade",
+                    values = colour.scale.date) +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "bottom",
-        legend.title = element_blank()) +
+  theme(legend.position = "bottom") +
   ggtitle("Timing")
 
 mk_all = plot_grid(mk_magnitude, mk_timing, nrow = 2, rel_heights = c(1,1))
@@ -252,10 +252,9 @@ dev.off()
 #Get legend for below plots
 legend = get_legend(
   mk_magnitude +
-    guides(color = guide_legend(nrow = 1)) +
+    guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "bottom",
-          legend.justification="right",
-          legend.title = element_blank())
+          legend.justification="right")
 )
 
 # Metrics - Magnitude of River Flow
@@ -264,11 +263,11 @@ legend = get_legend(
 annual_bar = mk_annual %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-                                                          "0.1 - 0.5% increase",
-                                                          "< 0.1% change",
-                                                          "0.1 - 0.5% decrease",
-                                                          "> 0.5% decrease",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 5% increase",
+                                                          "1 - 5% increase",
+                                                          "< 1% change",
+                                                          "1 - 5% decrease",
+                                                          "> 5% decrease",
                                                           "No significant trend"))) %>%
   group_by(HYDZN_NAME) %>%
   mutate(n_stations = n()) %>%
@@ -290,7 +289,6 @@ ne = annual_bar %>%
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -307,19 +305,12 @@ se = annual_bar %>%
   filter(region == "South-East")
 
 p2 = se %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean Annual Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -338,19 +329,12 @@ sw = annual_bar %>%
 
 p3 = sw %>%
   filter(region == "South-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean Annual Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -369,19 +353,12 @@ nw = annual_bar %>%
 
 p4 = nw %>%
   filter(region == "North-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean Annual Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -400,26 +377,15 @@ Island = annual_bar %>%
 
 p5 = Island %>%
   filter(region == "Island") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean Annual Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
-  # theme(axis.line.x = element_blank(),
-  #       axis.text.x = element_blank(),
-  #       axis.title.x = element_blank(),
-  #       axis.ticks.x = element_blank()) +
   ylim(0, max(annual_bar$n_stations)+ 10) +
   annotation_custom(grob = ggplotGrob(island.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
 
@@ -442,11 +408,11 @@ dev.off()
 peak_bar = mk_peak %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-                                                          "0.1 - 0.5% increase",
-                                                          "< 0.1% change",
-                                                          "0.1 - 0.5% decrease",
-                                                          "> 0.5% decrease",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 5% increase",
+                                                          "1 - 5% increase",
+                                                          "< 1% change",
+                                                          "1 - 5% decrease",
+                                                          "> 5% decrease",
                                                           "No significant trend"))) %>%
   group_by(HYDZN_NAME) %>%
   mutate(n_stations = n()) %>%
@@ -468,7 +434,6 @@ p1 = ne  %>%
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -485,19 +450,12 @@ se = peak_bar %>%
   filter(region == "South-East")
 
 p2 = se %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean peak Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -516,19 +474,12 @@ sw = peak_bar %>%
 
 p3 = sw %>%
   filter(region == "South-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean peak Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -547,19 +498,12 @@ nw = peak_bar %>%
 
 p4 = nw %>%
   filter(region == "North-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean peak Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -578,26 +522,15 @@ Island = peak_bar %>%
 
 p5 = Island %>%
   filter(region == "Island") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean peak Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
-  # theme(axis.line.x = element_blank(),
-  #       axis.text.x = element_blank(),
-  #       axis.title.x = element_blank(),
-  #       axis.ticks.x = element_blank()) +
   ylim(0, max(peak_bar$n_stations)+ 10) +
   annotation_custom(grob = ggplotGrob(island.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
 
@@ -620,11 +553,11 @@ dev.off()
 low_bar = mk_low %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-                                                          "0.1 - 0.5% increase",
-                                                          "< 0.1% change",
-                                                          "0.1 - 0.5% decrease",
-                                                          "> 0.5% decrease",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 5% increase",
+                                                          "1 - 5% increase",
+                                                          "< 1% change",
+                                                          "1 - 5% decrease",
+                                                          "> 5% decrease",
                                                           "No significant trend"))) %>%
   group_by(HYDZN_NAME) %>%
   mutate(n_stations = n()) %>%
@@ -646,7 +579,6 @@ p1 = ne  %>%
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -663,19 +595,12 @@ se = low_bar %>%
   filter(region == "South-East")
 
 p2 = se %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -694,19 +619,12 @@ sw = low_bar %>%
 
 p3 = sw %>%
   filter(region == "South-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -725,19 +643,12 @@ nw = low_bar %>%
 
 p4 = nw %>%
   filter(region == "North-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -756,26 +667,15 @@ Island = low_bar %>%
 
 p5 = Island %>%
   filter(region == "Island") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
-  # theme(axis.line.x = element_blank(),
-  #       axis.text.x = element_blank(),
-  #       axis.title.x = element_blank(),
-  #       axis.ticks.x = element_blank()) +
   ylim(0, max(low_bar$n_stations)+ 10) +
   annotation_custom(grob = ggplotGrob(island.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
 
@@ -798,8 +698,7 @@ legend_timing = get_legend(
   mk_timing +
     guides(color = guide_legend(nrow = 1)) +
     theme(legend.position = "bottom",
-          legend.justification="right",
-          legend.title = element_blank())
+          legend.justification="right")
 )
 
   # Date of Freshet
@@ -807,11 +706,11 @@ legend_timing = get_legend(
 freshet_bar = mk_freshet %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.2 days earlier",
-                                                          "0.1 - 0.2 days earlier",
-                                                          "< 0.1 days change",
-                                                          "0.1 - 0.2 days later",
-                                                          "> 0.2 days later",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 2 days earlier",
+                                                          "1 - 2 days earlier",
+                                                          "< 1 days change",
+                                                          "1 - 2 days later",
+                                                          "> 2 days later",
                                                           "No significant trend"))) %>%
   group_by(HYDZN_NAME) %>%
   mutate(n_stations = n()) %>%
@@ -833,7 +732,6 @@ p1 = ne  %>%
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -850,19 +748,12 @@ se = freshet_bar %>%
   filter(region == "South-East")
 
 p2 = se %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean freshet Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -881,19 +772,12 @@ sw = freshet_bar %>%
 
 p3 = sw %>%
   filter(region == "South-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean freshet Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -912,19 +796,12 @@ nw = freshet_bar %>%
 
 p4 = nw %>%
   filter(region == "North-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean freshet Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -943,19 +820,12 @@ Island = freshet_bar %>%
 
 p5 = Island %>%
   filter(region == "Island") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean freshet Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -985,11 +855,11 @@ dev.off()
 date_low_bar = mk_date_low %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.2 days earlier",
-                                                          "0.1 - 0.2 days earlier",
-                                                          "< 0.1 days change",
-                                                          "0.1 - 0.2 days later",
-                                                          "> 0.2 days later",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 2 days earlier",
+                                                          "1 - 2 days earlier",
+                                                          "< 1 days change",
+                                                          "1 - 2 days later",
+                                                          "> 2 days later",
                                                           "No significant trend"))) %>%
   group_by(HYDZN_NAME) %>%
   mutate(n_stations = n()) %>%
@@ -1011,7 +881,6 @@ p1 = ne  %>%
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -1028,12 +897,6 @@ se = date_low_bar %>%
   filter(region == "South-East")
 
 p2 = se %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean date_low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
@@ -1059,19 +922,12 @@ sw = date_low_bar %>%
 
 p3 = sw %>%
   filter(region == "South-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean date_low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -1090,19 +946,12 @@ nw = date_low_bar %>%
 
 p4 = nw %>%
   filter(region == "North-West") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean date_low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
@@ -1121,26 +970,15 @@ Island = date_low_bar %>%
 
 p5 = Island %>%
   filter(region == "Island") %>%
-  # mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 0.5% increase",
-  #                                                         "0.1 - 0.5% increase",
-  #                                                         "< 0.1% change",
-  #                                                         "0.1 - 0.5% decrease",
-  #                                                         "> 0.5% decrease",
-  #                                                         "No significant trend"))) %>%
   ggplot() +
   # ggtitle("Change in Mean date_low Flow") +
   geom_col(aes(x = fct_reorder(HYDZN_NAME,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
-  labs(fill = "Magnitude of change") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none") +
-  # theme(axis.line.x = element_blank(),
-  #       axis.text.x = element_blank(),
-  #       axis.title.x = element_blank(),
-  #       axis.ticks.x = element_blank()) +
   ylim(0, max(date_low_bar$n_stations)+ 10) +
   annotation_custom(grob = ggplotGrob(island.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
 
@@ -1168,7 +1006,8 @@ mk_average_monthly = unique(monthly_flow_dat$Month) %>%
     month_dat = monthly_flow_dat %>%
       filter(Month == .x) %>%
       calculate_MK_results(chosen_variable = "Average") %>%
-      mutate(Month = .x)
+      mutate(Month = .x,
+             Var = "Average")
 
       }) %>%
   bind_rows()
@@ -1176,11 +1015,11 @@ mk_average_monthly = unique(monthly_flow_dat$Month) %>%
 monthly_average_bar_plot = mk_average_monthly %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 0.5% increase",
-                                                         "0.1 - 0.5% increase",
-                                                         "< 0.1% change",
-                                                         "0.1 - 0.5% decrease",
-                                                         "> 0.5% decrease",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 5% increase",
+                                                         "1 - 5% increase",
+                                                         "< 1% change",
+                                                         "1 - 5% decrease",
+                                                         "> 5% decrease",
                                                          "No significant trend")),
          Month = factor(month.name[match(Month,month.abb)], levels = month.name)) %>%
   mutate(Month = fct_relevel(Month, "October",
@@ -1200,12 +1039,14 @@ monthly_average_bar_plot = mk_average_monthly %>%
   ggplot() +
   # ggtitle("Monthly Median River Flow")+
   geom_col(aes(x = Month, y = n, fill = magnitude_fixed), col = "black") +
-  scale_fill_manual(values = colour.scale) +
+  scale_fill_manual(name = "Change per decade",
+                    values = colour.scale) +
   ylab("Number of Stations") +
   xlab("") +
   theme_classic() +
-  theme(legend.position = "bottom",
-        legend.title = element_blank())
+  theme(legend.position = "bottom")  +
+  guides(fill = guide_legend(nrow = 1))
+
 
 
 svg_px("./print_ver/out/figs/monthly_average_bar_plot.svg", width = 800, height = 600)
@@ -1217,7 +1058,8 @@ mk_low_flow_monthly = unique(monthly_flow_dat$Month) %>%
     month_dat = monthly_flow_dat %>%
       filter(Month == .x) %>%
       calculate_MK_results(chosen_variable = "Min_7_Day") %>%
-      mutate(Month = .x)
+      mutate(Month = .x,
+             Var = "Low Flow")
 
   }) %>%
   bind_rows()
@@ -1225,11 +1067,11 @@ mk_low_flow_monthly = unique(monthly_flow_dat$Month) %>%
 monthly_low_flow_bar_plot = mk_low_flow_monthly %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 0.5% increase",
-                                                         "0.1 - 0.5% increase",
-                                                         "< 0.1% change",
-                                                         "0.1 - 0.5% decrease",
-                                                         "> 0.5% decrease",
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 5% increase",
+                                                         "1 - 5% increase",
+                                                         "< 1% change",
+                                                         "1 - 5% decrease",
+                                                         "> 5% decrease",
                                                          "No significant trend")),
          Month = factor(month.name[match(Month,month.abb)], levels = month.name)) %>%
   mutate(Month = fct_relevel(Month,
@@ -1250,17 +1092,23 @@ monthly_low_flow_bar_plot = mk_low_flow_monthly %>%
   ggplot() +
   # ggtitle("Monthly Low Flow")+
   geom_col(aes(x = Month, y = n, fill = magnitude_fixed), col = "black") +
-  scale_fill_manual(values = colour.scale) +
+  scale_fill_manual(name = "Change per decade",
+                    values = colour.scale) +
   ylab("Number of Stations") +
   xlab("") +
   theme_classic() +
-  theme(legend.position = "bottom",
-        legend.title = element_blank())
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1))
 
 
 svg_px("./print_ver/out/figs/monthly_low_flow_bar_plot.svg", width = 800, height = 600)
 plot(monthly_low_flow_bar_plot)
 dev.off()
+
+# Create table of MK results
+
+mk_results_monthly_tbl = bind_rows(mk_average_monthly,
+                                   mk_low_flow_monthly)
   # Write ecoprovinces -
 #to do: do we need ecoprovs?? KARLY
 
@@ -1271,3 +1119,5 @@ dev.off()
 save(mk_all, annual_bar_plot, low_bar_plot, peak_bar_plot, freshet_bar_plot, date_low_bar_plot, monthly_average_bar_plot, monthly_low_flow_bar_plot,  file = "print_ver/out/figures.RData")
 
 saveRDS(mk_results_tbl, 'print_ver/out/mk_results_tbl.rds')
+
+saveRDS(mk_results_monthly_tbl, 'print_ver/out/mk_results_monthly_tbl.rds')
