@@ -2,7 +2,12 @@
 topic: "water"
 title: "Long-Term Trends in River Flows in B.C."
 output: envreportutils.internal::print_ver
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
+
+```{=html}
 <!--
 Copyright 2024 Province of British Columbia
 
@@ -16,7 +21,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and limitations under the License.
 -->
-
+```
 ```{r setup, echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
 
 library(dplyr)
@@ -65,6 +70,7 @@ updateDate <- "February 2024"
 annual_flow_dat = readRDS(here("app/www","annual_flow_dat.rds"))
 stations_sf = st_read(here("app/www","stations.gpkg"))
 mk_results_tbl = readRDS("print_ver/out/mk_results_tbl.rds")
+mk_results_monthly_tbl = readRDS("print_ver/out/mk_results_monthly_tbl.rds")
 
 recent_stations = annual_flow_dat %>%
   group_by(STATION_NUMBER) %>%
@@ -83,7 +89,6 @@ summary_table_cat = mk_results_tbl %>%
                                      .default = magnitude_fixed)) %>%
   group_by(Var, category) %>%
   summarise(n = n())
-
 
 summary_table_direction = summary_table_cat %>%
   mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
@@ -127,56 +132,137 @@ low_date_cat = summary_table_cat %>%
 low_date_direction = summary_table_direction %>%
   filter(Var == "Date of Low Summer Flow")
 
+# Monthly results
+
+# Subset median flow by month
+summary_table_cat_monthly = mk_results_monthly_tbl %>%
+  filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
+    mutate(category = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  group_by(Var, Month, category) %>%
+  summarise(n = n())
+
+summary_table_direction_monthly = summary_table_cat_monthly %>%
+  mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
+                               str_detect(category, "decrease") | str_detect(category, "earlier") ~ "negative",
+                               .default = "no change")) %>%
+  group_by(Var, Month, direction) %>%
+  summarise(n = sum(n))
+
+# Load figures
 load(here("print_ver/out","figures.Rdata"))
 ```
 
-Changes in the timing and volume of river flow can affect both natural ecosystems and human 
-communities - they can affect our ability to predict and manage seasonal water resources and
-flood risks, and may impact natural systems that rely on natural flow patterns. Low river flows
-in summer may reduce the amount of water available for agriculture, hydroelectric power generation,
-industry and communities. Low river flows are also associated with declines in water quality and 
-warmer water temperatures which can threaten the health of aquatic ecosystems. The indicator measures
-several metrics representing river flow at `r nrow(stations_sf_filtered)` stations (`r nrow(stations_sf)`
-when including upstream stations) across the Province. These stations have been monitored for a minimum of 
-`r min(stations_sf_filtered$N_years)` years and a maximum of `r max(stations_sf_filtered$N_years)` years 
-between `r min(stations_sf_filtered$Min_Year)` and `r max(stations_sf_filtered$Max_Year)`.
+-   **Changes in the timing and volume of river flow can affect both natural ecosystems and human communities.** They can affect our ability to predict and manage seasonal water resources and flood
+    risks, and may impact natural systems that rely on natural flow patterns.
+    
+-   **Low river flows in summer may reduce the amount of water available for agriculture, hydroelectric power generation, industry and communities.** Low river flows are also associated with declines in
+    water quality and warmer water temperatures which can threaten the
+    health of aquatic ecosystems. 
+    
+-   **Trends in the volume of river flow varied by metric**. While average annual flow volume and peak flow volume are relatively constant across the province, volume of low flows is trending to lower levels for a number of rivers. 
+
+-   **Freshet is occurring earlier.** Freshet is taking place approximately 2 days earlier each decade for X% of rivers. The effect on timing of low flows is less pronounced - only X% of river low flows were occurring earlier, with some even becoming later.
+
+-   **Lack of change in annual averages explained by monthly flow trends.** Trends in median monthly flows are increasing for winter and spring months, however summer months (June - September) are decreasing for many rivers. A similar pattern can be seen for low flows.
+
+-   **Trends in timing and volume of river flow vary geographically.** Annual average flows increased in the south-west of the province, while there was a strong trend for lower river flows on Vancouver Island. Timing of freshet was consistently earlier across all regions apart from the North-East. 
+
+\newpage
+    
+# River flows in British Columbia
+
+The indicator measures several metrics representing river flow at `r nrow(stations_sf_filtered)` stations
+(`r nrow(stations_sf)` when including upstream stations) across the
+Province. These stations have been monitored for a minimum of `r min(stations_sf_filtered$N_years)` 
+years and a maximum of `r max(stations_sf_filtered$N_years)` years between `r min(stations_sf_filtered$Min_Year)` and `r max(stations_sf_filtered$Max_Year)`.
+
+Long-term trends were estimated using Mann-Kendall trend tests (REF). Further information is 
+contained within the Methods section below.
 
 # Description of metrics
 
 ## Average annual flow
 
-Average annual flow was calculated within each water year (October - October). The mean daily flow was identified for each station and each year of available data, and
-the trend was estimated. We removed years that had more than 30% daily missing data to avoid potentially biased annual measures of average flow.
+Average annual flow was calculated within each water year (October -
+October). The mean daily flow was identified for each station and each
+year of available data. We removed years that had more than 10% daily missing 
+data to avoid potentially biased annual measures of average flow.
 
 ## Volume of peak flow and timing of freshet
 
-Volume of peak flow and timing of freshet were calculated using water year (October - October). Volume of peak flow was calculated using a 3-day rolling window, identifying the maximum water volume measured at each station for each year. Freshet is defined as the flood of a river, often due to heavy rain or snow melt. For this analysis, we define date of freshet as the date whereby 50% of river flow for that water year has taken place. 
+Volume of peak flow and timing of freshet were calculated using water
+year (October - October). Volume of peak flow was calculated using a
+3-day rolling window, identifying the maximum water volume measured at
+each station for each year. Freshet is defined as the flood of a river,
+often due to heavy rain or snow melt. For this analysis, we define date
+of freshet as the date whereby 50% of river flow for that water year has
+taken place.
 
 ## Date and volume of low flow
 
-Timing and volume of low flows was calculated based on the low flow year^1^ (April - April). Volume of low flow was estimated based on a 7-day rolling window across the summer (May - October), and the minimum volume was identified for each year at each station. Timing of low flow was calculated based on the long-term Mean Annual Discharge (MAD). The first date when 50% of MAD was reached after freshet was used as the definition of the date of low flow. 
+Timing and volume of low flows was calculated based on the low flow
+year^1^ (April - April). Volume of low flow was estimated based on a
+7-day rolling window across the summer (May - October), and the minimum
+volume was identified for each year at each station. Timing of low flow
+was calculated based on the long-term Mean Annual Discharge (MAD). The
+first date when 50% of MAD was reached after freshet was used as the
+definition of the date of low flow.
 
-\vspace{.2cm}
+\newpage
 
 # Trend Results
+
+## Flow volume
+
+-   The metrics measured at each station can be broken down into two types:
+change in the magnitude of river flow and change in the timing of river
+flow. Of the `r nrow(stations_sf_filtered)` stations monitored across
+the Province,
+`r average_direction$n[average_direction$direction == "positive"]`
+stations identified increasing flows, of which
+`r average_cat$n[average_cat$category == "> 5% increase"]` were
+increasing by more than 5% per decade. In contrast,
+`r average_direction$n[average_direction$direction == "negative"]`
+displayed decreasing flows, while the remaining
+`r average_direction$n[average_direction$direction == "no change"]` were
+either less than 1% a year or had non-significant trends.
+
+-   Similarly, peak flows trends were almost evenly split between increasing
+(`r peak_direction$n[peak_direction$direction == "positive"]` stations)
+and decreasing
+(`r peak_direction$n[peak_direction$direction == "negative"]` stations),
+while the vast majority were found to have little significant change
+(`r peak_direction$n[peak_direction$direction == "no change"]`
+stations).
+
+-   Low summer flow volume has been significantly decreasing over time for a
+substantial number of rivers.
+`r Low_direction$n[Low_direction$direction == "negative"]` stations had
+decreasing summer flows, and
+`r Low_cat$n[Low_cat$category == "> 5% decrease"]` were greater than
+5% per decade.
 
 ```{r fig.width = 10, fig.height = 8, echo = FALSE}
 mk_all
 ```
 
-## Flow volume
-
-The metrics measured at each station can be broken down into two types: change in the magnitude of river flow and change in the timing of river flow. Of the `r nrow(stations_sf_filtered)` stations monitored across the Province, `r average_direction$n[average_direction$direction == "positive"]` stations identified increasing flows, of which `r average_cat$n[average_cat$category == "> 0.5% increase"]` were increasing by more than 0.5% per year. In contrast,  `r average_direction$n[average_direction$direction == "negative"]` displayed decreasing flows, while the remaining `r average_direction$n[average_direction$direction == "no change"]` were either less than 0.1% a year or had non-significant trends.
-
-Similarly, peak flows trends were almost evenly split between increasing (`r peak_direction$n[peak_direction$direction == "positive"]` stations) and decreasing (`r peak_direction$n[peak_direction$direction == "negative"]` stations), while the vast majority were found to have little significant change (`r peak_direction$n[peak_direction$direction == "no change"]` stations).
-
-Low summer flow volume has been significantly decreasing over time for a substantial number of rivers. `r Low_direction$n[Low_direction$direction == "negative"]` stations had decreasing summer flows, and `r Low_cat$n[Low_cat$category == "> 0.5% decrease"]` were greater than 0.5% per year.
-
 ## Flow timing
 
-Date of freshet has been occurring gradually earlier for a large number of locations. `r freshet_direction$n[freshet_direction$direction == "negative"]` have been trending earlier, and `r freshet_cat$n[freshet_cat$category == "> 0.2 days earlier"]` are occurring 0.2 days earlier per year. Only `r freshet_direction$n[freshet_direction$direction == "positive"]` was trending later, while `r freshet_direction$n[freshet_direction$direction == "no change"] + freshet_cat$n[freshet_cat$category == "< 0.1 days change"]` displayed trends that were less than 0.1 days change or not significant.
+-   Date of freshet has been occurring gradually earlier for a large number
+of locations.
+`r freshet_direction$n[freshet_direction$direction == "negative"]` stations have
+been trending earlier, and
+`r freshet_cat$n[freshet_cat$category == "> 2 days earlier"]` stations are
+occurring 2 days earlier per decade. Only
+`r freshet_direction$n[freshet_direction$direction == "positive"]` station was
+trending later, while
+`r freshet_direction$n[freshet_direction$direction == "no change"] + freshet_cat$n[freshet_cat$category == "< 1 days change"]` stations
+displayed trends that were less than 1 days change or not significant.
 
-The majority of locations did not show significant trends for timing of low flow. Of those that did, more stations had low flows occurring earlier (`r low_date_direction$n[low_date_direction$direction == "negative"]`) than later (`r low_date_direction$n[low_date_direction$direction == "positive"]`).
+-   The majority of locations did not show significant trends for timing of
+low flow. Of those that did, more stations had low flows occurring earlier
+(`r low_date_direction$n[low_date_direction$direction == "negative"]` stations) than later (`r low_date_direction$n[low_date_direction$direction == "positive"]` stations).
 
 # Changes in Flow Volume by Month
 
@@ -186,40 +272,128 @@ The majority of locations did not show significant trends for timing of low flow
 monthly_average_bar_plot
 ```
 
-Changes in average river flow across years varies by month. 
+-   Changes in average river flow across years varies by month. Winter and
+spring months (December - May) have seen a significant positive trend in
+median flows for a large number of rivers. For example, January flow trends are increasing for `r summary_table_direction_monthly$n[summary_table_direction_monthly$Var == "Average" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` stations, and over 5% per decade in April and May for `r summary_table_cat_monthly$n[summary_table_cat_monthly$Var == "Average" & summary_table_cat_monthly$Month == "Apr" & summary_table_cat_monthly$category == "> 5% increase"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$Var == "Average" & summary_table_cat_monthly$Month == "May" & summary_table_cat_monthly$category == "> 5% increase"]` stations respectively.
 
 ## Monthly low flows
+
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 monthly_low_flow_bar_plot
 ```
+
+-   Similarly to median flows, monthly low flows varied by month. January and April have seen higher low flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$Var == "Low Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$Var == "Low Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$Var == "Low Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$Var == "Low Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decresing low flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$Var == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$Var == "Low Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` are decreasing at more than 5% per decade.
 
 # Changes in Volume and Timing by Hydrologic Zones
 
 # Flow volume
 
 ## Average annual flow
+
+```{r echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
+average_by_zone_cat = mk_results_tbl %>%
+  filter(Var == "Average") %>%
+   filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
+    mutate(category = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  group_by(HYDZN_NAME, category) %>%
+  summarise(n = n())
+
+average_by_zone_direction = average_by_zone_cat %>%
+  mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
+                               str_detect(category, "decrease") | str_detect(category, "earlier") ~ "negative",
+                               .default = "no change")) %>%
+  group_by(HYDZN_NAME, direction) %>%
+  summarise(n = sum(n))
+```
+
+
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 annual_bar_plot
 ```
 
+-   For average annual flow, the vast majority of stations had non-significant trends. In the south-central and -west hydrologic zones, a number of stations had increasing annual flow trends including the Fraser Plateau (`r average_by_zone_direction$n[average_by_zone_direction$HYDZN_NAME == "Fraser Plateau" & average_by_zone_direction$direction == "positive"]` of `r sum(average_by_zone_direction$n[average_by_zone_direction$HYDZN_NAME == "Fraser Plateau"])` stations) and the west and central South Coast Mountains (`r average_by_zone_direction$n[average_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains" & average_by_zone_direction$direction == "positive"]` of `r sum(average_by_zone_direction$n[average_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains"])` and `r average_by_zone_direction$n[average_by_zone_direction$HYDZN_NAME == "Central South Coast Mountains" & average_by_zone_direction$direction == "positive"]` of `r sum(average_by_zone_direction$n[average_by_zone_direction$HYDZN_NAME == "Central South Coast Mountains"])` stations respectively).
+
 ## Peak flow
+
+```{r echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
+peak_by_zone_cat = mk_results_tbl %>%
+  filter(Var == "Peak Flow") %>%
+   filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
+    mutate(category = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  group_by(HYDZN_NAME, category) %>%
+  summarise(n = n())
+
+peak_by_zone_direction = peak_by_zone_cat %>%
+  mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
+                               str_detect(category, "decrease") | str_detect(category, "earlier") ~ "negative",
+                               .default = "no change")) %>%
+  group_by(HYDZN_NAME, direction) %>%
+  summarise(n = sum(n))
+```
+
+
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 peak_bar_plot
 ```
 
+-   There were no clear geographic patterns in trends in peak flow. The only result to highlight is Western Vancouver Island, which has `r peak_by_zone_direction$n[peak_by_zone_direction$HYDZN_NAME == "Western Vancouver Island" & peak_by_zone_direction$direction == "positive"]` of `r sum(peak_by_zone_direction$n[peak_by_zone_direction$HYDZN_NAME == "Western Vancouver Island"])` stations with increasing and `r peak_by_zone_direction$n[peak_by_zone_direction$HYDZN_NAME == "Western Vancouver Island" & peak_by_zone_direction$direction == "negative"]` of `r sum(peak_by_zone_direction$n[peak_by_zone_direction$HYDZN_NAME == "Western Vancouver Island"])` stations with decreasing annual peak flows.
+
 ## Low flow
+```{r echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
+low_by_zone_cat = mk_results_tbl %>%
+  filter(Var == "Low Summer Flow") %>%
+   filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
+    mutate(category = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  group_by(HYDZN_NAME, category) %>%
+  summarise(n = n())
+
+low_by_zone_direction = low_by_zone_cat %>%
+  mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
+                               str_detect(category, "decrease") | str_detect(category, "earlier") ~ "negative",
+                               .default = "no change")) %>%
+  group_by(HYDZN_NAME, direction) %>%
+  summarise(n = sum(n))
+```
+
+
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 low_bar_plot
 ```
 
+-   Trends is summer low flow are most apparent on Vancouver Island. Western Vancouver Islands monitored rivers are almost all (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western Vancouver Island" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western Vancouver Island"])` stations) are decreasing at more than 5% volume per decade. Eastern Vancouver Island also has a large proportion of river low flows in decline (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Eastern Vancouver Island" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Eastern Vancouver Island"])` stations). Other hydrologic zones with ddecreasing summer low flow volumes to highlight include the Western South and Central Coast Mountains (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains"])` and `r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Central Coast Mountains" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Central Coast Mountains"])` stations respectively)
+
 # Flow timing
 
 ## Date of freshet
+
+```{r echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
+freshet_by_zone_cat = mk_results_tbl %>%
+  filter(Var == "Date of Freshet") %>%
+   filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
+    mutate(category = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  group_by(HYDZN_NAME, category) %>%
+  summarise(n = n())
+
+freshet_by_zone_direction = freshet_by_zone_cat %>%
+  mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
+                               str_detect(category, "decrease") | str_detect(category, "earlier") ~ "negative",
+                               .default = "no change")) %>%
+  group_by(HYDZN_NAME, direction) %>%
+  summarise(n = sum(n))
+```
+
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 freshet_bar_plot
 ```
 
+
+
 ## Date of low flow
+
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 date_low_bar_plot
 ```
@@ -228,42 +402,68 @@ date_low_bar_plot
 
 ## Data
 
-The data sets are all sourced from the B.C. Data Catalogue, distributed under the [Open Government Licence - British Columbia](https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61).
+The data sets are all sourced from the B.C. Data Catalogue, distributed
+under the [Open Government Licence - British
+Columbia](https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61).
 
--   [Indicator Summary Data: Long-term Trends in Timing and Volume of B/C/s River Flow](https://catalogue.data.gov.bc.ca/dataset/indicator-summary-data-change-in-timing-and-volume-of-river-flow-in-bc-1912-2012-)
+-   [Indicator Summary Data: Long-term Trends in Timing and Volume of
+    B/C/s River
+    Flow](https://catalogue.data.gov.bc.ca/dataset/indicator-summary-data-change-in-timing-and-volume-of-river-flow-in-bc-1912-2012-)
 
-- River Flow Stations and daily flow data accessed with ['tidyhydat' R Package](https://cran.r-project.org/web/packages/tidyhydat/index.html)
+-   River Flow Stations and daily flow data accessed with ['tidyhydat' R
+    Package](https://cran.r-project.org/web/packages/tidyhydat/index.html)
 
-- [Hydrologic Zones](https://catalogue.data.gov.bc.ca/dataset/bc-hydrologic-zones).
+-   [Hydrologic
+    Zones](https://catalogue.data.gov.bc.ca/dataset/bc-hydrologic-zones).
 
-----
+------------------------------------------------------------------------
 
-Published and Available Online at Environmental Reporting BC (`r updateDate`): <https://www.env.gov.bc.ca/soe/indicators/climate-change/rivers.html0>
+Published and Available Online at Environmental Reporting BC
+(`r updateDate`):
+<https://www.env.gov.bc.ca/soe/indicators/climate-change/rivers.html0>
 
-Email correspondence to: envreportbc@gov.bc.ca
+Email correspondence to:
+[envreportbc\@gov.bc.ca](mailto:envreportbc@gov.bc.ca){.email}
 
-*Suggested Citation*:  
-Environmental Reporting BC. 2024.  Long-Term Trends in River Flows in B.C. State of Environment Reporting, Ministry of Environment and Climate Change Strategy, British Columbia, Canada.
+*Suggested Citation*:\
+Environmental Reporting BC. 2024. Long-Term Trends in River Flows in
+B.C. State of Environment Reporting, Ministry of Environment and Climate
+Change Strategy, British Columbia, Canada.
 
 ## Methods
 
 ### Filtering procedure
 
-To account for variation in monitoring at different stations on different rivers, a set of filtering procedures were implemented to reduce potential for erroneous trend estimations. These included:
+To account for variation in monitoring at different stations on
+different rivers, a set of filtering procedures were implemented to
+reduce potential for erroneous trend estimations. These included:
 
-- **Data gaps**: Monitoring stations containing gaps of 5 or more years had all annual data preceding the gap removed, to maintain relatively continuous datasets at each station for trend analyses.
+-   **Data gaps**: Monitoring stations containing gaps of 5 or more
+    years had all annual data preceding the gap removed, to maintain
+    relatively continuous datasets at each station for trend analyses.
 
-- **Recently active**: Stations were required to be active as recently as 2019 for inclusion in the analysis.
+-   **Recently active**: Stations were required to be active as recently
+    as 2019 for inclusion in the analysis.
 
-- **Minimum sample size**: Only stations with more than 10 years of monitoring data were retained.
+-   **Minimum sample size**: Only stations with more than 10 years of
+    monitoring data were retained.
 
-- **Regulated Rivers**: A river is defined as regulated if the flow regime has been modified and results in a 10% increase or decrease in flow (REF). For the purpose of this 
-analysis, regulated stations were removed from the analysis (apart from certain instances where flow was deemed close to natural).
+-   **Regulated Rivers**: A river is defined as regulated if the flow
+    regime has been modified and results in a 10% increase or decrease
+    in flow (REF). For the purpose of this analysis, regulated stations
+    were removed from the analysis (apart from certain instances where
+    flow was deemed close to natural).
 
-- **Upstream stations**: A number of rivers include multiple monitoring stations. In such situations, only the downstream stations are included (although upstream locations can be inspected using the online app).
+-   **Upstream stations**: A number of rivers include multiple
+    monitoring stations. In such situations, only the downstream
+    stations are included (although upstream locations can be inspected
+    using the online app).
 
-- **Recently installed stations**: Stations that have been installed within the last 30 years were...... FINISH
+-   **Recently installed stations**: Stations that have been installed
+    within the last 30 years were included within the analysis if they had at least 
+    10 years of data (and can be toggled on/off within the online app).
 
 ### References
 
-- ^1^[Low Flow Year](https://www.epa.gov/hydrowq/definition-and-characteristics-low-flows)
+-   ^1^[Low Flow
+    Year](https://www.epa.gov/hydrowq/definition-and-characteristics-low-flows)
