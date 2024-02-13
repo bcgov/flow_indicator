@@ -164,7 +164,7 @@ load(here("print_ver/out","figures.Rdata"))
 
 -   **Freshet is occurring earlier.** Freshet is taking place approximately 2 days earlier each decade for X% of rivers. The effect on timing of low flows is less pronounced - only X% of river low flows were occurring earlier, with some even becoming later.
 
--   **Lack of change in annual averages explained by monthly flow trends.** Trends in median monthly flows are increasing for winter and spring months, however summer months (June - September) are decreasing for many rivers. A similar pattern can be seen for low flows.
+-   **Lack of change in annual averages explained by monthly flow trends.** Trends in median monthly flows are increasing for winter and spring months (November - May), however summer months (June - September) are decreasing for many rivers. A similar pattern can be seen for low flows.
 
 -   **Trends in timing and volume of river flow vary geographically.** Annual average flows increased in the south-west of the province, while there was a strong trend for lower river flows on Vancouver Island. Timing of freshet was consistently earlier across all regions apart from the North-East. 
 
@@ -192,17 +192,17 @@ data to avoid potentially biased annual measures of average flow.
 ## Volume of peak flow and timing of freshet
 
 Volume of peak flow and timing of freshet were calculated using water
-year (October - October). Volume of peak flow was calculated using a
+year^1^ (October - October). Volume of peak flow was calculated using a
 3-day rolling window, identifying the maximum water volume measured at
 each station for each year. Freshet is defined as the flood of a river,
 often due to heavy rain or snow melt. For this analysis, we define date
-of freshet as the date whereby 50% of river flow for that water year has
+of freshet as the date whereby 50% of river discharge for that water year has
 taken place.
 
 ## Date and volume of low flow
 
 Timing and volume of low flows was calculated based on the low flow
-year^1^ (April - April). Volume of low flow was estimated based on a
+year^2^ (April - April). Volume of low flow was estimated based on a
 7-day rolling window across the summer (May - October), and the minimum
 volume was identified for each year at each station. Timing of low flow
 was calculated based on the long-term Mean Annual Discharge (MAD). The
@@ -220,15 +220,15 @@ change in the magnitude of river flow and change in the timing of river
 flow. Of the `r nrow(stations_sf_filtered)` stations monitored across
 the Province,
 `r average_direction$n[average_direction$direction == "positive"]`
-stations identified increasing flows, of which
+stations identified increasing average annual flows, of which
 `r average_cat$n[average_cat$category == "> 5% increase"]` were
 increasing by more than 5% per decade. In contrast,
 `r average_direction$n[average_direction$direction == "negative"]`
-displayed decreasing flows, while the remaining
+displayed decreasing average annual flows, while the remaining
 `r average_direction$n[average_direction$direction == "no change"]` were
 either less than 1% a year or had non-significant trends.
 
--   Similarly, peak flows trends were almost evenly split between increasing
+-   Similarly, annual peak flows trends were almost evenly split between increasing
 (`r peak_direction$n[peak_direction$direction == "positive"]` stations)
 and decreasing
 (`r peak_direction$n[peak_direction$direction == "negative"]` stations),
@@ -239,8 +239,8 @@ stations).
 -   Low summer flow volume has been significantly decreasing over time for a
 substantial number of rivers.
 `r Low_direction$n[Low_direction$direction == "negative"]` stations had
-decreasing summer flows, and
-`r Low_cat$n[Low_cat$category == "> 5% decrease"]` were greater than
+decreasing summer flows, and of those,
+`r Low_cat$n[Low_cat$category == "> 5% decrease"]` were at a rate greater than
 5% per decade.
 
 ```{r fig.width = 10, fig.height = 8, echo = FALSE}
@@ -249,7 +249,7 @@ mk_all
 
 ## Flow timing
 
--   Date of freshet has been occurring gradually earlier for a large number
+-   Freshet has been occurring gradually earlier for a large number
 of locations.
 `r freshet_direction$n[freshet_direction$direction == "negative"]` stations have
 been trending earlier, and
@@ -363,7 +363,7 @@ low_by_zone_direction = low_by_zone_cat %>%
 low_bar_plot
 ```
 
--   Trends is summer low flow are most apparent on Vancouver Island. Western Vancouver Islands monitored rivers are almost all (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western Vancouver Island" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western Vancouver Island"])` stations) are decreasing at more than 5% volume per decade. Eastern Vancouver Island also has a large proportion of river low flows in decline (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Eastern Vancouver Island" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Eastern Vancouver Island"])` stations). Other hydrologic zones with ddecreasing summer low flow volumes to highlight include the Western South and Central Coast Mountains (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains"])` and `r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Central Coast Mountains" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Central Coast Mountains"])` stations respectively)
+-   Trends is summer low flow are most apparent on Vancouver Island. Western Vancouver Islands monitored rivers are almost all (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western Vancouver Island" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western Vancouver Island"])` stations) are decreasing at more than 5% volume per decade. Eastern Vancouver Island also has a large proportion of river low flows in decline (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Eastern Vancouver Island" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Eastern Vancouver Island"])` stations). Other hydrologic zones with decreasing summer low flow volumes to highlight include the Western South and Central Coast Mountains (`r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Western South Coast Mountains"])` and `r low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Central Coast Mountains" & low_by_zone_direction$direction == "negative"]` of `r sum(low_by_zone_direction$n[low_by_zone_direction$HYDZN_NAME == "Central Coast Mountains"])` stations respectively)
 
 # Flow timing
 
@@ -390,7 +390,7 @@ freshet_by_zone_direction = freshet_by_zone_cat %>%
 freshet_bar_plot
 ```
 
--   Timing of freshet is getting earlier for stations across most hydrologic zones. North-eastern B.C. was the only region that was immune to this effect, apart from the Rocky Mountains which saw earlier freshet at several stations (`r freshet_by_zone_direction$n[freshet_by_zone_direction$HYDZN_NAME == "Northern Rocky Mountains" & freshet_by_zone_direction$direction == "negative"]` of `r sum(freshet_by_zone_direction$n[freshet_by_zone_direction$HYDZN_NAME == "Northern Rocky Mountains"])` stations). This pattern was also missing from Vancouver Island, although this is likely due to the majority of rivers not being snow and glacier-fed - the driver behind the freshet phenomena. 
+-   Timing of freshet has been getting earlier for stations across most hydrologic zones. North-eastern B.C. was the only region that was immune to this effect, apart from the Rocky Mountains which saw earlier freshet at several stations (`r freshet_by_zone_direction$n[freshet_by_zone_direction$HYDZN_NAME == "Northern Rocky Mountains" & freshet_by_zone_direction$direction == "negative"]` of `r sum(freshet_by_zone_direction$n[freshet_by_zone_direction$HYDZN_NAME == "Northern Rocky Mountains"])` stations). This pattern was also missing from Vancouver Island, although this is likely due to the majority of rivers not being snow and glacier-fed - the driver behind the freshet phenomena. 
 
 ## Date of low flow
 ```{r echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
@@ -480,8 +480,13 @@ reduce potential for erroneous trend estimations. These included:
 -   **Recently installed stations**: Stations that have been installed
     within the last 30 years were included within the analysis if they had at least 
     10 years of data (and can be toggled on/off within the online app).
+    
+### Trend Analysis
+
+TBC
 
 ### References
 
--   ^1^[Low Flow
-    Year](https://www.epa.gov/hydrowq/definition-and-characteristics-low-flows)
+-   ^1^[Water Year](https://water.usgs.gov/nwc/explain_data.html)
+
+-   ^2^[Low Flow Year](https://www.epa.gov/hydrowq/definition-and-characteristics-low-flows)
