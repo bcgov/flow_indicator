@@ -390,13 +390,31 @@ freshet_by_zone_direction = freshet_by_zone_cat %>%
 freshet_bar_plot
 ```
 
-
+-   Timing of freshet is getting earlier for stations across most hydrologic zones. North-eastern B.C. was the only region that was immune to this effect, apart from the Rocky Mountains which saw earlier freshet at several stations (`r freshet_by_zone_direction$n[freshet_by_zone_direction$HYDZN_NAME == "Northern Rocky Mountains" & freshet_by_zone_direction$direction == "negative"]` of `r sum(freshet_by_zone_direction$n[freshet_by_zone_direction$HYDZN_NAME == "Northern Rocky Mountains"])` stations). This pattern was also missing from Vancouver Island, although this is likely due to the majority of rivers not being snow and glacier-fed - the driver behind the freshet phenomena. 
 
 ## Date of low flow
+```{r echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
+date_low_by_zone_cat = mk_results_tbl %>%
+  filter(Var == "Date of Low Summer Flow") %>%
+   filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
+    mutate(category = case_when(significant == 0.1 ~ "No significant trend",
+                                     .default = magnitude_fixed)) %>%
+  group_by(HYDZN_NAME, category) %>%
+  summarise(n = n())
+
+date_low_by_zone_direction = date_low_by_zone_cat %>%
+  mutate(direction = case_when(str_detect(category,"increase") | str_detect(category,"later")  ~ "positive",
+                               str_detect(category, "decrease") | str_detect(category, "earlier") ~ "negative",
+                               .default = "no change")) %>%
+  group_by(HYDZN_NAME, direction) %>%
+  summarise(n = sum(n))
+```
 
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 date_low_bar_plot
 ```
+
+Trends in the timing of low flow are far less clear than that of timing of freshet. Trends indicating earlier timing of low flows were present in some hydrologic zones, most prominent in the Southern Quesnel Highland (`r date_low_by_zone_direction$n[date_low_by_zone_direction$HYDZN_NAME == "Southern Quesnel Highland" & date_low_by_zone_direction$direction == "negative"]` of `r sum(date_low_by_zone_direction$n[date_low_by_zone_direction$HYDZN_NAME == "Southern Quesnel Highland"])` stations), the Fraser Plateau (`r date_low_by_zone_direction$n[date_low_by_zone_direction$HYDZN_NAME == "Fraser Plateau" & date_low_by_zone_direction$direction == "negative"]` of `r sum(date_low_by_zone_direction$n[date_low_by_zone_direction$HYDZN_NAME == "Fraser Plateau"])` stations) and Nechako Plateau (`r date_low_by_zone_direction$n[date_low_by_zone_direction$HYDZN_NAME == "Nechako Plateau" & date_low_by_zone_direction$direction == "negative"]` of `r sum(date_low_by_zone_direction$n[date_low_by_zone_direction$HYDZN_NAME == "Nechako Plateau"])` stations).
 
 ## Useful Links
 
