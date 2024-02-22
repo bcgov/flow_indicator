@@ -30,8 +30,18 @@ if(!dir.exists('app/www')) dir.create('app/www')
 # tidyhydat::download_hydat()
 
 ## Get all BC stations with "flow"
+# STATIONS TO REMOVE BASED ON JON RECOMMENDATION (Trending Cluster Recommendations.xlsx)
 stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
                                  filter(Parameter == "Flow") %>%
+                                 filter(! (STATION_NUMBER %in% c("07FD002",
+                                                                 "08ND025",
+                                                                 "08NH126",
+                                                                 "08NM050",
+                                                                 "08NM002",
+                                                                 "08GC006",
+                                                                 "08GC007",
+                                                                 "07FA004"
+                                 ))) %>%
                                  pull(STATION_NUMBER))
 
 ## Pulls HYDAT daily flow data for all BC stations that measure flow
@@ -40,14 +50,27 @@ stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
 hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
 hydat_daily_all = hydat_daily_all %>%
-  mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
+  mutate(Year = year(Date),
+         wYear = case_when(month(Date) >= 10 ~ year(Date),
                            month(Date) < 10 ~ year(Date) - 1),
          lfYear = case_when(month(Date) >= 4 ~ year(Date),
                             month(Date) < 4 ~ year(Date) - 1))
 
-#create daily station data for water year
+#create daily station data for calendar year
+daily_station_data_Year <- hydat_daily_all %>%
+  filter(!is.na(Value)) %>%
+  group_by(STATION_NUMBER, Year) %>%
+  summarise(Ann_Mean = mean(Value, na.rm = TRUE),
+            n = n(),
+            ndays = max(yday(as.Date(paste0("31-12-", year(Date)), format = "%d-%m-%Y"))),
+            perc_daily_missing = ((ndays - n) / ndays) * 100) %>%
+  select(STATION_NUMBER,
+         Year,
+         perc_daily_missing_Year = perc_daily_missing)
 
+#create daily station data for water year
 daily_station_data_wYear <- hydat_daily_all %>%
+  filter(!is.na(Value)) %>%
   group_by(STATION_NUMBER, wYear) %>%
   summarise(Ann_Mean = mean(Value, na.rm = TRUE),
             n = n(),
@@ -59,6 +82,7 @@ daily_station_data_wYear <- hydat_daily_all %>%
 
 # Do the same for low flow year
 daily_station_data_lfYear <- hydat_daily_all %>%
+  filter(!is.na(Value)) %>%
   group_by(STATION_NUMBER, lfYear) %>%
   summarise(Ann_Mean = mean(Value, na.rm = TRUE),
             n = n(),
@@ -70,6 +94,7 @@ daily_station_data_lfYear <- hydat_daily_all %>%
 
 daily_station_data = daily_station_data_wYear %>%
   left_join(daily_station_data_lfYear) %>%
+  left_join(daily_station_data_Year) %>%
   left_join(hy_stations(), by = "STATION_NUMBER") %>%
   left_join(hy_stn_regulation(), by = "STATION_NUMBER")
 
