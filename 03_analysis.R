@@ -18,17 +18,22 @@ library(data.table)
 library(tidyhydat)
 library(sf)
 library(fasstr)
+library(rmapshaper)
 
 if(!exists("final_station_summary_wYear")){final_station_summary_wYear = read_csv('data/finalstns_wYear.csv')}
 if(!exists("final_station_summary_lfYear")){final_station_summary_lfYear = read_csv('data/finalstns_lfYear.csv')}
+if(!exists("final_station_summary_cYear")){final_station_summary_cYear = read_csv('data/finalstns_cYear.csv')}
 if(!exists("filtered_station_year_wYear")){filtered_station_year_wYear = read_csv('data/finalstnyr_wYear.csv')}
 if(!exists("filtered_station_year_lfYear")){filtered_station_year_lfYear = read_csv('data/finalstnyr_lfYear.csv')}
+if(!exists("filtered_station_year_cYear")){filtered_station_year_cYear = read_csv('data/finalstnyr_cYear.csv')}
 
+# Load regime group table
+regime_groups = read.csv("data/river_groups.csv")
 
 # If no /www folder (used for the shiny app, and also for static results PDF)
 if(!dir.exists('app/www')) dir.create('app/www')
 
-# Pull out the stations to keep from the loading script.
+# Pull out the stations to keep from the loading script
 stations_to_keep = final_station_summary_wYear %>%
   # filter(keep == TRUE) %>%
   pull(STATION_NUMBER)
@@ -43,27 +48,37 @@ stations_to_keep = final_station_summary_wYear %>%
 # Note: this includes 'gappy' data we identified in script 1.
 # ~5 million rows, 7 columns.
 flow_dat = tidyhydat::hy_daily_flows(stations_to_keep) %>%
-  mutate(wYear = case_when(month(Date) >= 10 ~ year(Date),
+  mutate(Year = year(Date),
+         wYear = case_when(month(Date) >= 10 ~ year(Date),
                            month(Date) < 10 ~ year(Date) - 1),
          lfYear = case_when(month(Date) >= 4 ~ year(Date),
                             month(Date) < 4 ~ year(Date) - 1)) %>%
   filter(Parameter == 'Flow') %>%
   filter(!is.na(Value)) %>%
-  mutate(Month = lubridate::month(Date))
+  mutate(Month = lubridate::month(Date)) %>%
+  left_join(regime_groups)
 
 #Restrict by station_year list (this will remove years with missing data) - water year
 flow_dat_filtered_wYear = flow_dat %>%
   filter(paste0(STATION_NUMBER, wYear) %in% paste0(filtered_station_year_wYear$STATION_NUMBER,filtered_station_year_wYear$Year)) %>%
   mutate(DoY = case_when(month(Date) >= 10 ~ yday(Date) - yday(paste0(year(Date),"-09-30")),
                           month(Date) < 10 ~ yday(Date) + (365 - yday(paste0(year(Date),"-09-30"))))) %>%
-  dplyr::select(-lfYear)
+  dplyr::select(-lfYear, -Year)
 
 # Low flow year
 flow_dat_filtered_lfYear = flow_dat %>%
   filter(paste0(STATION_NUMBER, lfYear) %in% paste0(filtered_station_year_lfYear$STATION_NUMBER,filtered_station_year_lfYear$Year)) %>%
   mutate(DoY = case_when(month(Date) >= 4 ~ yday(Date) - yday(paste0(year(Date),"-03-31")),
                          month(Date) < 4 ~ yday(Date) + (365 - yday(paste0(year(Date),"-03-31"))))) %>%
-  dplyr::select(-wYear)
+  dplyr::select(-wYear, -Year)
+
+#Calendar year
+flow_dat_filtered_cYear = flow_dat %>%
+  mutate(Year = year(Date)) %>%
+  filter(paste0(STATION_NUMBER, Year) %in% paste0(filtered_station_year_cYear$STATION_NUMBER,filtered_station_year_cYear$Year)) %>%
+  mutate(DoY = yday(Date)) %>%
+  dplyr::select(-wYear, -lfYear)
+
 
 # Annual Values =========================================================
 # Use water year (October - October)
@@ -78,10 +93,24 @@ annual_mean_dat = flow_dat_filtered_wYear %>%
 ggplot(annual_mean_dat, aes(Year,STATION_NUMBER, colour = Average)) +
   geom_point()
 
+# # Calculate "annual" mean for mixed regime stations (March - September)
+# annual_mean_dat_summer = flow_dat_filtered_cYear %>%
+#   filter(between(Month, 3, 9)) %>%
+#   group_by(Year, STATION_NUMBER) %>%
+#   summarise(Average = mean(Value)) %>%
+#
+# # Calculate annual mean using calendar year for Late peak stations
+# annual_mean_dat_cYear = flow_dat_filtered_cYear %>%
+#   group_by(Year, STATION_NUMBER) %>%
+#   summarise(Average = mean(Value)) %>%
+#   ungroup()%>%
+#   filter(wYear > 1915) # remove some random early year that looks to not have been removed by gap code (no idea why!)
+
 
 # Timing of Freshet =========================================================
 # Use water year (October - October)
-flow_timing_dat = flow_dat_filtered_wYear %>%
+flow_timing_earlypeak = flow_dat_filtered_wYear %>%
+  filter(Regime == "Snow-Dominated - Early Peak") %>%
   group_by(STATION_NUMBER, wYear) %>%
   mutate(RowNumber = row_number(),
          TotalFlow = sum(Value),
@@ -95,6 +124,42 @@ flow_timing_dat = flow_dat_filtered_wYear %>%
                 Year = wYear,
                 DoY_50pct_TotalQ,
                 Date)
+
+flow_timing_latepeak = flow_dat_filtered_cYear %>%
+  filter(Regime == "Snow-Dominated - Late Peak") %>%
+  group_by(STATION_NUMBER, Year) %>%
+  mutate(RowNumber = row_number(),
+         TotalFlow = sum(Value),
+         FlowToDate = cumsum(Value)) %>%
+  filter(FlowToDate > TotalFlow/2) %>%
+  slice(1) %>%
+  mutate(DoY_50pct_TotalQ = DoY,
+         Date = as.Date(DoY, origin = "2000-01-01")) %>%
+  ungroup() %>%
+  dplyr::select(STATION_NUMBER,
+                Year,
+                DoY_50pct_TotalQ,
+                Date)
+
+flow_timing_mixed = flow_dat_filtered_cYear %>%
+  filter(Regime == "Mixed Regime" & between(Month, 3, 9)) %>%
+  group_by(STATION_NUMBER,Year)%>%
+  mutate(RowNumber = row_number(),
+         TotalFlow = sum(Value),
+         FlowToDate = cumsum(Value)) %>%
+  filter(FlowToDate > TotalFlow/2) %>%
+  slice(1) %>%
+  mutate(DoY_50pct_TotalQ = DoY,
+         Date = as.Date(DoY, origin = "2000-01-01")) %>%
+  ungroup() %>%
+  dplyr::select(STATION_NUMBER,
+                Year,
+                DoY_50pct_TotalQ,
+                Date)
+
+flow_timing_dat = bind_rows(flow_timing_earlypeak,
+                            flow_timing_latepeak,
+                            flow_timing_mixed)
 
 # Return to 50% Mean Annual Discharge =========================================================
 
@@ -117,7 +182,28 @@ MAD_station = calc_longterm_mean(flow_dat_filtered_lfYear,
                                  groups = STATION_NUMBER,
                                  percent_MAD = 50)
 
-rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
+MAD_station_rain = calc_longterm_mean(flow_dat_filtered_lfYear,
+                                 values = Value,
+                                 groups = STATION_NUMBER,
+                                 percent_MAD = 20)
+
+rtn_2_mad_perc_rain = flow_dat_filtered_lfYear %>%
+  filter(Regime == "Rain-Dominated") %>%
+  left_join(MAD_station) %>%
+  group_by(STATION_NUMBER) %>%
+  mutate(below_mad_perc = case_when (Value <= '20%MAD' ~ 1,
+                                     .default = 0)) %>%
+  group_by(STATION_NUMBER, lfYear) %>%
+  mutate(peak_date = DoY[which.max(Value)]) %>%
+  filter(below_mad_perc == 1 & DoY>peak_date) %>%
+  arrange(Date) %>%
+  slice(1) %>%
+  dplyr::select(STATION_NUMBER,
+                Year = lfYear,
+                R2MAD_DoY = DoY)
+
+rtn_2_mad_perc_rest = flow_dat_filtered_lfYear %>%
+  filter(Regime != "Rain-Dominated") %>%
   left_join(MAD_station) %>%
   group_by(STATION_NUMBER) %>%
   mutate(below_mad_perc = case_when (Value <= '50%MAD' ~ 1,
@@ -129,13 +215,16 @@ rtn_2_mad_perc = flow_dat_filtered_lfYear %>%
   slice(1) %>%
   dplyr::select(STATION_NUMBER,
                 Year = lfYear,
-                R2MAD_DoY_50 = DoY
-  )
+                R2MAD_DoY = DoY)
+
+rtn_2_mad_perc = bind_rows(rtn_2_mad_perc_rain,
+                           rtn_2_mad_perc_rest)
+
 
 #Filter out NAs (i.e. never returned to 50% MAD within that year)
 nas_MADs = annual_mean_dat %>%
   left_join(rtn_2_mad_perc) %>%
-  filter(is.na(R2MAD_DoY_50))
+  filter(is.na(R2MAD_DoY))
 
 #Apply above, but ignore requirement for it to happen after freshet
 #Alternatively, apply it to water year instead of low flow year
@@ -178,23 +267,23 @@ dir.create(file.path("./pngs"), showWarnings = FALSE)
 #   })
 
 # Try using same approach as with freshet but a higher percentage of flow (may not work due to the huge variability between years of speed of snowmelt)
-low_perc = 0.8
-
-low_flow_timing_dat = flow_dat_filtered_lfYear %>%
-  filter(paste0(STATION_NUMBER, lfYear) %in% paste0(filtered_station_year_lfYear$STATION_NUMBER,filtered_station_year_lfYear$Year)) %>%
-  group_by(STATION_NUMBER, lfYear) %>%
-  mutate(RowNumber = row_number(),
-         TotalFlow = sum(Value),
-         FlowToDate = cumsum(Value)) %>%
-  filter(FlowToDate > TotalFlow * low_perc) %>%
-  slice(1) %>%
-  mutate(DoY_90pct_TotalQ = DoY,
-         Date = Date) %>%
-  ungroup() %>%
-  dplyr::select(STATION_NUMBER,
-                Year = lfYear,
-                DoY_90pct_TotalQ
-  )
+# low_perc = 0.8
+#
+# low_flow_timing_dat = flow_dat_filtered_lfYear %>%
+#   filter(paste0(STATION_NUMBER, lfYear) %in% paste0(filtered_station_year_lfYear$STATION_NUMBER,filtered_station_year_lfYear$Year)) %>%
+#   group_by(STATION_NUMBER, lfYear) %>%
+#   mutate(RowNumber = row_number(),
+#          TotalFlow = sum(Value),
+#          FlowToDate = cumsum(Value)) %>%
+#   filter(FlowToDate > TotalFlow * low_perc) %>%
+#   slice(1) %>%
+#   mutate(DoY_90pct_TotalQ = DoY,
+#          Date = Date) %>%
+#   ungroup() %>%
+#   dplyr::select(STATION_NUMBER,
+#                 Year = lfYear,
+#                 DoY_90pct_TotalQ
+#   )
 
 #plot freshet results
 
@@ -251,7 +340,7 @@ low_flow_dat_filtered_7day = stations_to_keep %>% map( ~ {
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
-    filter(flow_7_Day != lead(flow_7_Day) & between(Month, 7, 10)) %>%
+    filter(flow_7_Day != lead(flow_7_Day) & between(Month, 6, 10)) %>%
     group_by(lfYear) %>%
     slice_min(flow_7_Day) %>%
     group_by(lfYear,flow_7_Day) %>%
@@ -441,7 +530,7 @@ high_flow_dat_filtered_3day = stations_to_keep %>% map( ~ {
 
 annual_flow_dat_filtered = annual_mean_dat  |>
   left_join(flow_timing_dat) |>
-  left_join(low_flow_timing_dat) %>%
+  # left_join(low_flow_timing_dat) %>%
   left_join(rtn_2_mad_perc) %>%
   left_join(low_flow_dat_filtered_7day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
   left_join(high_flow_dat_filtered_3day, by = c("STATION_NUMBER"="STATION_NUMBER", "Year"= "Year")) |>
@@ -512,8 +601,9 @@ annual_flow_dat_filtered = annual_mean_dat  |>
 monthly_mean_dat_filtered = flow_dat_filtered_wYear %>%
   group_by(wYear,Month,STATION_NUMBER) %>%
   mutate(perc_na = ((days_in_month(Month)-n())/days_in_month(Month))*100) %>%
-  filter(perc_na<30) %>%
-reframe(median_flow = median(Value,na.rm=T)) %>%
+  filter(perc_na<10) %>%
+reframe(median_flow = median(Value,na.rm=T),
+        mean_flow = mean(Value, na.rm = T)) %>%
 rename(Year = wYear)
 
 monthly_quantiles_dat = flow_dat_filtered_wYear %>%
@@ -706,10 +796,138 @@ hydrozones = hydrozones %>%
 
 write_sf(hydrozones, 'app/www/hydrozones.gpkg')
 
+# BC = bcmaps::bc_bound() %>% st_transform(st_crs(stations_sf))
+#
+# #wsc drainages
+# basins = bcmaps::wsc_drainages() %>%
+#   group_by(SUB_DRAINAGE_AREA_NAME) %>%
+#   st_transform(st_crs(stations_sf)) %>%
+#   summarise(BASIN = unique(SUB_DRAINAGE_AREA_NAME)) %>%
+#   st_intersection(BC)
+#
+# basins = basins %>%
+#   group_by(BASIN) %>%
+#   summarise()
+#
+#
+# basins = basins %>%
+#   mutate(region = case_when(BASIN %in% c("Thompson",
+#                                          "Upper Fraser",
+#                                          "Lower Fraser",
+#                                          "Nechako") ~ "Fraser",
+#                             BASIN %in% c("Upper Peace",
+#                                          "Williston Lake") ~ "Peace",
+#                             BASIN %in% c("Columbia - U.S.A.",
+#                                          "Skagit") ~ "Columbia",
+#                             BASIN %in% c("Stikine - Coast",
+#                                          "Skeena - Coast",
+#                                          "Nass - Coast") ~ "North Coast",
+#                             BASIN %in% c("Hay",
+#                                          "Central Liard - Petitot",
+#                                          "Fort Nelson",
+#                                          "Central Liard",
+#                                          "Upper Liard",
+#                                          "Headwaters Yukon") ~ "Liard",
+#                             BASIN %in% c("Southern Coastal Waters of B.C.",
+#                                          "Central Coastal Waters of B.C.") ~ "South Coast",
+#                             BASIN %in% c("Vancouver Island",
+#                                          "Queen Charlotte Islands") ~ "Island",
+#                             .default = "NA"))
+# plot(basins$geometry)
+#
+# # Basins
+# basins = read_sf('data/BC_Basins_GoogleMapPL.shp') %>%
+#   st_set_crs(st_crs(3005)) %>%
+#   st_transform(crs = st_crs(stations_sf)) %>%
+#   mutate(BASIN = str_to_title(BASIN))
+#
+# write_sf(basins, 'app/www/basins.gpkg')
+
+library(tidyverse)
+library(sf)
+
+# BC Boundaries
+bound <- bcmaps::bc_bound_hres()%>%
+  st_as_sf(crs = 4326)
+
+# WSC Basins and clip to BC (remove Alberta and territory basins)
+wsc_basins <- bcmaps::wsc_drainages()%>%
+  filter(MAJOR_DRAINAGE_AREA_CD != "05",
+         !SUB_SUB_DRAINAGE_AREA_CD %in% c("07AA","07AB",
+                                          "10ED","10FA")) %>%
+  st_as_sf(crs = 4326) %>%
+  st_intersection(bound) %>%
+  st_transform(crs = 4326)
+
+# View the map
+mapview::mapview(wsc_basins, zcol = "SUB_SUB_DRAINAGE_AREA_CD")
+mapview::mapview(wsc_basins, zcol = "SUB_DRAINAGE_AREA_CD")
+mapview::mapview(wsc_basins, zcol = "MAJOR_DRAINAGE_AREA_CD")
+
+
+# Group subbasins to create major and sub-basin groups
+trending_basins <- wsc_basins  %>%
+  mutate(Major_Basin = case_when(SUB_DRAINAGE_AREA_CD == "08N" ~ "Columbia",
+                                 SUB_SUB_DRAINAGE_AREA_CD %in% c("08MH") ~ "Coastal",
+                                 SUB_DRAINAGE_AREA_CD %in% c("08M","08L","08K","08J") ~ "Fraser",
+                                 SUB_DRAINAGE_AREA_CD %in% c("08H","08G","08F","08O") ~ "Coastal",
+                                 SUB_DRAINAGE_AREA_CD %in% c("07F","07E") ~ "Peace",
+                                 SUB_DRAINAGE_AREA_CD %in% c("10A","10B","10C","10D","10E","10F") ~ "Liard",
+                                 SUB_DRAINAGE_AREA_CD %in% c("08A","08B","08C","08D","08E","09A") ~ "Northwest"),
+         Sub_Basin = case_when(SUB_SUB_DRAINAGE_AREA_CD == "08NL" ~ "Similkameen",
+                               SUB_SUB_DRAINAGE_AREA_CD == "08NM" ~ "Okanagan",
+                               SUB_SUB_DRAINAGE_AREA_CD == "08NN" ~ "Kettle",
+                               #SUB_SUB_DRAINAGE_AREA_CD %in% c("08NL","08NM","08NN") ~ "Similkameen-Okanagan-Kettle",
+                               SUB_DRAINAGE_AREA_CD == "08H" ~ "Vancouver Island",
+                               SUB_DRAINAGE_AREA_CD == "08O" ~ "Haida Gwaii",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08GD","08GC","08GB","08GA","08MH") ~ "South Coast",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08GF","08GE") ~ "Central and North Coast",
+                               SUB_DRAINAGE_AREA_CD == "08F" ~ "Central and North Coast",
+                               SUB_DRAINAGE_AREA_CD == "08D" ~ "Nass",
+                               SUB_DRAINAGE_AREA_CD == "08J" ~ "Nechako",
+                               SUB_DRAINAGE_AREA_CD == "08E" ~ "Skeena",
+                               SUB_DRAINAGE_AREA_CD == "08C" ~ "Stikine",
+                               SUB_DRAINAGE_AREA_CD == "09A" ~ "Yukon",
+                               SUB_DRAINAGE_AREA_CD == "08L" ~ "Thompson",
+                               SUB_DRAINAGE_AREA_CD == "07F" ~ "Upper Peace",
+                               SUB_DRAINAGE_AREA_CD == "07E" ~ "Williston Lake",
+                               SUB_DRAINAGE_AREA_CD == "10C" ~ "Fort Nelson",
+                               SUB_DRAINAGE_AREA_CD %in% c("10A","10B") ~ "Upper and Central Liard",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08KA","08KB","08KD","08KC","08KE","08KG","08KF") ~ "Upper Fraser",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08MD","08ME","08MG","08MF","08MC") ~ "Lower Fraser",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08NC","08NB","08NA","08ND","08NE") ~ "Columbia",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08MB","08MA") ~ "Chilcotin",
+                               SUB_SUB_DRAINAGE_AREA_CD == "08KH" ~ "Quesnel",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08NG","08NF","08NK","08NP",
+                                                               "08NH", "08NJ") ~ "Kootenay"))
+# make simple table for viewing data
+trending_basins_table <- trending_basins %>%
+  st_drop_geometry()
+
+# view the basin groupings by all basins
+mapview::mapview(trending_basins, zcol = "Major_Basin")
+mapview::mapview(trending_basins, zcol = "Sub_Basin")
+
+# Merge major basins and view features
+major_basins <- trending_basins %>%
+  group_by(Major_Basin) %>%
+  summarize(geometry = sf::st_union(geometry)) %>%
+  ungroup()
+mapview::mapview(list(major_basins), zcol = c("Major_Basin"))
+
+# Merge sub basins and view features
+sub_basins <- trending_basins %>%
+  group_by(Sub_Basin) %>%
+  summarize(geometry = sf::st_union(geometry)) %>%
+  ungroup() %>%
+  ms_simplify()
+mapview::mapview(list(sub_basins), zcol = c("Sub_Basin"))
+
 #spatial join with hydrozones
 stations_sf = stations_sf %>%
-  st_join(hydrozones)
+  st_join(sub_basins) %>%
+  left_join(regime_groups)
 
 write_sf(stations_sf, 'app/www/stations.gpkg')
-
+write_sf(sub_basins, 'app/www/basins.gpkg')
 
