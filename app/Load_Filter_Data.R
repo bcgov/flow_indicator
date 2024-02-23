@@ -5,6 +5,7 @@ monthly_flow_dat = readRDS('www/monthly_flow_dat.rds')
 hydrograph_dat = readRDS('www/hydrograph_dat.rds')
 stations_sf = read_sf('www/stations.gpkg')
 hydrozones = read_sf('www/hydrozones.gpkg')
+basins = read_sf('www/basins.gpkg')
 
 # Drop variables that do not pertain to the selected time scale.
 flow_dat = reactive({
