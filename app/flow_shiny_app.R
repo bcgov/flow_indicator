@@ -49,7 +49,7 @@ server <- function(input, output, session) {
     # "Max_3_Day_DoY",
     "DoY_50pct_TotalQ",
     # "DoY_90pct_TotalQ",
-    'R2MAD_DoY_50')
+    'R2MAD_DoY')
 
   recent_stations = annual_flow_dat %>%
     group_by(STATION_NUMBER) %>%
@@ -77,7 +77,7 @@ server <- function(input, output, session) {
                              'Low Summer Flow' = 'Min_7_Day_summer',
                              # 'Date of Low Summer Flow (7-day)' = 'Min_7_Day_summer_DoY',
                              # 'Date of 90% Annual Flow' = 'DoY_90pct_TotalQ',
-                             'Date of Low Flow' = 'R2MAD_DoY_50',
+                             'Date of Low Flow' = 'R2MAD_DoY',
                              'Peak Flow' = 'Max_3_Day'
                              # 'Date of Peak Flow (3-day)' = 'Max_3_Day_DoY'
                            )
@@ -92,15 +92,15 @@ server <- function(input, output, session) {
     lon = input$leafmap_center[1]
 
     # Change region_rv() to 'All'
-    if(hydro_rv() != 'All'| zoom != 5 | lat != 50 | lon != -130){
-      hydro_rv('All')
+    if(basin_rv() != 'All'| zoom != 5 | lat != 50 | lon != -130){
+      basin_rv('All')
 
       # Update map to BC zoom (customizable)
       leafletProxy('leafmap') |>
         set_bc_view()
 
       updateSelectInput(session = session,
-                        'hydrozone_choice',
+                        'basin_choice',
                         selected = 'All')
     }
   })
@@ -112,43 +112,43 @@ server <- function(input, output, session) {
     lon = input$leafmap_center[1]
 
     # Change region_rv() to 'All'
-    if(hydro_rv() != 'All'| zoom != 5 | lat != 50 | lon != -130){
-      hydro_rv('All')
+    if(basin_rv() != 'All'| zoom != 5 | lat != 50 | lon != -130){
+      basin_rv('All')
 
       # Update map to BC zoom (customizable)
       leafletProxy('leafmap') |>
         set_bc_view()
 
       updateSelectInput(session = session,
-                        'hydrozone_choice',
+                        'basin_choice',
                         selected = 'All')
     }
   })
 
   #Some reactives
 
-  hydro_rv = reactiveVal('All')
+  basin_rv = reactiveVal('All')
 
-  # Hydrozone reactives
-  hydro_drop_rv = reactive({
-    input$hydrozone_choice
+  # Basin reactives
+  basin_drop_rv = reactive({
+    input$basin_choice
   })
 
-  observeEvent(input$hydrozone_choice,{
+  observeEvent(input$basin_choice,{
 
-    hydro_rv(hydro_drop_rv())
+    basin_rv(basin_drop_rv())
 
   })
 
-  hydro_click_rv = reactive({
+  basin_click_rv = reactive({
     input$leafmap_shape_click$id
   })
 
   observeEvent(input$leafmap_shape_click$id,{
     updateSelectInput(session = session,
-                      'hydrozone_choice',
+                      'basin_choice',
                       selected = input$leafmap_shape_click$id)
-    hydro_rv(hydro_click_rv())
+    basin_rv(basin_click_rv())
   })
 
   #Calculate trend results
@@ -182,12 +182,12 @@ server <- function(input, output, session) {
     else{
       dat = dat
     }
-    if(hydro_rv() == "All"){
+    if(basin_rv() == "All"){
       dat = dat
     }
     else {
       dat = dat %>%
-        filter(HYDZN_NAME == hydro_rv())
+        filter(Sub_Basin == basin_rv())
     }
 
     if(input$user_var_choice %in% date_vars){
@@ -290,24 +290,24 @@ server <- function(input, output, session) {
 
   # zoom
   boundary_data = reactive({
-    if(hydro_rv()== "All") {
-      hydrozones
+    if(basin_rv()== "All") {
+      basins
     }
     else{
-      stations_sf %>%
-        filter(HYDZN_NAME == hydro_rv()) %>%
+      basins %>%
+        filter(Sub_Basin == basin_rv()) %>%
         st_bbox()
     }
   })
 
   # polygon
-  hydro_data = reactive({
-    if(hydro_rv()== "All") {
-      hydrozones
+  basin_data = reactive({
+    if(basin_rv()== "All") {
+      basins
     }
     else{
-      hydrozones %>%
-        filter(HYDZN_NAME == hydro_rv())
+      basins %>%
+        filter(Sub_Basin == basin_rv())
     }
   })
 
@@ -323,7 +323,7 @@ server <- function(input, output, session) {
                        options = layersControlOptions(collapsed = F),
                        position = 'bottomright')
 
-    if(hydro_rv() == "All"){
+    if(basin_rv() == "All"){
       map %>%
         set_bc_view()
     }
@@ -336,16 +336,16 @@ server <- function(input, output, session) {
   observe({
     leafletProxy("leafmap") %>%
       clearMarkers() %>%
-      addPolygons(layerId = ~HYDZN_NAME,
-                  data = hydrozones,
-                  label = ~paste0(HYDZN_NAME), color = "grey", fillColor = "white",
+      addPolygons(layerId = ~Sub_Basin,
+                  data = basins,
+                  label = ~paste0(Sub_Basin), color = "grey", fillColor = "white",
                   weight = 1, smoothFactor = 0.5, opacity = 1.0, fillOpacity = 0.2,
                   highlightOptions = highlightOptions(color = "#979B9D", weight = 2,
                                                       bringToFront = FALSE)
       ) %>%
-      addPolygons(layerId = ~HYDZN_NAME,
-                  data = hydro_data(),
-                  label = ~paste0(HYDZN_NAME), color = "black", fillColor = "white",
+      addPolygons(layerId = ~Sub_Basin,
+                  data = basin_data(),
+                  label = ~paste0(Sub_Basin), color = "black", fillColor = "white",
                   weight = 1, smoothFactor = 0.5, opacity = 1.0, fillOpacity = 0.2,
                   highlightOptions = highlightOptions(color = "black", weight = 2,
                                                       bringToFront = FALSE)
