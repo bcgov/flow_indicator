@@ -19,10 +19,13 @@ library(cowplot)
 library(envreportutils)
 library(webshot)
 library(htmlwidgets)
+library(ggpubr)
 
 #Load data
 if(!exists("hydrozones")){hydrozones = st_read('app/www/hydrozones.gpkg')}
 if(!exists("basins")){basins = st_read('app/www/basins.gpkg')}
+if(!exists("sub_basins")){sub_basins = st_read('app/www/sub_basins.gpkg')}
+if(!exists("major_basins")){major_basins = st_read('app/www/major_basins.gpkg')}
 
 if(!exists("stations")){stations = st_read('app/www/stations.gpkg')}
 
@@ -31,9 +34,8 @@ if(!exists("monthly_flow_dat")){monthly_flow_dat = readRDS('app/www/monthly_flow
 
 if(!exists("regime_groups")){regime_groups = read.csv('app/www/river_groups.csv')}
 
-
-#transform basins CRS
-basins = st_set_crs(basins, st_crs(hydrozones))
+# #transform basins CRS
+# basins = st_set_crs(basins, st_crs(hydrozones))
 
 # Remove upstream stations (n = 182)
 stations_filt = stations %>%
@@ -62,7 +64,7 @@ leaflet(options =
   setView(lat = 55, lng = -125, zoom = 5) %>%
   # fitBounds(lng1 = bounds[1], lat1 = bounds[2], lng2 = bounds[3], lat2 = bounds[4]) %>%
   addTiles(group = "Streets") %>%
-  addPolygons(data = basins,
+  addPolygons(data = sub_basins,
               color = "black",
               fillColor = "white",
               weight = 1,
@@ -85,88 +87,6 @@ leaflet(options =
   saveWidget("temp.html", selfcontained = FALSE)
 webshot("temp.html", file = "print_ver/out/figs/static_leaflet.png",
         cliprect = "viewport", zoom = 2)
-
-
-## Create images of regions to add to plots
-# ne.poly = hydrozones %>%
-#   ggplot() +
-#   theme_void() +
-#   geom_sf(fill = NA) +
-#   geom_sf(data = hydrozones %>% filter(region == "North-East"), fill = "yellow")
-#
-# se.poly = hydrozones %>%
-#   ggplot() +
-#   theme_void() +
-#   geom_sf(fill = NA) +
-#   geom_sf(data = hydrozones %>% filter(region == "South-East"), fill = "yellow")
-#
-# sw.poly = hydrozones %>%
-#   ggplot() +
-#   theme_void() +
-#   geom_sf(fill = NA) +
-#   geom_sf(data = hydrozones %>% filter(region == "South-West"), fill = "yellow")
-#
-# nw.poly = hydrozones %>%
-#   ggplot() +
-#   theme_void() +
-#   geom_sf(fill = NA) +
-#   geom_sf(data = hydrozones %>% filter(region == "North-West"), fill = "yellow")
-#
-# island.poly = hydrozones %>%
-#   ggplot() +
-#   theme_void() +
-#   geom_sf(fill = NA) +
-#   geom_sf(data = hydrozones %>% filter(region == "Island"), fill = "yellow")
-
-#Create images of basins to add to plots
-peace.poly = basins %>%
-  ggplot() +
-  theme_void() +
-  geom_sf(fill = NA) +
-  geom_sf(data = basins %>% filter(region == "Peace"),
-          fill = "yellow")
-
-columbia.poly = basins %>%
-  ggplot() +
-  theme_void() +
-  geom_sf(fill = NA) +
-  geom_sf(data = basins %>% filter(region == "Columbia"),
-          fill = "yellow")
-
-fraser.poly = basins %>%
-  ggplot() +
-  theme_void() +
-  geom_sf(fill = NA) +
-  geom_sf(data = basins %>% filter(region == "Fraser"),
-          fill = "yellow")
-
-ncoast.poly = basins %>%
-  ggplot() +
-  theme_void() +
-  geom_sf(fill = NA) +
-  geom_sf(data = basins %>% filter(region == "North Coast"),
-          fill = "yellow")
-
-scoast.poly = basins %>%
-  ggplot() +
-  theme_void() +
-  geom_sf(fill = NA) +
-  geom_sf(data = basins %>% filter(region == "South Coast"),
-          fill = "yellow")
-
-liard.poly = basins %>%
-  ggplot() +
-  theme_void() +
-  geom_sf(fill = NA) +
-  geom_sf(data = basins %>% filter(region == "Liard"),
-          fill = "yellow")
-
-island.poly = basins %>%
-  ggplot() +
-  theme_void() +
-  geom_sf(fill = NA) +
-  geom_sf(data = basins %>% filter(region == "Island"),
-          fill = "yellow")
 
 calculate_MK_results = function(data,chosen_variable){
 
@@ -203,63 +123,63 @@ calculate_MK_results = function(data,chosen_variable){
     mutate(
       trend_sig = fcase(
         abs(Tau) <= 0.05 , "No Trend",
-        Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Earlier",
-        Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Earlier",
-        Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Later",
-        Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Later",
-        Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Down",
-        Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Down",
-        Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Up",
-        Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Up"
+        Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Earlier",
+        Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Earlier",
+        Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Later",
+        Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Later",
+        Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Down",
+        Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Down",
+        Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Up",
+        Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Up"
       ),
       magnitude_fixed = fcase(
-        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 2 days earlier",
-        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "1 - 2 days earlier",
-        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 1 days change",
-        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "1 - 2 days later",
-        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 2 days later",
-        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 5% decrease",
-        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "1 - 5% decrease",
-        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 1% change",
-        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "1 - 5% increase",
-        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 5% increase"
+        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 2 days earlier",
+        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "1 - 2 days earlier",
+        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "< 1 days change",
+        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "1 - 2 days later",
+        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 2 days later",
+        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 5% decrease",
+        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "1 - 5% decrease",
+        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "< 1% change",
+        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "1 - 5% increase",
+        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "> 5% increase"
       ),
       significant = case_when(P_value <=0.05~ 1,
                               .default = 0.1),
       color = fcase(
-        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'),"#CA0020",
-        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F4A582",
-        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F7F7F7",
-        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#92C5DE",
-        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#0571B0",
-        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#CA0020",
-        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F4A582",
-        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F7F7F7",
-        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#92C5DE",
-        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY_50', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#0571B0")
+        change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'),"#CA0020",
+        between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F4A582",
+        between(change_timing, -0.1, 0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#F7F7F7",
+        between(change_timing, 0.1, 0.2) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#92C5DE",
+        change_timing > 0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "#0571B0",
+        per_change < -0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#CA0020",
+        between(per_change, -0.5, -0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F4A582",
+        between(per_change, -0.1, 0.1) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#F7F7F7",
+        between(per_change, 0.1, 0.5) & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#92C5DE",
+        per_change > 0.5 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "#0571B0")
     )
 }
 
 # Number of stations in each category for each metric
 mk_annual = calculate_MK_results(annual_flow_dat, chosen_variable = "Average")  %>%
   left_join(stations, by = "STATION_NUMBER") %>%
-  mutate(Var = "Average")
+  mutate(metric = "Average Annual Flow")
 
 mk_peak = calculate_MK_results(annual_flow_dat, chosen_variable = "Max_3_Day")  %>%
   left_join(stations, by = "STATION_NUMBER")%>%
-  mutate(Var = "Peak Flow")
+  mutate(metric = "Peak Flow")
 
 mk_low = calculate_MK_results(annual_flow_dat, chosen_variable = "Min_7_Day_summer")  %>%
   left_join(stations, by = "STATION_NUMBER")%>%
-  mutate(Var = "Low Summer Flow")
+  mutate(metric = "Low Summer Flow")
 
 mk_freshet = calculate_MK_results(annual_flow_dat, chosen_variable = "DoY_50pct_TotalQ")  %>%
   left_join(stations, by = "STATION_NUMBER")%>%
-  mutate(Var = "Date of Freshet")
+  mutate(metric = "Date of Freshet")
 
-mk_date_low = calculate_MK_results(annual_flow_dat, chosen_variable = "R2MAD_DoY_50") %>%
+mk_date_low = calculate_MK_results(annual_flow_dat, chosen_variable = "R2MAD_DoY") %>%
   left_join(stations, by = "STATION_NUMBER")%>%
-  mutate(Var = "Date of Low Summer Flow")
+  mutate(metric = "Date of Low Flow")
 
 #combine above results
 mk_results_tbl = bind_rows(mk_annual,
@@ -290,18 +210,12 @@ mk_results_all = bind_rows(mk_annual,
                            mk_peak,
                            mk_freshet,
                            mk_date_low) %>%
-  mutate(metric = rep(c("Average Annual flow",
-                        "Low flow",
-                        "Peak flow",
-                        "Date of Freshet",
-                        "Date of low flow"),
-                      each = length(unique(annual_flow_dat$STATION_NUMBER)))) %>%
   dplyr::select(metric, STATION_NUMBER, magnitude_fixed, significant)
 
 mk_magnitude = mk_results_all %>%
-  filter(metric %in% c("Average Annual flow",
-                       "Low flow",
-                       "Peak flow"))  %>%
+  filter(metric %in% c("Average Annual Flow",
+                       "Low Summer Flow",
+                       "Peak Flow"))  %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
   mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 5% increase",
@@ -323,9 +237,9 @@ mk_magnitude = mk_results_all %>%
   ggtitle("Volume")
 
 mk_timing = mk_results_all %>%
-  filter(!metric %in% c("Average Annual flow",
-                       "Low flow",
-                       "Peak flow"))  %>%
+  filter(!metric %in% c("Average Annual Flow",
+                       "Low Summer Flow",
+                       "Peak Flow"))  %>%
   mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
   mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 2 days later",
@@ -373,136 +287,58 @@ annual_bar = mk_annual %>%
                                                           "1 - 5% decrease",
                                                           "> 5% decrease",
                                                           "No significant trend"))) %>%
-  group_by(BASIN) %>%
+  group_by(Sub_Basin) %>%
   mutate(n_stations = n()) %>%
-  group_by(BASIN, magnitude_fixed) %>%
+  group_by(Sub_Basin, magnitude_fixed) %>%
   summarise(n = n(),
             n_stations = unique(n_stations),
-            region = unique(region)) %>%
+            region = unique(Major_Basin)) %>%
   mutate(percent = n/n_stations)
 
 
-# Try plotting each region "separately and combining in facet grid
-island = annual_bar %>%
-  filter(region == "Island")
+# Try plotting each major basin "separately and combining in facet grid
+coast = annual_bar %>%
+  filter(region == "Coastal")
 
- p1 = island  %>%
+coast.map = major_basins %>%
+  ggplot() +
+  labs(title = "Coastal") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Coastal"), fill = "yellow")
+
+ p1 = coast  %>%
    ggplot() +
   # ggtitle("Change in Mean Annual Flow") +
-  geom_col(aes(x = fct_reorder(BASIN, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none",
-        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+        plot.margin = unit(c(0,0,-2,0), "lines")) +
   ylim(0, max(annual_bar$n_stations) + 10) +
-  annotation_custom(grob = ggplotGrob(island.poly), ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
+  annotation_custom(grob = ggplotGrob(coast.map), ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
 
 p1
-
-sc = annual_bar %>%
-  filter(region == "South Coast")
-
-p2 = sc %>%
-  ggplot() +
-  # ggtitle("Change in Mean Annual Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none",
-        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(annual_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(scoast.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
-
-
-p2
-
-nc = annual_bar %>%
-  filter(region == "North Coast")
-
-p3 = nc %>%
-  ggplot() +
-  # ggtitle("Change in Mean Annual Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none",
-        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(annual_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(ncoast.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
-
-
-p3
-
-liard = annual_bar %>%
-  filter(region == "Liard")
-
-p4 = liard %>%
-  ggplot() +
-  # ggtitle("Change in Mean Annual Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none",
-        plot.margin = unit(c(0,-1,-1,-1), "lines")) +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(annual_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(liard.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
-
-
-p4
-
-columbia = annual_bar %>%
-  filter(region == "Columbia")
-
-p5 = columbia %>%
-  ggplot() +
-  # ggtitle("Change in Mean Annual Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none",
-        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-
-  ylim(0, max(annual_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(columbia.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
 
 fraser = annual_bar %>%
   filter(region == "Fraser")
 
-p6 = fraser %>%
+fraser.map = major_basins %>%
+  ggplot() +
+  labs(title = "Fraser") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Fraser"), fill = "yellow")
+
+p2 = fraser  %>%
   ggplot() +
   # ggtitle("Change in Mean Annual Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
@@ -514,16 +350,120 @@ p6 = fraser %>%
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(annual_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(fraser.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
+  ylim(0, max(annual_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(fraser.map), ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
 
-peace = annual_bar %>%
+p2
+
+Columbia = annual_bar %>%
+  filter(region == "Columbia")
+
+Columbia.map = major_basins %>%
+  ggplot() +
+  labs(title = "Columbia") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Columbia"), fill = "yellow")
+
+p3 = Columbia  %>%
+  ggplot() +
+  # ggtitle("Change in Mean Annual Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(annual_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Columbia.map), ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
+
+p3
+
+Liard = annual_bar %>%
+  filter(region == "Liard")
+
+Liard.map = major_basins %>%
+  ggplot() +
+  labs(title = "Liard") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Liard"), fill = "yellow")
+
+p4 = Liard  %>%
+  ggplot() +
+  # ggtitle("Change in Mean Annual Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(annual_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Liard.map), ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
+
+p4
+
+
+Northwest = annual_bar %>%
+  filter(region == "Northwest")
+
+Northwest.map = major_basins %>%
+  ggplot() +
+  labs(title = "North-West") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Northwest"), fill = "yellow")
+
+p5 = Northwest  %>%
+  ggplot() +
+  # ggtitle("Change in Mean Annual Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(annual_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Northwest.map), ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
+
+p5
+
+Peace = annual_bar %>%
   filter(region == "Peace")
 
-p7 = peace %>%
+Peace.map = major_basins %>%
+  ggplot() +
+  labs(title = "Peace") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Peace"), fill = "yellow")
+
+p6 = Peace  %>%
   ggplot() +
   # ggtitle("Change in Mean Annual Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
@@ -535,20 +475,14 @@ p7 = peace %>%
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(annual_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(peace.poly),ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
+  ylim(0, max(annual_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Peace.map), ymin = max(annual_bar$n_stations) + 2, ymax = max(annual_bar$n_stations) + 10)
 
-# annual_bar_plot = plot_grid(p4,p7, p3,p2,p6,p5, p1, ncol = 1,
-#                             align = "v")
-#
-# annual_bar_plot = plot_grid(annual_bar_plot,
-#                             legend,
-#                             ncol = 1,
-#                             rel_heights = c(1,0.1))
+p6
 
 
 
-annual_bar_plot = ggarrange(p4, p7, p3, p2, p6, p5, p1, ncol = 1,
+annual_bar_plot = ggarrange(p4, p3, p2, p6, p5, p1, ncol = 1,
                             common.legend = TRUE,
                             legend = "bottom",
                             # align = "v",
@@ -570,175 +504,202 @@ peak_bar = mk_peak %>%
                                                           "1 - 5% decrease",
                                                           "> 5% decrease",
                                                           "No significant trend"))) %>%
-  group_by(BASIN) %>%
+  group_by(Sub_Basin) %>%
   mutate(n_stations = n()) %>%
-  group_by(BASIN, magnitude_fixed) %>%
+  group_by(Sub_Basin, magnitude_fixed) %>%
   summarise(n = n(),
             n_stations = unique(n_stations),
-            region = unique(region)) %>%
+            region = unique(Major_Basin)) %>%
   mutate(percent = n/n_stations)
 
 
-# Try plotting each region "separately and combining in facet grid
-island = peak_bar %>%
-  filter(region == "Island")
+# Try plotting each major basin "separately and combining in facet grid
+coast = peak_bar %>%
+  filter(region == "Coastal")
 
-p1 = island  %>%
+coast.map = major_basins %>%
+  ggplot() +
+  labs(title = "Coastal") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Coastal"), fill = "yellow")
+
+p1 = coast  %>%
   ggplot() +
   # ggtitle("Change in Mean peak Flow") +
-  geom_col(aes(x = fct_reorder(BASIN, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0,0,-2,0), "lines")) +
   ylim(0, max(peak_bar$n_stations) + 10) +
-  annotation_custom(grob = ggplotGrob(island.poly), ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+  annotation_custom(grob = ggplotGrob(coast.map), ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
 
 p1
-
-sc = peak_bar %>%
-  filter(region == "South Coast")
-
-p2 = sc %>%
-  ggplot() +
-  # ggtitle("Change in Mean peak Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(peak_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(scoast.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
-
-
-p2
-
-nc = peak_bar %>%
-  filter(region == "North Coast")
-
-p3 = nc %>%
-  ggplot() +
-  # ggtitle("Change in Mean peak Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(peak_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(ncoast.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
-
-
-p3
-
-liard = peak_bar %>%
-  filter(region == "Liard")
-
-p4 = liard %>%
-  ggplot() +
-  # ggtitle("Change in Mean peak Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(peak_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(liard.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
-
-
-p4
-
-columbia = peak_bar %>%
-  filter(region == "Columbia")
-
-p5 = columbia %>%
-  ggplot() +
-  # ggtitle("Change in Mean peak Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-
-  ylim(0, max(peak_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(columbia.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
 
 fraser = peak_bar %>%
   filter(region == "Fraser")
 
-p6 = fraser %>%
+fraser.map = major_basins %>%
+  ggplot() +
+  labs(title = "Fraser") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Fraser"), fill = "yellow")
+
+p2 = fraser  %>%
   ggplot() +
   # ggtitle("Change in Mean peak Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(peak_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(fraser.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+  ylim(0, max(peak_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(fraser.map), ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
 
-peace = peak_bar %>%
+p2
+
+Columbia = peak_bar %>%
+  filter(region == "Columbia")
+
+Columbia.map = major_basins %>%
+  ggplot() +
+  labs(title = "Columbia") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Columbia"), fill = "yellow")
+
+p3 = Columbia  %>%
+  ggplot() +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Columbia.map), ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+
+p3
+
+Liard = peak_bar %>%
+  filter(region == "Liard")
+
+Liard.map = major_basins %>%
+  ggplot() +
+  labs(title = "Liard") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Liard"), fill = "yellow")
+
+p4 = Liard  %>%
+  ggplot() +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Liard.map), ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+
+p4
+
+
+Northwest = peak_bar %>%
+  filter(region == "Northwest")
+
+Northwest.map = major_basins %>%
+  ggplot() +
+  labs(title = "North-West") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Northwest"), fill = "yellow")
+
+p5 = Northwest  %>%
+  ggplot() +
+  # ggtitle("Change in Mean peak Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(peak_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Northwest.map), ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+
+p5
+
+Peace = peak_bar %>%
   filter(region == "Peace")
 
-p7 = peace %>%
+Peace.map = major_basins %>%
+  ggplot() +
+  labs(title = "Peace") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Peace"), fill = "yellow")
+
+p6 = Peace  %>%
   ggplot() +
   # ggtitle("Change in Mean peak Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(peak_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(peace.poly),ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
+  ylim(0, max(peak_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Peace.map), ymin = max(peak_bar$n_stations) + 2, ymax = max(peak_bar$n_stations) + 10)
 
-# peak_bar_plot = plot_grid(p4,p7, p3,p2,p6,p5, p1, ncol = 1,
-#                             align = "v")
-#
-# peak_bar_plot = plot_grid(peak_bar_plot,
-#                             legend,
-#                             ncol = 1,
-#                             rel_heights = c(1,0.1))
+p6
 
 
 
-peak_bar_plot = ggarrange(p4, p7, p3, p2, p6, p5, p1, ncol = 1,
+peak_bar_plot = ggarrange(p4, p3, p2, p6, p5, p1, ncol = 1,
                             common.legend = TRUE,
                             legend = "bottom",
                             # align = "v",
@@ -760,175 +721,202 @@ low_bar = mk_low %>%
                                                           "1 - 5% decrease",
                                                           "> 5% decrease",
                                                           "No significant trend"))) %>%
-  group_by(BASIN) %>%
+  group_by(Sub_Basin) %>%
   mutate(n_stations = n()) %>%
-  group_by(BASIN, magnitude_fixed) %>%
+  group_by(Sub_Basin, magnitude_fixed) %>%
   summarise(n = n(),
             n_stations = unique(n_stations),
-            region = unique(region)) %>%
+            region = unique(Major_Basin)) %>%
   mutate(percent = n/n_stations)
 
 
-# Try plotting each region "separately and combining in facet grid
-island = low_bar %>%
-  filter(region == "Island")
+# Try plotting each major basin "separately and combining in facet grid
+coast = low_bar %>%
+  filter(region == "Coastal")
 
-p1 = island  %>%
+coast.map = major_basins %>%
+  ggplot() +
+  labs(title = "Coastal") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Coastal"), fill = "yellow")
+
+p1 = coast  %>%
   ggplot() +
   # ggtitle("Change in Mean low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0,0,-2,0), "lines")) +
   ylim(0, max(low_bar$n_stations) + 10) +
-  annotation_custom(grob = ggplotGrob(island.poly), ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+  annotation_custom(grob = ggplotGrob(coast.map), ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
 
 p1
-
-sc = low_bar %>%
-  filter(region == "South Coast")
-
-p2 = sc %>%
-  ggplot() +
-  # ggtitle("Change in Mean low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(scoast.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
-
-
-p2
-
-nc = low_bar %>%
-  filter(region == "North Coast")
-
-p3 = nc %>%
-  ggplot() +
-  # ggtitle("Change in Mean low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(ncoast.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
-
-
-p3
-
-liard = low_bar %>%
-  filter(region == "Liard")
-
-p4 = liard %>%
-  ggplot() +
-  # ggtitle("Change in Mean low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(liard.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
-
-
-p4
-
-columbia = low_bar %>%
-  filter(region == "Columbia")
-
-p5 = columbia %>%
-  ggplot() +
-  # ggtitle("Change in Mean low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-
-  ylim(0, max(low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(columbia.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
 
 fraser = low_bar %>%
   filter(region == "Fraser")
 
-p6 = fraser %>%
+fraser.map = major_basins %>%
+  ggplot() +
+  labs(title = "Fraser") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Fraser"), fill = "yellow")
+
+p2 = fraser  %>%
   ggplot() +
   # ggtitle("Change in Mean low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(fraser.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+  ylim(0, max(low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(fraser.map), ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
 
-peace = low_bar %>%
+p2
+
+Columbia = low_bar %>%
+  filter(region == "Columbia")
+
+Columbia.map = major_basins %>%
+  ggplot() +
+  labs(title = "Columbia") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Columbia"), fill = "yellow")
+
+p3 = Columbia  %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Columbia.map), ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+p3
+
+Liard = low_bar %>%
+  filter(region == "Liard")
+
+Liard.map = major_basins %>%
+  ggplot() +
+  labs(title = "Liard") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Liard"), fill = "yellow")
+
+p4 = Liard  %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Liard.map), ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+p4
+
+
+Northwest = low_bar %>%
+  filter(region == "Northwest")
+
+Northwest.map = major_basins %>%
+  ggplot() +
+  labs(title = "North-West") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Northwest"), fill = "yellow")
+
+p5 = Northwest  %>%
+  ggplot() +
+  # ggtitle("Change in Mean low Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Northwest.map), ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+
+p5
+
+Peace = low_bar %>%
   filter(region == "Peace")
 
-p7 = peace %>%
+Peace.map = major_basins %>%
+  ggplot() +
+  labs(title = "Peace") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Peace"), fill = "yellow")
+
+p6 = Peace  %>%
   ggplot() +
   # ggtitle("Change in Mean low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(peace.poly),ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
+  ylim(0, max(low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Peace.map), ymin = max(low_bar$n_stations) + 2, ymax = max(low_bar$n_stations) + 10)
 
-# low_bar_plot = plot_grid(p4,p7, p3,p2,p6,p5, p1, ncol = 1,
-#                             align = "v")
-#
-# low_bar_plot = plot_grid(low_bar_plot,
-#                             legend,
-#                             ncol = 1,
-#                             rel_heights = c(1,0.1))
+p6
 
 
 
-low_bar_plot = ggarrange(p4, p7, p3, p2, p6, p5, p1, ncol = 1,
+low_bar_plot = ggarrange(p4, p3, p2, p6, p5, p1, ncol = 1,
                             common.legend = TRUE,
                             legend = "bottom",
                             # align = "v",
@@ -958,175 +946,202 @@ freshet_bar = mk_freshet %>%
                                                           "1 - 5% decrease",
                                                           "> 5% decrease",
                                                           "No significant trend"))) %>%
-  group_by(BASIN) %>%
+  group_by(Sub_Basin) %>%
   mutate(n_stations = n()) %>%
-  group_by(BASIN, magnitude_fixed) %>%
+  group_by(Sub_Basin, magnitude_fixed) %>%
   summarise(n = n(),
             n_stations = unique(n_stations),
-            region = unique(region)) %>%
+            region = unique(Major_Basin)) %>%
   mutate(percent = n/n_stations)
 
 
-# Try plotting each region "separately and combining in facet grid
-island = freshet_bar %>%
-  filter(region == "Island")
+# Try plotting each major basin "separately and combining in facet grid
+coast = freshet_bar %>%
+  filter(region == "Coastal")
 
-p1 = island  %>%
+coast.map = major_basins %>%
+  ggplot() +
+  labs(title = "Coastal") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Coastal"), fill = "yellow")
+
+p1 = coast  %>%
   ggplot() +
   # ggtitle("Change in Mean freshet Flow") +
-  geom_col(aes(x = fct_reorder(BASIN, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0,0,-2,0), "lines")) +
   ylim(0, max(freshet_bar$n_stations) + 10) +
-  annotation_custom(grob = ggplotGrob(island.poly), ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+  annotation_custom(grob = ggplotGrob(coast.map), ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
 
 p1
-
-sc = freshet_bar %>%
-  filter(region == "South Coast")
-
-p2 = sc %>%
-  ggplot() +
-  # ggtitle("Change in Mean freshet Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(freshet_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(scoast.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
-
-
-p2
-
-nc = freshet_bar %>%
-  filter(region == "North Coast")
-
-p3 = nc %>%
-  ggplot() +
-  # ggtitle("Change in Mean freshet Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(freshet_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(ncoast.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
-
-
-p3
-
-liard = freshet_bar %>%
-  filter(region == "Liard")
-
-p4 = liard %>%
-  ggplot() +
-  # ggtitle("Change in Mean freshet Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(freshet_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(liard.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
-
-
-p4
-
-columbia = freshet_bar %>%
-  filter(region == "Columbia")
-
-p5 = columbia %>%
-  ggplot() +
-  # ggtitle("Change in Mean freshet Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-
-  ylim(0, max(freshet_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(columbia.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
 
 fraser = freshet_bar %>%
   filter(region == "Fraser")
 
-p6 = fraser %>%
+fraser.map = major_basins %>%
+  ggplot() +
+  labs(title = "Fraser") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Fraser"), fill = "yellow")
+
+p2 = fraser  %>%
   ggplot() +
   # ggtitle("Change in Mean freshet Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(freshet_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(fraser.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+  ylim(0, max(freshet_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(fraser.map), ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
 
-peace = freshet_bar %>%
+p2
+
+Columbia = freshet_bar %>%
+  filter(region == "Columbia")
+
+Columbia.map = major_basins %>%
+  ggplot() +
+  labs(title = "Columbia") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Columbia"), fill = "yellow")
+
+p3 = Columbia  %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Columbia.map), ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+p3
+
+Liard = freshet_bar %>%
+  filter(region == "Liard")
+
+Liard.map = major_basins %>%
+  ggplot() +
+  labs(title = "Liard") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Liard"), fill = "yellow")
+
+p4 = Liard  %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Liard.map), ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+p4
+
+
+Northwest = freshet_bar %>%
+  filter(region == "Northwest")
+
+Northwest.map = major_basins %>%
+  ggplot() +
+  labs(title = "North-West") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Northwest"), fill = "yellow")
+
+p5 = Northwest  %>%
+  ggplot() +
+  # ggtitle("Change in Mean freshet Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(freshet_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Northwest.map), ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+
+p5
+
+Peace = freshet_bar %>%
   filter(region == "Peace")
 
-p7 = peace %>%
+Peace.map = major_basins %>%
+  ggplot() +
+  labs(title = "Peace") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Peace"), fill = "yellow")
+
+p6 = Peace  %>%
   ggplot() +
   # ggtitle("Change in Mean freshet Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(freshet_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(peace.poly),ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
+  ylim(0, max(freshet_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Peace.map), ymin = max(freshet_bar$n_stations) + 2, ymax = max(freshet_bar$n_stations) + 10)
 
-# freshet_bar_plot = plot_grid(p4,p7, p3,p2,p6,p5, p1, ncol = 1,
-#                             align = "v")
-#
-# freshet_bar_plot = plot_grid(freshet_bar_plot,
-#                             legend,
-#                             ncol = 1,
-#                             rel_heights = c(1,0.1))
+p6
 
 
 
-freshet_bar_plot = ggarrange(p4, p7, p3, p2, p6, p5, p1, ncol = 1,
+freshet_bar_plot = ggarrange(p4, p3, p2, p6, p5, p1, ncol = 1,
                             common.legend = TRUE,
                             legend = "bottom",
                             # align = "v",
@@ -1148,179 +1163,206 @@ date_low_bar = mk_date_low %>%
                                                           "1 - 5% decrease",
                                                           "> 5% decrease",
                                                           "No significant trend"))) %>%
-  group_by(BASIN) %>%
+  group_by(Sub_Basin) %>%
   mutate(n_stations = n()) %>%
-  group_by(BASIN, magnitude_fixed) %>%
+  group_by(Sub_Basin, magnitude_fixed) %>%
   summarise(n = n(),
             n_stations = unique(n_stations),
-            region = unique(region)) %>%
+            region = unique(Major_Basin)) %>%
   mutate(percent = n/n_stations)
 
 
-# Try plotting each region "separately and combining in facet grid
-island = date_low_bar %>%
-  filter(region == "Island")
+# Try plotting each major basin "separately and combining in facet grid
+coast = date_low_bar %>%
+  filter(region == "Coastal")
 
-p1 = island  %>%
+coast.map = major_basins %>%
+  ggplot() +
+  labs(title = "Coastal") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Coastal"), fill = "yellow")
+
+p1 = coast  %>%
   ggplot() +
   # ggtitle("Change in Mean date_low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0,0,-2,0), "lines")) +
   ylim(0, max(date_low_bar$n_stations) + 10) +
-  annotation_custom(grob = ggplotGrob(island.poly), ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+  annotation_custom(grob = ggplotGrob(coast.map), ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
 
 p1
-
-sc = date_low_bar %>%
-  filter(region == "South Coast")
-
-p2 = sc %>%
-  ggplot() +
-  # ggtitle("Change in Mean date_low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(date_low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(scoast.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
-
-
-p2
-
-nc = date_low_bar %>%
-  filter(region == "North Coast")
-
-p3 = nc %>%
-  ggplot() +
-  # ggtitle("Change in Mean date_low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(date_low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(ncoast.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
-
-
-p3
-
-liard = date_low_bar %>%
-  filter(region == "Liard")
-
-p4 = liard %>%
-  ggplot() +
-  # ggtitle("Change in Mean date_low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-  ylim(0, max(date_low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(liard.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
-
-
-p4
-
-columbia = date_low_bar %>%
-  filter(region == "Columbia")
-
-p5 = columbia %>%
-  ggplot() +
-  # ggtitle("Change in Mean date_low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
-  scale_fill_manual(values = colour.scale.date) +
-  xlab("") +
-  ylab("Number of stations") +
-  coord_flip() +
-  theme_classic() +
-  theme(legend.position = "none") +
-  theme(axis.line.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank()) +
-
-  ylim(0, max(date_low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(columbia.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
 
 fraser = date_low_bar %>%
   filter(region == "Fraser")
 
-p6 = fraser %>%
+fraser.map = major_basins %>%
+  ggplot() +
+  labs(title = "Fraser") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Fraser"), fill = "yellow")
+
+p2 = fraser  %>%
   ggplot() +
   # ggtitle("Change in Mean date_low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(date_low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(fraser.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+  ylim(0, max(date_low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(fraser.map), ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
 
-peace = date_low_bar %>%
+p2
+
+Columbia = date_low_bar %>%
+  filter(region == "Columbia")
+
+Columbia.map = major_basins %>%
+  ggplot() +
+  labs(title = "Columbia") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Columbia"), fill = "yellow")
+
+p3 = Columbia  %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Columbia.map), ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+p3
+
+Liard = date_low_bar %>%
+  filter(region == "Liard")
+
+Liard.map = major_basins %>%
+  ggplot() +
+  labs(title = "Liard") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Liard"), fill = "yellow")
+
+p4 = Liard  %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Liard.map), ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+p4
+
+
+Northwest = date_low_bar %>%
+  filter(region == "Northwest")
+
+Northwest.map = major_basins %>%
+  ggplot() +
+  labs(title = "North-West") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Northwest"), fill = "yellow")
+
+p5 = Northwest  %>%
+  ggplot() +
+  # ggtitle("Change in Mean date_low Flow") +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  scale_fill_manual(values = colour.scale.date) +
+  xlab("") +
+  ylab("Number of stations") +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylim(0, max(date_low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Northwest.map), ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+
+p5
+
+Peace = date_low_bar %>%
   filter(region == "Peace")
 
-p7 = peace %>%
+Peace.map = major_basins %>%
+  ggplot() +
+  labs(title = "Peace") +
+  theme_void() +
+  geom_sf(fill = NA) +
+  geom_sf(data = major_basins %>%
+            filter(Major_Basin == "Peace"), fill = "yellow")
+
+p6 = Peace  %>%
   ggplot() +
   # ggtitle("Change in Mean date_low Flow") +
-  geom_col(aes(x = fct_reorder(BASIN,region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
+  geom_col(aes(x = fct_reorder(Sub_Basin, region) , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(values = colour.scale.date) +
   xlab("") +
   ylab("Number of stations") +
   coord_flip() +
   theme_classic() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.margin = unit(c(-1,-1,-1,-1), "lines")) +
   theme(axis.line.x = element_blank(),
         axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
-  ylim(0, max(date_low_bar$n_stations)+ 10) +
-  annotation_custom(grob = ggplotGrob(peace.poly),ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
+  ylim(0, max(date_low_bar$n_stations) + 10) +
+  annotation_custom(grob = ggplotGrob(Peace.map), ymin = max(date_low_bar$n_stations) + 2, ymax = max(date_low_bar$n_stations) + 10)
 
-# date_low_bar_plot = plot_grid(p4,p7, p3,p2,p6,p5, p1, ncol = 1,
-#                             align = "v")
-#
-# date_low_bar_plot = plot_grid(date_low_bar_plot,
-#                             legend,
-#                             ncol = 1,
-#                             rel_heights = c(1,0.1))
+p6
 
 
 
-date_low_bar_plot = ggarrange(p4, p7, p3, p2, p6, p5, p1, ncol = 1,
-                             common.legend = TRUE,
-                             legend = "bottom",
-                             # align = "v",
-                             align = "hv")
+date_low_bar_plot = ggarrange(p4, p3, p2, p6, p5, p1, ncol = 1,
+                            common.legend = TRUE,
+                            legend = "bottom",
+                            # align = "v",
+                            align = "hv")
 
 date_low_bar_plot
 
@@ -1339,7 +1381,7 @@ mk_average_monthly = unique(monthly_flow_dat$Month) %>%
       filter(Month == .x) %>%
       calculate_MK_results(chosen_variable = "Average") %>%
       mutate(Month = .x,
-             Var = "Average")
+             metric = "Average")
 
       }) %>%
   bind_rows()
@@ -1391,7 +1433,7 @@ mk_low_flow_monthly = unique(monthly_flow_dat$Month) %>%
       filter(Month == .x) %>%
       calculate_MK_results(chosen_variable = "Min_7_Day") %>%
       mutate(Month = .x,
-             Var = "Low Flow")
+             metric = "Low Flow")
 
   }) %>%
   bind_rows()
