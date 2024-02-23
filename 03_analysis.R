@@ -759,93 +759,6 @@ stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat_fil
   dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS) %>%
   left_join(final_station_summary_wYear)
 
-#Hydrologic Zones
-hydrozones = read_sf('data/HYDZ_HYDROLOGICZONE_SP/HYD_BC_H_Z_polygon.shp') %>%
-  st_transform(crs = st_crs(stations_sf)) %>%
-  mutate(HYDZN_NAME = str_to_title(HYDZN_NAME))
-
-# Add grouping variable
-hydrozones = hydrozones %>%
-  mutate(region = case_when(HYDZN_NAME %in% c("Northern Interior Plains",
-                                              "Southern Interior Plains",
-                                              "Northern Rocky Mountains",
-                                              "Southern Rocky Mountain Foothills",
-                                              "Mcgregor Basin") ~ "North-East",
-                            HYDZN_NAME %in% c("Upper Fraser Basin",
-                                              "Northern Columbia Mountains",
-                                              "Upper Columbia Basin",
-                                              "Upper Kootenay Basin",
-                                              "Central Kootenay Basin",
-                                              "Lower Kootenay Basin",
-                                              "Lower Columbia Basin",
-                                              "Southern Quesnel Highland") ~ "South-East",
-                            HYDZN_NAME %in% c("Okanagan Highland",
-                                              "Southern Thompson Plateau",
-                                              "Eastern South Coast Mountains",
-                                              "Central South Coast Mountains",
-                                              "Western South Coast Mountains",
-                                              "Fraser Plateau",
-                                              "Northern Thompson Plateau") ~ "South-West",
-                            HYDZN_NAME %in% c("Nechako Plateau",
-                                              "Northern Central Uplands",
-                                              "Stikine Plateau",
-                                              "Northern Coast Mountains",
-                                              "Southern Hazelton Mountains",
-                                              "Central Coast Mountains") ~ "North-West",
-                            .default = "Island"))
-
-write_sf(hydrozones, 'app/www/hydrozones.gpkg')
-
-# BC = bcmaps::bc_bound() %>% st_transform(st_crs(stations_sf))
-#
-# #wsc drainages
-# basins = bcmaps::wsc_drainages() %>%
-#   group_by(SUB_DRAINAGE_AREA_NAME) %>%
-#   st_transform(st_crs(stations_sf)) %>%
-#   summarise(BASIN = unique(SUB_DRAINAGE_AREA_NAME)) %>%
-#   st_intersection(BC)
-#
-# basins = basins %>%
-#   group_by(BASIN) %>%
-#   summarise()
-#
-#
-# basins = basins %>%
-#   mutate(region = case_when(BASIN %in% c("Thompson",
-#                                          "Upper Fraser",
-#                                          "Lower Fraser",
-#                                          "Nechako") ~ "Fraser",
-#                             BASIN %in% c("Upper Peace",
-#                                          "Williston Lake") ~ "Peace",
-#                             BASIN %in% c("Columbia - U.S.A.",
-#                                          "Skagit") ~ "Columbia",
-#                             BASIN %in% c("Stikine - Coast",
-#                                          "Skeena - Coast",
-#                                          "Nass - Coast") ~ "North Coast",
-#                             BASIN %in% c("Hay",
-#                                          "Central Liard - Petitot",
-#                                          "Fort Nelson",
-#                                          "Central Liard",
-#                                          "Upper Liard",
-#                                          "Headwaters Yukon") ~ "Liard",
-#                             BASIN %in% c("Southern Coastal Waters of B.C.",
-#                                          "Central Coastal Waters of B.C.") ~ "South Coast",
-#                             BASIN %in% c("Vancouver Island",
-#                                          "Queen Charlotte Islands") ~ "Island",
-#                             .default = "NA"))
-# plot(basins$geometry)
-#
-# # Basins
-# basins = read_sf('data/BC_Basins_GoogleMapPL.shp') %>%
-#   st_set_crs(st_crs(3005)) %>%
-#   st_transform(crs = st_crs(stations_sf)) %>%
-#   mutate(BASIN = str_to_title(BASIN))
-#
-# write_sf(basins, 'app/www/basins.gpkg')
-
-library(tidyverse)
-library(sf)
-
 # BC Boundaries
 bound <- bcmaps::bc_bound_hres()%>%
   st_as_sf(crs = 4326)
@@ -912,7 +825,8 @@ mapview::mapview(trending_basins, zcol = "Sub_Basin")
 major_basins <- trending_basins %>%
   group_by(Major_Basin) %>%
   summarize(geometry = sf::st_union(geometry)) %>%
-  ungroup()
+  ungroup()%>%
+  ms_simplify()
 mapview::mapview(list(major_basins), zcol = c("Major_Basin"))
 
 # Merge sub basins and view features
@@ -923,11 +837,18 @@ sub_basins <- trending_basins %>%
   ms_simplify()
 mapview::mapview(list(sub_basins), zcol = c("Sub_Basin"))
 
-#spatial join with hydrozones
+#Merge major basins and sub basins
+basins = sub_basins %>%
+  st_intersection(major_basins) %>%
+  ms_simplify()
+
+#spatial join with basins
 stations_sf = stations_sf %>%
-  st_join(sub_basins) %>%
+  st_intersection(basins) %>%
   left_join(regime_groups)
 
 write_sf(stations_sf, 'app/www/stations.gpkg')
-write_sf(sub_basins, 'app/www/basins.gpkg')
+write_sf(basins, 'app/www/basins.gpkg')
+write_sf(sub_basins, 'app/www/sub_basins.gpkg')
+write_sf(major_basins, 'app/www/major_basins.gpkg')
 
