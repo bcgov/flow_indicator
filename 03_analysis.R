@@ -142,7 +142,7 @@ flow_timing_latepeak = flow_dat_filtered_cYear %>%
                 Date)
 
 flow_timing_mixed = flow_dat_filtered_cYear %>%
-  filter(Regime == "Mixed Regime" & between(Month, 3, 9)) %>%
+  filter(Regime == "Mixed Regimes" & between(Month, 3, 9)) %>%
   group_by(STATION_NUMBER,Year)%>%
   mutate(RowNumber = row_number(),
          TotalFlow = sum(Value),
@@ -654,19 +654,19 @@ monthly_7day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
 }) %>%
   bind_rows()
 
-monthly_3day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
+monthly_3day_highflow_dat_filtered = stations_to_keep %>% map( ~ {
 
   # Tell us which station the map function is on...
   print(paste0('Working on station ',.x))
 
   # Grab daily flows for the station of interest in this iteration...
-  daily_flows = flow_dat_filtered_lfYear |>
+  daily_flows = flow_dat_filtered_wYear |>
     filter(STATION_NUMBER == .x) |>
-    group_by(STATION_NUMBER, lfYear, Month) |>
+    group_by(STATION_NUMBER, wYear, Month) |>
     ungroup()
 
   # Use {data.table} package to convert our dataframe into a data.table object
-  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','lfYear','Month'))
+  daily_flows_dt = data.table::data.table(daily_flows, key = c('STATION_NUMBER','wYear','Month'))
 
   # Calculate the rolling average with a 'window' of 3 days, such that a given day's
   # mean flow is the average of that day plus six days LATER in the year ("align = 'right'").
@@ -674,22 +674,22 @@ monthly_3day_lowflow_dat_filtered = stations_to_keep %>% map( ~ {
 
   # Convert back from data.table object to a dataframe, and clean it up.
 
-  min_3_day_dat = daily_flows_dt %>%
+  max_3_day_dat = daily_flows_dt %>%
     as_tibble() %>%
     # Missing data can produce identical minimum flow values.
     # Keep only the latest record for each such duplication.
     filter(flow_3_Day != lead(flow_3_Day)) %>%
-    group_by(lfYear,Month) %>%
-    slice_min(flow_3_Day) %>%
-    group_by(lfYear,Month,flow_3_Day) %>%
+    group_by(wYear,Month) %>%
+    slice_max(flow_3_Day) %>%
+    group_by(wYear,Month,flow_3_Day) %>%
     slice(1) %>%
     ungroup() %>%
     dplyr::select(-Parameter,-Value,-Symbol,
-                  Min_3_Day_DoY = DoY, Min_3_Day_Date = Date,
-                  Min_3_Day = flow_3_Day)
+                  Max_3_Day_DoY = DoY, Max_3_Day_Date = Date,
+                  Max_3_Day = flow_3_Day)
 
-  min_3_day_dat %>%
-    dplyr::select(STATION_NUMBER, Month, Year = lfYear, everything())
+  max_3_day_dat %>%
+    dplyr::select(STATION_NUMBER, Month, Year = wYear, everything())
 }) %>%
   bind_rows()
 
@@ -701,11 +701,11 @@ monthly_flow_dat_filtered = monthly_mean_dat_filtered |>
   left_join(monthly_7day_lowflow_dat_filtered,
             by = join_by(STATION_NUMBER, Year, Month))|>
               dplyr::select(-Min_7_Day_DoY) |>
-  left_join(monthly_3day_lowflow_dat_filtered,
+  left_join(monthly_3day_highflow_dat_filtered,
             by = join_by(STATION_NUMBER, Year, Month)) |>
-              dplyr::select(-Min_3_Day_DoY) |>
+              dplyr::select(-Max_3_Day_DoY) |>
   mutate(Month = month.abb[Month]) |>
-  dplyr::rename('Average' = median_flow) |>
+  dplyr::rename('Average' = mean_flow) |>
   dplyr::select(-ends_with("_Date"))
 
 hydrograph_dat = monthly_quantiles_dat |>
@@ -833,6 +833,7 @@ mapview::mapview(list(major_basins), zcol = c("Major_Basin"))
 sub_basins <- trending_basins %>%
   group_by(Sub_Basin) %>%
   summarize(geometry = sf::st_union(geometry)) %>%
+  filter(!is.na(Sub_Basin)) %>%
   ungroup() %>%
   ms_simplify()
 mapview::mapview(list(sub_basins), zcol = c("Sub_Basin"))
@@ -841,6 +842,7 @@ mapview::mapview(list(sub_basins), zcol = c("Sub_Basin"))
 basins = sub_basins %>%
   st_intersection(major_basins) %>%
   ms_simplify()
+mapview::mapview(list(basins), zcol = c("Sub_Basin"))
 
 #spatial join with basins
 stations_sf = stations_sf %>%
