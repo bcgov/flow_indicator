@@ -291,10 +291,10 @@ server <- function(input, output, session) {
   # zoom
   boundary_data = reactive({
     if(basin_rv()== "All") {
-      basins
+      sbasins
     }
     else{
-      basins %>%
+      sbasins %>%
         filter(Sub_Basin == basin_rv()) %>%
         st_bbox()
     }
@@ -303,10 +303,10 @@ server <- function(input, output, session) {
   # polygon
   basin_data = reactive({
     if(basin_rv()== "All") {
-      basins
+      sbasins
     }
     else{
-      basins %>%
+      sbasins %>%
         filter(Sub_Basin == basin_rv())
     }
   })
@@ -336,8 +336,11 @@ server <- function(input, output, session) {
   observe({
     leafletProxy("leafmap") %>%
       clearMarkers() %>%
+      addPolygons(data = bound,
+                  color = "grey", fillColor = "white",
+                  weight = 1, smoothFactor = 0.5, opacity = 1.0, fillOpacity = 0.2) %>%
       addPolygons(layerId = ~Sub_Basin,
-                  data = basins,
+                  data = sbasins,
                   label = ~paste0(Sub_Basin), color = "grey", fillColor = "white",
                   weight = 1, smoothFactor = 0.5, opacity = 1.0, fillOpacity = 0.2,
                   highlightOptions = highlightOptions(color = "#979B9D", weight = 2,
