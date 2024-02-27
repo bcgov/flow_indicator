@@ -311,7 +311,7 @@ annual_regime = mk_annual %>%
             n_stations = unique(n_stations)) %>%
   mutate(percent = n/n_stations) %>%
   ggplot() +
-  # ggtitle("Change in Mean Annual Flow") +
+  ggtitle("Mean Annual Flow") +
   geom_col(aes(x = Regime , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(name = "Change per decade",
                     values = colour.scale,
@@ -321,7 +321,7 @@ annual_regime = mk_annual %>%
   coord_flip() +
   theme_classic() +
   theme(legend.position = "none",
-        plot.margin = unit(c(0,0,-2,0), "lines"))
+        plot.margin = unit(c(0.5,0,-2,0), "lines"))
 
 peak_regime = mk_peak %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
@@ -440,7 +440,7 @@ freshet_regime = mk_freshet %>%
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank()) +
   theme(legend.position = "none",
-        plot.margin = unit(c(0,0,-2,0), "lines"))
+        plot.margin = unit(c(0.5,0,-2,0), "lines"))
 
 date_low_regime = mk_date_low %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
