@@ -21,9 +21,10 @@ library(webshot)
 library(htmlwidgets)
 library(ggpubr)
 library(leaflet)
+library(ggtext)
+library(scales)
 
 #Load data
-if(!exists("hydrozones")){hydrozones = st_read('app/www/hydrozones.gpkg')}
 if(!exists("basins")){basins = st_read('app/www/basins.gpkg')}
 if(!exists("sub_basins")){sub_basins = st_read('app/www/sub_basins.gpkg')}
 if(!exists("major_basins")){major_basins = st_read('app/www/major_basins.gpkg')}
@@ -35,10 +36,9 @@ if(!exists("monthly_flow_dat")){monthly_flow_dat = readRDS('app/www/monthly_flow
 
 if(!exists("regime_groups")){regime_groups = read.csv('app/www/river_groups.csv')}
 
-# #transform basins CRS
-# basins = st_set_crs(basins, st_crs(hydrozones))
+if(!exists("hydrograph_dat")){hydrograph_dat = readRDS('app/www/hydrograph_dat.rds')}
 
-# Remove upstream stations (n = 182)
+# Remove upstream stations (n = 185)
 stations_filt = stations %>%
   filter(keep == 1)
 
@@ -47,10 +47,12 @@ stations_filt = stations_filt %>%
   left_join(regime_groups) %>%
   filter(!is.na(Regime))
 
+# Subset annual flow data with filtered station list
 annual_flow_dat = annual_flow_dat %>%
   filter(STATION_NUMBER %in% stations_filt$STATION_NUMBER)
 
-#Color scheme
+## FIGURE 1 - Map of stations and regime type =====================================
+#Color scheme - for REGIMES (leflet map)
 mypal = colorFactor(palette = c("#2171b5", "#bdd7e7", "#784B84", "#ff0000"),
                     domain = stations_filt,
                     levels = c("Snow-Dominated - Early Peak",
@@ -59,11 +61,9 @@ mypal = colorFactor(palette = c("#2171b5", "#bdd7e7", "#784B84", "#ff0000"),
                                "Rain-Dominated"),
                     ordered = T)
 
-## FIGURE 1 - Map of stations and regime type
 leaflet(options =
           leafletOptions(zoomControl = FALSE)) %>%
   setView(lat = 55, lng = -125, zoom = 5) %>%
-  # fitBounds(lng1 = bounds[1], lat1 = bounds[2], lng2 = bounds[3], lat2 = bounds[4]) %>%
   addTiles(group = "Streets") %>%
   addPolygons(data = sub_basins,
               color = "black",
@@ -86,15 +86,19 @@ leaflet(options =
             values = ~Regime,
             title = "River Flow Stations",
             data =stations_filt,
-            #className = "info legend solid circle", #Css from original leaflet script
             opacity = 1,
             layerId = 'legend',
             position = 'topright') %>%
+
   ## save html to png
   saveWidget("temp.html", selfcontained = FALSE)
 webshot("temp.html", file = "print_ver/out/figs/static_leaflet.png",
         cliprect = "viewport", zoom = 2)
 
+## Function for calculating Mann-Kendall results
+# creates magnitude, significance and colour scheme columns
+# Magnitude is currently based on more than 2 day per decade change, 1 - 2 day per decade change and less than 1 day change for timing,
+# and more than 5% change, 1 - 5% change and less than 1% change for volume.
 calculate_MK_results = function(data,chosen_variable){
 
   yeardat = data %>%
@@ -128,17 +132,6 @@ calculate_MK_results = function(data,chosen_variable){
            change_timing =  (end_flow - begin_flow)/range) %>%
     ungroup() %>%
     mutate(
-      trend_sig = fcase(
-        abs(Tau) <= 0.05 , "No Trend",
-        Tau < -0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Earlier",
-        Tau < -0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Earlier",
-        Tau > 0.05 & P_value >= 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Non-Significant Trend Later",
-        Tau > 0.05 & P_value < 0.05 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "Significant Trend Later",
-        Tau < -0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Down",
-        Tau < -0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Down",
-        Tau > 0.05 & P_value >= 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Non-Significant Trend Up",
-        Tau > 0.05 & P_value < 0.05 & (!chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY')), "Significant Trend Up"
-      ),
       magnitude_fixed = fcase(
         change_timing < -0.2 & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "> 2 days earlier",
         between(change_timing, -0.2, -0.1) & chosen_variable %in% c('DoY_50pct_TotalQ', 'DoY_90pct_TotalQ', 'R2MAD_DoY', 'Min_7_Day_summer_DoY','Max_7_Day_DoY','Min_3_Day_DoY','Max_3_Day_DoY'), "1 - 2 days earlier",
@@ -167,7 +160,7 @@ calculate_MK_results = function(data,chosen_variable){
     )
 }
 
-# Number of stations in each category for each metric
+# Calculate for each metric, join with station info and add new metric name
 mk_annual = calculate_MK_results(annual_flow_dat, chosen_variable = "Average")  %>%
   left_join(stations, by = "STATION_NUMBER") %>%
   mutate(metric = "Average Annual Flow")
@@ -195,6 +188,8 @@ mk_results_tbl = bind_rows(mk_annual,
                            mk_date_low,
                            mk_freshet)
 
+## Plot results ===============================================================================
+
 ## Plot settings - magnitude of flow
 colour.scale <- c("> 5% increase"="#2171b5",
                   "1 - 5% increase"="#bdd7e7",
@@ -219,6 +214,8 @@ mk_results_all = bind_rows(mk_annual,
                            mk_date_low) %>%
   dplyr::select(metric, STATION_NUMBER, magnitude_fixed, significant)
 
+
+# Create summary of sample size in each grouping - Volume metrics
 mk_magnitude = mk_results_all %>%
   filter(metric %in% c("Average Annual Flow",
                        "Low Summer Flow",
@@ -250,6 +247,7 @@ mk_magnitude = mk_results_all %>%
   theme(legend.position = "bottom") +
   ggtitle("Volume")
 
+# Timing metrics
 mk_timing = mk_results_all %>%
   filter(!metric %in% c("Average Annual Flow",
                        "Low Summer Flow",
@@ -281,6 +279,8 @@ mk_timing = mk_results_all %>%
   theme(legend.position = "bottom") +
   ggtitle("Timing")
 
+
+# Combine above into single cowplot grid and save
 mk_all = plot_grid(mk_magnitude, mk_timing, nrow = 2, rel_heights = c(1,1))
 mk_all
 
@@ -288,7 +288,7 @@ svg_px("./print_ver/out/figs/mk_all.svg", width = 600, height = 600)
 plot(mk_all)
 dev.off()
 
-# Split by regime
+# Split by regime ===========================================================================
 annual_regime = mk_annual %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
                                             .default = magnitude_fixed),
@@ -360,14 +360,6 @@ peak_regime = mk_peak %>%
         axis.ticks.x = element_blank()) +
   theme(legend.position = "none",
         plot.margin = unit(c(0,0,-2,0), "lines"))
-
-#Get legend for below plots
-legend = get_legend(
-  mk_magnitude +
-    guides(fill = guide_legend(nrow = 1)) +
-    theme(legend.position = "bottom",
-          legend.justification="right")
-)
 
 low_regime = mk_low %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
@@ -476,6 +468,8 @@ date_low_regime = mk_date_low %>%
   theme(legend.position = "none",
         plot.margin = unit(c(0,0,-2,0), "lines"))
 
+
+## Arrange and create plot for Volume metrics and save
 volume_regime = ggarrange(annual_regime, peak_regime, low_regime,
                           ncol = 1,
                           common.legend = TRUE,
@@ -487,6 +481,8 @@ svg_px("./print_ver/out/figs/volume_regime.svg", width = 600, height = 600)
 plot(volume_regime)
 dev.off()
 
+
+# Do same for timing metrics and save
 timing_regime = ggarrange(freshet_regime, date_low_regime,
                           ncol = 1,
                           common.legend = TRUE,
@@ -498,8 +494,9 @@ svg_px("./print_ver/out/figs/timing_regime.svg", width = 600, height = 600)
 plot(timing_regime)
 dev.off()
 
-# Metrics - Magnitude of River Flow
-# - Average Annual Flow
+## Geographic Plots (Appendix?) =====================================================================
+# Metrics - Volume
+# - Average Annual Flow =============================================================
 
 annual_bar = mk_annual %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
@@ -735,7 +732,8 @@ svg_px("./print_ver/out/figs/annual_bar.svg", width = 600, height = 600)
 plot(annual_bar_plot)
 dev.off()
 
-# - Peak Flow
+# - Peak Flow ===========================================================================
+
 peak_bar = mk_peak %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
                                             .default = magnitude_fixed),
@@ -970,7 +968,7 @@ svg_px("./print_ver/out/figs/peak_bar.svg", width = 600, height = 600)
 plot(peak_bar_plot)
 dev.off()
 
-# - Low Flow
+# - Low Flow ===============================================================================
 low_bar = mk_low %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
                                             .default = magnitude_fixed),
@@ -1205,15 +1203,10 @@ svg_px("./print_ver/out/figs/low_bar.svg", width = 600, height = 600)
 plot(low_bar_plot)
 dev.off()
 
-  #Metrics - Timing of Flow
-legend_timing = get_legend(
-  mk_timing +
-    guides(color = guide_legend(nrow = 1)) +
-    theme(legend.position = "bottom",
-          legend.justification="right")
-)
+#Metrics - Timing of Flow ===================================================================
 
-  # Date of Freshet
+# Date of Freshet ======================================================================
+
 freshet_bar = mk_freshet %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
                                             .default = magnitude_fixed),
@@ -1442,7 +1435,8 @@ svg_px("./print_ver/out/figs/freshet_bar.svg", width = 600, height = 600)
 plot(freshet_bar_plot)
 dev.off()
 
-  # Start of Low Flow Period
+# Start of Low Flow Period ==================================================================
+
 date_low_bar = mk_date_low %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
                                             .default = magnitude_fixed),
@@ -1671,11 +1665,13 @@ svg_px("./print_ver/out/figs/date_low_bar.svg", width = 600, height = 600)
 plot(date_low_bar_plot)
 dev.off()
 
-## MONTHLY BREAKDOWN ------------------------------------------------------------------------------------------------------
+## MONTHLY BREAKDOWN ================================================================================
 
+# subset to filtered stations
 monthly_flow_dat = monthly_flow_dat %>%
   filter(STATION_NUMBER %in% stations_filt$STATION_NUMBER)
 
+# Average monthly flow
 mk_average_monthly = unique(monthly_flow_dat$Month) %>%
   map ( ~ {
     month_dat = monthly_flow_dat %>%
@@ -1687,6 +1683,7 @@ mk_average_monthly = unique(monthly_flow_dat$Month) %>%
       }) %>%
   bind_rows()
 
+# bar plot and save
 monthly_average_bar_plot = mk_average_monthly %>%
   mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed),
@@ -1746,6 +1743,8 @@ svg_px("./print_ver/out/figs/monthly_average_bar_plot.svg", width = 800, height 
 plot(monthly_average_bar_plot)
 dev.off()
 
+
+# Monthly low flow
 mk_low_flow_monthly = unique(monthly_flow_dat$Month) %>%
   map ( ~ {
     month_dat = monthly_flow_dat %>%
@@ -1757,15 +1756,22 @@ mk_low_flow_monthly = unique(monthly_flow_dat$Month) %>%
   }) %>%
   bind_rows()
 
+# bar plot and save
 monthly_low_flow_bar_plot = mk_low_flow_monthly %>%
-  mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
-                                     .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 5% increase",
-                                                         "1 - 5% increase",
-                                                         "< 1% change",
-                                                         "1 - 5% decrease",
-                                                         "> 5% decrease",
-                                                         "No significant trend")),
+  mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
+                                            .default = magnitude_fixed),
+                                  levels = c("> 5% increase",
+                                             "1 - 5% increase",
+                                             "< 1% change",
+                                             "1 - 5% decrease",
+                                             "> 5% decrease",
+                                             "No significant trend"))) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 5% increase",
+                                                          "1 - 5% increase",
+                                                          "< 1% change",
+                                                          "1 - 5% decrease",
+                                                          "> 5% decrease",
+                                                          "No significant trend")),
          Month = factor(month.name[match(Month,month.abb)], levels = month.name)) %>%
   mutate(Month = fct_relevel(Month,
                              "April",
@@ -1811,16 +1817,23 @@ mk_peak_flow_monthly = unique(monthly_flow_dat$Month) %>%
   }) %>%
   bind_rows()
 
+# bar plot and save
 monthly_peak_flow_bar_plot = mk_peak_flow_monthly %>%
-  mutate(magnitude_fixed = case_when(significant == 0.1 ~ "No significant trend",
-                                     .default = magnitude_fixed)) %>%
-  mutate(magnitude_fixed = fct_relevel(magnitude_fixed,c("> 5% increase",
-                                                         "1 - 5% increase",
-                                                         "< 1% change",
-                                                         "1 - 5% decrease",
-                                                         "> 5% decrease",
-                                                         "No significant trend")),
-         Month = factor(month.name[match(Month,month.abb)], levels = month.name)) %>%
+  mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
+                                            .default = magnitude_fixed),
+                                  levels = c("> 5% increase",
+                                             "1 - 5% increase",
+                                             "< 1% change",
+                                             "1 - 5% decrease",
+                                             "> 5% decrease",
+                                             "No significant trend"))) %>%
+  mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 5% increase",
+                                                          "1 - 5% increase",
+                                                          "< 1% change",
+                                                          "1 - 5% decrease",
+                                                          "> 5% decrease",
+                                                          "No significant trend")),
+         Month = factor(month.name[match(Month,month.abb)], levels = month.name))%>%
   mutate(Month = fct_relevel(Month, "October",
                              "November",
                              "December",
@@ -1852,20 +1865,233 @@ svg_px("./print_ver/out/figs/monthly_peak_flow_bar_plot.svg", width = 800, heigh
 plot(monthly_peak_flow_bar_plot)
 dev.off()
 
-# Create table of MK results
+# Create table of MK results =================================================================
 
 mk_results_monthly_tbl = bind_rows(mk_average_monthly,
                                    mk_low_flow_monthly,
                                    mk_peak_flow_monthly)
-  # Write ecoprovinces -
-#to do: do we need ecoprovs?? KARLY
 
-# ecoprovs = bcmaps::ecoprovinces() |> st_transform(crs = 4326) |>
-#   st_simplify(dTolerance = 1000)
-# sf::write_sf(ecoprovs, 'app/www/ecoprovinces.gpkg')
-
-save(mk_all, annual_bar_plot, low_bar_plot, peak_bar_plot, freshet_bar_plot, date_low_bar_plot, monthly_average_bar_plot, monthly_low_flow_bar_plot, monthly_peak_flow_bar_plot, timing_regime, volume_regime, file = "print_ver/out/figures.RData")
+# Save all pertinent plots in single Rdata file
+save(mk_all, annual_bar_plot, low_bar_plot, peak_bar_plot, freshet_bar_plot, date_low_bar_plot,
+     monthly_average_bar_plot, monthly_low_flow_bar_plot, monthly_peak_flow_bar_plot, timing_regime,
+     volume_regime, file = "print_ver/out/figures.RData")
 
 saveRDS(mk_results_tbl, 'print_ver/out/mk_results_tbl.rds')
 
 saveRDS(mk_results_monthly_tbl, 'print_ver/out/mk_results_monthly_tbl.rds')
+
+# Appendices ==================================================================================
+
+# Individual station maps ===============================================================
+stations_filt = stations_filt %>%
+  mutate(lon = st_coordinates(.)[,1],
+         lat = st_coordinates(.)[,2])
+
+stationMaps = vector("list", length(unique(stations_filt$STATION_NUMBER)))
+names(stationMaps) = stations_filt %>%
+  arrange(Regime, Sub_Basin) %>%
+  distinct(STATION_NUMBER) %>%
+  pull(STATION_NUMBER)
+
+for(s in names(stationMaps)) {
+  station = filter(stations_filt, STATION_NUMBER == s)
+  stationMaps[[s]] = leaflet(options =
+                               leafletOptions(zoomControl = FALSE)) %>%
+    addProviderTiles("OpenStreetMap") %>%
+    setView(lng = station$lon, lat = station$lat,
+            zoom = 9) %>%
+    addCircleMarkers(lng = station$lon, lat = station$lat,
+                     fillColor = mypal(station$Regime),
+                     opacity = 1,
+                     fillOpacity = 1,
+                     color = "black",
+                     radius = 6,
+                     weight = 2,
+                     label = station$STATION_NAME,
+                     labelOptions = labelOptions(noHide = T)) %>%
+    addLegend(position = "topright",
+              pal = mypal,
+              values = station$Regime)
+
+  library(mapview)
+  ifelse(!dir.exists(file.path("print_ver","out", "figs","maps")), dir.create(file.path("print_ver","out", "figs","maps")), FALSE)
+  stationMaps[[s]] %>%
+    mapview::mapshot(file = paste0("./print_ver/out/figs/maps/",station$STATION_NAME,".png"))
+  print(s)
+}
+
+# Individual hydrograph plots ==============================================================
+for(s in names(stationMaps)) {
+  station_name = unique(hydrograph_dat[hydrograph_dat$STATION_NUMBER == s,]$STATION_NAME)
+
+  plotting_df = hydrograph_dat %>%
+  ungroup() |>
+  filter(STATION_NUMBER == s) %>%
+  # Convert from calendar year to 'water year'
+  mutate(month_label = factor(Month, levels = c(month.abb[10:12],month.abb[1:9]))) %>%
+  arrange(month_label) |>
+  # Add labels for the ribbons we'll add to the figure.
+  mutate(median_line_label = 'Median Flow') %>%
+  mutate(fifty_pct_label = '"Normal" range (50%) of flow') %>%
+  mutate(ninety_pct_label = 'Range of 90% of flow')
+
+p = plotting_df %>%
+  ggplot() +
+  geom_ribbon(aes(x = as.numeric(month_label), ymin = five_perc, ymax = ninetyfive_perc, fill = ninety_pct_label)) +
+  geom_ribbon(aes(x = as.numeric(month_label), ymin = twentyfive_perc, ymax = seventyfive_perc, fill = fifty_pct_label)) +
+  geom_line(aes(x = as.numeric(month_label), y = median_flow, colour = median_line_label),
+            linewidth = 1) +
+  geom_hline(aes(yintercept = unique(MAD) * 0.5, linetype = "50% Mean Annual Discharge"), col = "red") +
+  scale_colour_manual(values = c("Median Flow" = "#2d7ca1")) +
+  scale_linetype_manual(name = "", values = 2, guide = guide_legend(override.aes = list(color = "red"))) +
+  scale_fill_manual(values = c("Range of 90% of flow" = "#ceeaed",
+                               '"Normal" range (50%) of flow' = 'lightblue')) +
+  scale_x_continuous(breaks = c(1:12),
+                     labels = plotting_df$month_label[c(1:12)]) +
+  labs(y = 'Average Discharge (m<sup>3</sup>/s)',
+       x = '',
+       title = '*Daily Stream or River Discharge*',
+       subtitle = station_name,
+       col = '',
+       fill = '') +
+  theme(axis.title.y = element_markdown(size = 15),
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12),
+        legend.position = 'top',
+        legend.justification = 'left',
+        legend.box="vertical",
+        legend.box.just = "left",
+        legend.margin = unit(0,"cm"),
+        plot.title = element_markdown(hjust = 0),
+        panel.background = element_rect(fill = 'transparent'),
+        panel.grid.major = element_line(colour = 'grey'))
+
+ifelse(!dir.exists(file.path("print_ver","out", "figs","hgraphs")), dir.create(file.path("print_ver","out", "figs","hgraphs")), FALSE)
+
+png(paste0("./print_ver/out/figs/hgraphs/",s,".png"), width = 800, height = 600)
+plot(p)
+dev.off()
+}
+
+# Individual metric trend results ===============================================
+for(s in names(stationMaps)) {
+  dat = mk_results_tbl %>%
+    filter(STATION_NUMBER == s) %>%
+    filter(metric %in% c("Average Annual Flow", "Peak Flow", "Low Summer Flow")) %>%
+    mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
+                                              .default = magnitude_fixed),
+                                    levels = c("> 5% increase",
+                                               "1 - 5% increase",
+                                               "< 1% change",
+                                               "1 - 5% decrease",
+                                               "> 5% decrease",
+                                               "No significant trend"))) %>%
+    mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 5% increase",
+                                                            "1 - 5% increase",
+                                                            "< 1% change",
+                                                            "1 - 5% decrease",
+                                                            "> 5% decrease",
+                                                            "No significant trend")))
+
+  min = -(max(abs(dat$per_change))) * 10
+  max = max(abs(dat$per_change)) * 10
+
+
+  p1 = ggplot(dat) +
+    geom_col(aes(x = metric, y = per_change * 10, fill = magnitude_fixed),
+             color = "black") +
+    theme_classic() +
+    ggtitle("Volume of flow events") +
+  theme(axis.text = element_text(size = 16),
+        axis.title.y = element_blank(),
+        plot.title = element_text(size = 20, face = "bold"),
+        legend.position = "top",
+        legend.text = element_text(size = 16)) +
+    scale_fill_manual(name = "Change per decade",
+                                        values = c("#2171b5",
+                                                   "#bdd7e7",
+                                                   "white",
+                                                   "#ff7b7b",
+                                                   "#ff0000",
+                                                   "grey"),
+                                        labels = c("> 5% increase",
+                                                   "1 - 5% increase",
+                                                   "< 1% change",
+                                                   "1 - 5% decrease",
+                                                   "> 5% decrease",
+                                                   "No significant trend"),
+                                        drop = FALSE) +
+    scale_y_continuous(name = "Percent change per decade",
+                       labels = pretty_breaks(n = 6)(c(min,max)),
+                       breaks = pretty_breaks(n = 6)(c(min,max)))+
+    xlab("") +
+    ylab("") +
+    ylim(min,max)
+
+  ifelse(!dir.exists(file.path("print_ver","out", "figs","volume_plots")), dir.create(file.path("print_ver","out", "figs","volume_plots")), FALSE)
+
+  png(paste0("./print_ver/out/figs/volume_plots/",s,".png"), width = 800, height = 600)
+  plot(p1)
+  dev.off()
+  print(s)
+
+  dat2 = mk_results_tbl %>%
+    filter(STATION_NUMBER == s) %>%
+    filter(!metric %in% c("Average Annual Flow", "Peak Flow", "Low Summer Flow")) %>%
+    mutate(magnitude_fixed = factor(case_when(significant == 0.1 ~ "No significant trend",
+                                              .default = magnitude_fixed),
+                                    levels = c("> 2 days later",
+                                               "1 - 2 days later",
+                                               "< 1 days change",
+                                               "1 - 2 days earlier",
+                                               "> 2 days earlier",
+                                               "No significant trend"))) %>%
+    mutate(magnitude_fixed = fct_relevel(magnitude_fixed, c("> 2 days later",
+                                                            "1 - 2 days later",
+                                                            "< 1 days change",
+                                                            "1 - 2 days earlier",
+                                                            "> 2 days earlier",
+                                                            "No significant trend")))
+
+  min = -(max(abs(dat2$change_timing))) * 10
+  max = max(abs(dat2$change_timing)) * 10
+
+  p2 = ggplot(dat2) +
+    geom_col(aes(x = metric, y = change_timing * 10, fill = magnitude_fixed),
+             color = "black") +
+    theme_classic() +
+    ggtitle("Timing of flow events") +
+    theme(axis.text = element_text(size = 16),
+          axis.title.y = element_blank(),
+          plot.title = element_text(size = 20, face = "bold"),
+          legend.position = "top",
+          legend.text = element_text(size = 16)) +
+    scale_fill_manual(name = "Change per decade",
+                      values = c("#2171b5",
+                                 "#bdd7e7",
+                                 "white",
+                                 "#ff7b7b",
+                                 "#ff0000",
+                                 "grey"),
+                      labels = c("> 2 days later",
+                                 "1 - 2 days later",
+                                 "< 1 days change",
+                                 "1 - 2 days earlier",
+                                 "> 2 days earlier",
+                                 "No significant trend"),
+                      drop = FALSE) +
+    scale_y_continuous(name = "Change per decade",
+                       labels = pretty_breaks(n = 6)(c(min,max)),
+                       breaks = pretty_breaks(n = 6)(c(min,max))) +
+    xlab("") +
+    ylab("") +
+    ylim(min,max)
+
+
+  ifelse(!dir.exists(file.path("print_ver","out", "figs","timing_plots")), dir.create(file.path("print_ver","out", "figs","timing_plots")), FALSE)
+
+  png(paste0("./print_ver/out/figs/timing_plots/",s,".png"), width = 800, height = 600)
+  plot(p2)
+  dev.off()
+  print(s)
+}
