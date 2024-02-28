@@ -109,6 +109,7 @@ station_year = expand.grid(stations, years) %>%
 
 station_summary <- daily_station_data |>
   group_by(STATION_NUMBER) %>%
+  filter(Year >=1915) %>%
   summarise(n_years = n(),
             incomplete_wYears = sum(perc_daily_missing_wYear>0),
             incomplete_lfYears = sum(perc_daily_missing_lfYear>0),
