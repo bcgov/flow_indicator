@@ -23,7 +23,7 @@ daily_station_data = read_rds("./data/daily_station_data.rds")
 station_year = read_rds("./data/station_year.rds")
 station_summary = read_rds("./data/station_summary.rds")
 
-# There are five main filtering/cleaning stages --------------------------
+# There are five main filtering/cleaning stages =================================================
 # 1. Remove station-years with missing data (based on threshold value)
 # 2. Identifying (adding filter option) downstream and upstream stations on the same river
 # 3. Removing regulated rivers
@@ -38,7 +38,7 @@ sy_df = daily_station_data %>%
 station_year = station_year %>%
   left_join(sy_df)
 
-# 1. Remove years with missing data (based on threshold value) --------
+# 1. Remove years with missing data (based on threshold value) ====================================
 
 # Set threshold
 threshold = 2
@@ -64,7 +64,7 @@ station_year_filters = station_year %>%
   left_join(percent_missing_lfYear) %>%
   left_join(percent_missing_Year)
 
-# 2. Identifying downstream and upstream stations on the same river --------
+# 2. Identifying downstream and upstream stations on the same river ===============================
 
 ## manual check for multiple stations on same river (choosing most downstream station)
 ## filter if station names
