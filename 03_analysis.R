@@ -547,6 +547,12 @@ stations_sf = stations_sf %>%
   st_intersection(basins) %>%
   left_join(regime_groups)
 
+#Create BC boundary
+bound = major_basins %>%
+  st_union() %>%
+  ms_simplify()
+
+write_sf(bound, 'app/www/bound.gpkg')
 write_sf(stations_sf, 'app/www/stations.gpkg')
 write_sf(basins, 'app/www/basins.gpkg')
 write_sf(sub_basins, 'app/www/sub_basins.gpkg')
