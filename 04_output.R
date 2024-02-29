@@ -53,7 +53,7 @@ annual_flow_dat = annual_flow_dat %>%
 
 ## FIGURE 1 - Map of stations and regime type =====================================
 #Color scheme - for REGIMES (leflet map)
-mypal = colorFactor(palette = c("#2171b5", "#bdd7e7", "#784B84", "#ff0000"),
+mypal = colorFactor(palette = c("#D55E00", "#E69F00", "#F0E442","#009E73"),
                     domain = stations_filt,
                     levels = c("Snow-Dominated - Early Peak",
                                "Snow-Dominated - Late Peak",
@@ -94,6 +94,20 @@ leaflet(options =
   saveWidget("temp.html", selfcontained = FALSE)
 webshot("temp.html", file = "print_ver/out/figs/static_leaflet.png",
         cliprect = "viewport", zoom = 2)
+
+# Alternative to leaflet
+ggplot() +
+  geom_sf(data = sub_basins,
+          fill = NA,
+          color = "gray") +
+  geom_sf(data = major_basins,
+          fill = NA,
+          color = "black",
+          linewidth = 0.1) +
+  geom_point(data = stations_filt,
+          aes(x = st_coordinates(geom)[,1], y = st_coordinates(geom)[,2], color = Regime),
+          size = 3) +
+  scale_color_manual(values = c("#F0E442","#009E73", "#D55E00", "#E69F00"))
 
 ## Function for calculating Mann-Kendall results
 # creates magnitude, significance and colour scheme columns
