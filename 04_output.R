@@ -1905,7 +1905,7 @@ for(s in names(stationMaps)) {
                      opacity = 1,
                      fillOpacity = 1,
                      color = "black",
-                     radius = 6,
+                     radius = 10,
                      weight = 2,
                      label = station$STATION_NAME,
                      labelOptions = labelOptions(noHide = T)) %>%
