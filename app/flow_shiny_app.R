@@ -158,7 +158,6 @@ server <- function(input, output, session) {
   })
 
   flow_dat_with_mk = reactive({
-    # flow_dat() %>%
     flow_dat_chosen_var() %>%
       left_join(mk_results(), by = join_by(STATION_NUMBER))
   })
