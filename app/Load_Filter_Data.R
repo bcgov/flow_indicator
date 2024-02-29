@@ -7,9 +7,7 @@ stations_sf = read_sf('www/stations.gpkg')
 hydrozones = read_sf('www/hydrozones.gpkg')
 mbasins = read_sf('www/major_basins.gpkg')
 sbasins = read_sf('www/sub_basins.gpkg')
-bound = mbasins %>%
-  st_union() %>%
-  ms_simplify()
+bound = read_sf('www/bound.gpkg')
 
 # Drop variables that do not pertain to the selected time scale.
 flow_dat = reactive({
