@@ -29,7 +29,7 @@ if(!exists("basins")){basins = st_read('app/www/basins.gpkg')}
 if(!exists("sub_basins")){sub_basins = st_read('app/www/sub_basins.gpkg')}
 if(!exists("major_basins")){major_basins = st_read('app/www/major_basins.gpkg')}
 
-if(!exists("stations")){stations = st_read('app/www/stations.gpkg')}
+if(!exists("stations_sf")){stations_sf = st_read('app/www/stations.gpkg')}
 
 if(!exists("annual_flow_dat")){annual_flow_dat = readRDS('app/www/annual_flow_dat.rds')}
 if(!exists("monthly_flow_dat")){monthly_flow_dat = readRDS('app/www/monthly_flow_dat.rds')}
@@ -39,7 +39,7 @@ if(!exists("regime_groups")){regime_groups = read.csv('app/www/river_groups.csv'
 if(!exists("hydrograph_dat")){hydrograph_dat = readRDS('app/www/hydrograph_dat.rds')}
 
 # Remove upstream stations (n = 185)
-stations_filt = stations %>%
+stations_filt = stations_sf %>%
   filter(keep == 1)
 
 # Merge with regime info
@@ -162,23 +162,23 @@ calculate_MK_results = function(data,chosen_variable){
 
 # Calculate for each metric, join with station info and add new metric name
 mk_annual = calculate_MK_results(annual_flow_dat, chosen_variable = "Average")  %>%
-  left_join(stations, by = "STATION_NUMBER") %>%
+  left_join(stations_sf, by = "STATION_NUMBER") %>%
   mutate(metric = "Average Annual Flow")
 
 mk_peak = calculate_MK_results(annual_flow_dat, chosen_variable = "Max_3_Day")  %>%
-  left_join(stations, by = "STATION_NUMBER")%>%
+  left_join(stations_sf, by = "STATION_NUMBER")%>%
   mutate(metric = "Peak Flow")
 
 mk_low = calculate_MK_results(annual_flow_dat, chosen_variable = "Min_7_Day_summer")  %>%
-  left_join(stations, by = "STATION_NUMBER")%>%
+  left_join(stations_sf, by = "STATION_NUMBER")%>%
   mutate(metric = "Low Summer Flow")
 
 mk_freshet = calculate_MK_results(annual_flow_dat, chosen_variable = "DoY_50pct_TotalQ")  %>%
-  left_join(stations, by = "STATION_NUMBER")%>%
+  left_join(stations_sf, by = "STATION_NUMBER")%>%
   mutate(metric = "Date of Freshet")
 
 mk_date_low = calculate_MK_results(annual_flow_dat, chosen_variable = "R2MAD_DoY") %>%
-  left_join(stations, by = "STATION_NUMBER")%>%
+  left_join(stations_sf, by = "STATION_NUMBER")%>%
   mutate(metric = "Start of Low Flow Period")
 
 #combine above results
