@@ -11,6 +11,7 @@ library(tidyverse)
 library(ggtext)
 library(shinyjs)
 library(shinyBS)
+library(rmapshaper)
 
 # Trend selection options
 trend_select_options_tab = wellPanel(
@@ -109,6 +110,7 @@ hydrograph_plot_tab = card(
 )
 
 # Absolute Panel with trend selection.
+# ISSUES WITH SMALLER SCREENS. Maybe fiddle with dimensions, use % instead?
 trend_select_abs_panel = absolutePanel(
   id = 'trend_selector',
   top = 400, left = 10, width = 450, #height = 800,
