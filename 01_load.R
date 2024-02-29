@@ -96,7 +96,8 @@ daily_station_data = daily_station_data_wYear %>%
   left_join(daily_station_data_lfYear) %>%
   left_join(daily_station_data_Year) %>%
   left_join(hy_stations(), by = "STATION_NUMBER") %>%
-  left_join(hy_stn_regulation(), by = "STATION_NUMBER")
+  left_join(hy_stn_regulation(), by = "STATION_NUMBER") %>%
+  filter(Year >= 1915)
 
 #Create complete station-year df
 minYear = min(daily_station_data$Year)
@@ -109,7 +110,6 @@ station_year = expand.grid(stations, years) %>%
 
 station_summary <- daily_station_data |>
   group_by(STATION_NUMBER) %>%
-  filter(Year >=1915) %>%
   summarise(n_years = n(),
             incomplete_wYears = sum(perc_daily_missing_wYear>0),
             incomplete_lfYears = sum(perc_daily_missing_lfYear>0),
