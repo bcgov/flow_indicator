@@ -248,7 +248,7 @@ plot(leaflet_map)
 change in the magnitude of river flow and change in the timing of river
 flow. Of the `r nrow(stations_sf_filtered)` stations monitored across
 the Province, `r sum(average_direction$n[average_direction$direction == "positive"])`
-stations identified increasing average annual flows, of which `r average_cat$n[average_cat$category == "> 5% increase"]` were increasing by more than 5% per decade. In contrast, `r average_direction$n[average_direction$direction == "negative"]` displayed decreasing average annual flows, while the remaining `r average_direction$n[average_direction$direction == "no change"]` were either less than 1% a year or had non-significant trends.
+stations identified increasing average annual flows, of which `r sum(average_cat$n[average_cat$category == "> 5% increase"])` were increasing by more than 5% per decade. In contrast, `r sum(average_direction$n[average_direction$direction == "negative"])` displayed decreasing average annual flows, while the remaining `r sum(average_direction$n[average_direction$direction == "no change"])` were either less than 1% a year or had non-significant trends.
 
 -   Similarly, annual peak flows trends were almost evenly split between increasing
 (`r sum(peak_direction$n[peak_direction$direction == "positive"])` stations)
@@ -276,28 +276,36 @@ of locations.
 `r sum(freshet_direction$n[freshet_direction$direction == "negative"])` stations have
 been trending earlier, and
 `r sum(freshet_cat$n[freshet_cat$category == "> 2 days earlier"])` stations are
-occurring 2 days earlier per decade. Only
-`r freshet_direction$n[freshet_direction$direction == "positive"]` station was
+occurring 2 days earlier per decade.No stations were
 trending later, while
-`r freshet_direction$n[freshet_direction$direction == "no change"] + freshet_cat$n[freshet_cat$category == "< 1 days change"]` stations
+`r sum(freshet_direction$n[freshet_direction$direction == "no change"] + freshet_cat$n[freshet_cat$category == "< 1 days change"])` stations
 displayed trends that were less than 1 days change or not significant.
 
--   The majority of locations did not show significant trends forthe start date of the low flow period. Of those that 
+-   The majority of locations did not show significant trends for the start date of the low flow period. Of those that 
 did, more stations had low flows occurring earlier
-(`r low_date_direction$n[low_date_direction$direction == "negative"]` stations) than later (`r low_date_direction$n[low_date_direction$direction == "positive"]` stations).
+(`r sum(low_date_direction$n[low_date_direction$direction == "negative"])` stations) than later (`r sum(low_date_direction$n[low_date_direction$direction == "positive"])` stations).
 
 # Volume and Timing of Flow by River Regime
 
+Trends for several indicators varied based on the type of river regime, with a clear distinction between rain and mixed regime rivers, and those dominated by snow melt runoff. 
 
 # Volume metrics
+
+Trends towards increasing flow are present in a number of snow-dominated rivers (`r average_direction$n[average_direction$direction == "positive" & average_direction$Regime == "Snow-Dominated - Late Peak"]` stations with late peak flows and `r average_direction$n[average_direction$direction == "positive" & average_direction$Regime == "Snow-Dominated - Early Peak"]` stations with regular peak flows), while rain-dominated rivers and rivers with mixed regimes had some declines in average flow.
+
+There were no clear trends in volume of peak flows, however more than half of rain-dominated rivers in B.C. have experienced a 5% or greater decline in low summer flow volume (`r Low_cat$n[Low_cat$category == "> 5% decrease" & Low_cat$Regime == "Rain-Dominated"]` stations). 
+
 ```{r fig.width = 10, fig.height = 8, echo = FALSE}
 volume_regime
 ```
 
 # Timing metrics
+
 ```{r fig.width = 10, fig.height = 8, echo = FALSE}
 timing_regime
 ```
+
+Earlier freshet is taking place for large number of rivers in all regimes, particularly in rivers with spring freshet (`r freshet_direction$n[freshet_direction$direction == "positive" & freshet_direction$Regime == "Snow-Dominated - Early Peak"]` stations). Earlier starts to the low flow period were also documented in snow-dominated rivers (`r low_date_direction$n[low_date_direction$direction == "positive" & low_date_direction$Regime == "Snow-Dominated - Late Peak"]` stations with late peak flows and `r low_date_direction$n[low_date_direction$direction == "positive" & low_date_direction$Regime == "Snow-Dominated - Early Peak"]` stations with regular peak flows)
 
 # Changes in Flow Volume by Month
 
@@ -317,13 +325,15 @@ median flows for a large number of rivers. For example, January flow trends are 
 monthly_low_flow_bar_plot
 ```
 
--   Similarly to median flows, monthly low flows varied by month. January and April have seen higher low flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decresing low flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Low Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` are decreasing at more than 5% per decade.
+-   Similarly to mean flows, monthly low flows varied by month. January and April have seen higher low flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decreasing low flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Low Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` are decreasing at more than 5% per decade.
 
 ## Monthly peak flows
 
 ```{r fig.width = 10, fig.height=8, echo = FALSE}
 monthly_peak_flow_bar_plot
 ```
+
+-   Peak flow monthly trends are almost identical to low and mean annual flows, monthly Peak Flows varied by month. As with Peak Flows, January and April have seen higher Peak Flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decreasing peak flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Peak Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` are decreasing at more than 5% per decade.
 
 ## Useful Links
 
