@@ -205,8 +205,7 @@ contained within the Methods section below.
 
 Average annual flow was calculated within each water year (October -
 October). The mean daily flow was identified for each station and each
-year of available data. We removed years that had more than 2% daily missing 
-data to avoid potentially biased annual measures of average flow.
+year of available data. 
 
 ## Volume of peak flow
 
