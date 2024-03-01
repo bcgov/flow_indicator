@@ -35,7 +35,6 @@ if(!dir.exists('app/www')) dir.create('app/www')
 
 # Pull out the stations to keep from the loading script
 stations_to_keep = final_station_summary_wYear %>%
-  # filter(keep == TRUE) %>%
   pull(STATION_NUMBER)
 
 # The below code calculates the following flow variables:
