@@ -189,7 +189,7 @@ mk_low = calculate_MK_results(annual_flow_dat, chosen_variable = "Min_7_Day_summ
 
 mk_freshet = calculate_MK_results(annual_flow_dat, chosen_variable = "DoY_50pct_TotalQ")  %>%
   left_join(stations_sf, by = "STATION_NUMBER")%>%
-  mutate(metric = "Date of Freshet")
+  mutate(metric = "Date of Freshet*")
 
 mk_date_low = calculate_MK_results(annual_flow_dat, chosen_variable = "R2MAD_DoY") %>%
   left_join(stations_sf, by = "STATION_NUMBER")%>%
@@ -432,7 +432,7 @@ freshet_regime = mk_freshet %>%
             n_stations = unique(n_stations)) %>%
   mutate(percent = n/n_stations) %>%
   ggplot() +
-  ggtitle("Timing of Freshet") +
+  ggtitle("Date of Freshet") +
   geom_col(aes(x = Regime , y = n, fill = magnitude_fixed), col = "black", linewidth = 0.1) +
   scale_fill_manual(name = "Change per decade",
                     values = colour.scale.date,
