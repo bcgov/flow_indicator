@@ -67,20 +67,14 @@ colour.scale <- brewer.pal(3,"Blues")
 
 updateDate <- "February 2024"
 
+# Load datasets
 annual_flow_dat = readRDS(here("app/www","annual_flow_dat.rds"))
-stations_sf = st_read(here("app/www","stations.gpkg"))
+stations_sf = st_read(here("app/www","stations.gpkg")) 
 mk_results_tbl = readRDS("print_ver/out/mk_results_tbl.rds")
 mk_results_monthly_tbl = readRDS("print_ver/out/mk_results_monthly_tbl.rds")
 
-recent_stations = annual_flow_dat %>%
-  group_by(STATION_NUMBER) %>%
-  summarise(minYear = min(Year)) %>%
-  filter(minYear>=1992) %>%
-  pull(STATION_NUMBER)
-
-stations_sf_filtered = stations_sf %>% 
-  filter(! (is.na(keep))) #%>%
-  # filter(! STATION_NUMBER %in% recent_stations)
+stations_sf_filtered = stations_sf %>%
+  filter(keep == 1)
 
 # summary table of number of stations in each category
 summary_table_cat = mk_results_tbl %>%
@@ -120,10 +114,10 @@ Low_direction = summary_table_direction %>%
 
 #Subset Freshet
 freshet_cat = summary_table_cat %>%
-  filter(metric == "Date of Freshet")
+  filter(metric == "Date of Freshet*")
 
 freshet_direction = summary_table_direction %>%
-  filter(metric == "Date of Freshet")
+  filter(metric == "Date of Freshet*")
 
 #Subset Freshet
 low_date_cat = summary_table_cat %>%
@@ -155,7 +149,7 @@ summary_table_direction_monthly = summary_table_cat_monthly %>%
 # Load figures
 load(here("print_ver/out","figures.Rdata"))
 
-# Load map png
+# Load map png (perhaps change this to a nicer looking map?)
 leaflet_map = image_read(here("print_ver/out/figs","static_leaflet.png"))
 ```
 
@@ -166,9 +160,9 @@ leaflet_map = image_read(here("print_ver/out/figs","static_leaflet.png"))
     water quality and warmer water temperatures which can threaten the
     health of aquatic ecosystems. 
     
--   **Trends in the volume of river flow varied by metric and regime type**. While peak flow volume are relatively constant across the province, annual flows are trending higher for many snow-dominated rivers. Volume of summer low flows is trending to lower levels for a number of rivers, particularly those with rain-dominated and mixed regimes. 
+-   **Trends in the volume of river flow varied by metric and regime type**. While peak flow volume trends are relatively constant across the province, annual flows are trending higher for many snow-dominated rivers. Volume of summer low flows is trending to lower levels for a number of rivers, particularly those with rain-dominated and mixed flow regimes. 
 
--   **Freshet is occurring earlier.** Freshet is taking place earlier for a large number of rivers across the province. The effect on the start of low flows is less pronounced, however this metric was trending earlier for several snow-dominated rivers.
+-   **Freshet is occurring earlier.** Freshet is taking place earlier for a large number of rivers across the province. The effect on the start of low flow period is less pronounced, however this metric is trending earlier for several snow-dominated rivers.
 
 -   **Shift in seasonal timing of flow events seen in monthly flow trends.** For all three volume metrics (average, summer low and peak flows), flow is shifting to higher levels during the winter and spring months (November - May) and declining sharply in the summer (July - September).
 
@@ -185,7 +179,7 @@ years and a maximum of `r max(stations_sf_filtered$N_years)` years between `r mi
 
 ## Types of flow regimes
 
-The variation in flow volume and timing of specific flow events varies significantly based on the source of the rivers water. Although there are many different types of regimes (REF), this analysis separates river flow regimes into four categories:
+The variation in flow volume and timing of specific flow events varies significantly based on the source of the rivers water. Although there are many additional types of regimes ^1^, this analysis separates river flow regimes into four categories:
 
 - **Snow-Dominated - Early Peak**: Flows are primarily driven by snow melt in the spring and early summer, resulting in a spring freshet and lower volumes during the summer. 
 
@@ -196,61 +190,62 @@ The variation in flow volume and timing of specific flow events varies significa
 - **Mixed Regime**: Flows are driven by a combination of snow melt and precipitation, leading to 
 presence of a freshet event as well as high river flows during the winter months.
 
-# Description of metrics
+# Description of river flow metrics
 
-Long-term trends in all below metrics were estimated using Mann-Kendall trend tests (REF). Further information is 
-contained within the Methods section below.
+The metrics measured at each station can be broken down into two types:
+change in the volume of river flow and change in the timing of key river
+flow events.
+
+##Volume metrics
 
 ## Average annual flow
 
-Average annual flow was calculated within each water year (October -
-October). The mean daily flow was identified for each station and each
-year of available data. 
+Average annual flow (meters^3^/s) was calculated within each water year^2^ (October -
+October). Daily flows were identified for each station and the mean flow volume was calculated for each year of available data.
 
-## Volume of peak flow
+## Peak annual flow
 
-Volume of peak flow was calculated using water
-year^1^ (October - October). Volume of peak flow was calculated using a
-3-day rolling window, identifying the maximum water volume measured at
+Volume of peak flow (m^3^/s) was calculated using water
+year (October - October). Volume of peak flow was calculated using a
+3-day rolling window, identifying the maximum flow measured at
 each station for each year. 
 
-## Timing of freshet
+## Low summer flow
+
+Volume of low flows (m^3^/s) was calculated based on the low flow
+year^3^ (April - April). Volume of low flow was estimated based on a
+7-day rolling window across the summer (May - October), and the minimum
+flow was identified for each year at each station. 
+
+## Timing metrics
+
+## Date of freshet
 
 Freshet is defined as the flood of a river, often due to snow melt. For this reason, it is calculated differently based on the river regime. For this analysis, we define date of freshet as the date whereby 50% of river discharge for a specified period has taken place. Water year is used for snow-dominated - Early Peak rivers, while for late peak, calendar year is used. For mixed regimes, identification of freshet timing is done by calculating river discharge between March and September, ignoring rain-dominated winter months. For rain-dominated stations, freshet does not take place and therefore not calculated.
 
-## Volume of low summer flow
-
-Volume of low flows was calculated based on the low flow
-year^2^ (April - April). Volume of low flow was estimated based on a
-7-day rolling window across the summer (May - October), and the minimum
-volume was identified for each year at each station. 
-
 ## Start of low flow period
 
-Timing of the beginning of low summer flows was calculated based on the long-term Mean Annual Discharge (MAD). The first date when 50% of MAD was reached after freshet was used as the
-definition of the date of low flow. Due to the difference in flow regime in
-rain-dominated streams, 20% MAD was used for these.
+Timing of the beginning of low summer flows was calculated based on the long-term Mean Annual Discharge (MAD). The first date when 50% of MAD was reached after peak flow was used as the
+definition of the start date of the low flow period. Due to the difference in flow regimes, a lower threshold (20% MAD) was used for rain-dominated rivers.
 
 \newpage
 
 # River Stations
 
-The below map displays all downstream river stations (`r nrow(stations_sf_filtered)` stations) - the colour of the symbol represents the rivers' flow regime. 
+The below map displays all downstream river stations (`r nrow(stations_sf_filtered)` stations) - the colour of the symbol represents the rivers' flow regime. Black lines represent the boundaries of the 6 major river basins (from top-left: Northwest, Liard, Peace, Coastal, Fraser and Columbia). The grey lines outline the 23 sub-basins that contain at least one monitoring station.
 ```{r overview_map, echo = FALSE, warning = FALSE, error = FALSE, message = FALSE, fig.align = 'left', fig.width = 28, fig.asp=0.75}
 plot(leaflet_map)
 ```
 
 # Trend Results
 
-## Flow volume
+## Volume metrics
 
--   The metrics measured at each station can be broken down into two types:
-change in the magnitude of river flow and change in the timing of river
-flow. Of the `r nrow(stations_sf_filtered)` stations monitored across
+- Of the `r nrow(stations_sf_filtered)` stations monitored across
 the Province, `r sum(average_direction$n[average_direction$direction == "positive"])`
-stations identified increasing average annual flows, of which `r sum(average_cat$n[average_cat$category == "> 5% increase"])` were increasing by more than 5% per decade. In contrast, `r sum(average_direction$n[average_direction$direction == "negative"])` displayed decreasing average annual flows, while the remaining `r sum(average_direction$n[average_direction$direction == "no change"])` were either less than 1% a year or had non-significant trends.
+stations identified increasing average annual flows, of which `r sum(average_cat$n[average_cat$category == "> 5% increase"])` stations were increasing by more than 5% per decade. In contrast, `r sum(average_direction$n[average_direction$direction == "negative"])` stations displayed decreasing average annual flows, while the remaining `r sum(average_direction$n[average_direction$direction == "no change"])` stations were either less than 1% a year or had non-significant trends.
 
--   Similarly, annual peak flows trends were almost evenly split between increasing
+-   Annual peak flows trends were almost evenly split between increasing
 (`r sum(peak_direction$n[peak_direction$direction == "positive"])` stations)
 and decreasing
 (`r sum(peak_direction$n[peak_direction$direction == "negative"])` stations),
@@ -258,7 +253,7 @@ while the vast majority were found to have little significant change
 (`r sum(peak_direction$n[peak_direction$direction == "no change"])`
 stations).
 
--   Low summer flow volume has been significantly decreasing over time for a
+-   Low summer flow volume has decreased significantly over time for a
 substantial number of rivers.
 `r sum(Low_direction$n[Low_direction$direction == "negative"])` stations had
 decreasing summer flows, and of those,
@@ -268,15 +263,16 @@ decreasing summer flows, and of those,
 ```{r fig.width = 10, fig.height = 8, echo = FALSE}
 mk_all
 ```
+* Reduced number of stations included in Date of Freshet due to rain-dominated rivers not being included in the analysis
 
-## Flow timing
+## Timing metrics
 
 -   Freshet has been occurring gradually earlier for a large number
 of locations.
 `r sum(freshet_direction$n[freshet_direction$direction == "negative"])` stations have
 been trending earlier, and
 `r sum(freshet_cat$n[freshet_cat$category == "> 2 days earlier"])` stations are
-occurring 2 days earlier per decade.No stations were
+occurring 2 days earlier per decade. No stations were
 trending later, while
 `r sum(freshet_direction$n[freshet_direction$direction == "no change"] + freshet_cat$n[freshet_cat$category == "< 1 days change"])` stations
 displayed trends that were less than 1 days change or not significant.
@@ -291,7 +287,7 @@ Trends for several indicators varied based on the type of river regime, with a c
 
 # Volume metrics
 
-Trends towards increasing flow are present in a number of snow-dominated rivers (`r average_direction$n[average_direction$direction == "positive" & average_direction$Regime == "Snow-Dominated - Late Peak"]` stations with late peak flows and `r average_direction$n[average_direction$direction == "positive" & average_direction$Regime == "Snow-Dominated - Early Peak"]` stations with regular peak flows), while rain-dominated rivers and rivers with mixed regimes had some declines in average flow.
+Trends towards increasing flow are present in a number of snow-dominated rivers (`r average_direction$n[average_direction$direction == "positive" & average_direction$Regime == "Snow-Dominated - Late Peak"]` stations with late peak flows and `r average_direction$n[average_direction$direction == "positive" & average_direction$Regime == "Snow-Dominated - Early Peak"]` stations with regular peak flows), while rain-dominated rivers and rivers with mixed regimes had some declines in average annual flows.
 
 There were no clear trends in volume of peak flows, however more than half of rain-dominated rivers in B.C. have experienced a 5% or greater decline in low summer flow volume (`r Low_cat$n[Low_cat$category == "> 5% decrease" & Low_cat$Regime == "Rain-Dominated"]` stations). 
 
@@ -305,7 +301,7 @@ volume_regime
 timing_regime
 ```
 
-Earlier freshet is taking place for large number of rivers in all regimes, particularly in rivers with spring freshet (`r freshet_direction$n[freshet_direction$direction == "positive" & freshet_direction$Regime == "Snow-Dominated - Early Peak"]` stations). Earlier starts to the low flow period were also documented in snow-dominated rivers (`r low_date_direction$n[low_date_direction$direction == "positive" & low_date_direction$Regime == "Snow-Dominated - Late Peak"]` stations with late peak flows and `r low_date_direction$n[low_date_direction$direction == "positive" & low_date_direction$Regime == "Snow-Dominated - Early Peak"]` stations with regular peak flows)
+Earlier freshet is taking place for a large number of rivers in all regimes, particularly in rivers with spring freshet (`r freshet_direction$n[freshet_direction$direction == "negative" & freshet_direction$Regime == "Snow-Dominated - Early Peak"]` stations). Earlier starts to the low flow period were also documented in snow-dominated rivers (`r low_date_direction$n[low_date_direction$direction == "negative" & low_date_direction$Regime == "Snow-Dominated - Late Peak"]` stations with late peak flows and `r low_date_direction$n[low_date_direction$direction == "negative" & low_date_direction$Regime == "Snow-Dominated - Early Peak"]` stations with regular peak flows)
 
 # Changes in Flow Volume by Month
 
@@ -317,7 +313,7 @@ monthly_average_bar_plot
 
 -   Changes in average river flow across years varies by month. Winter and
 spring months (December - May) have seen a significant positive trend in
-median flows for a large number of rivers. For example, January flow trends are increasing for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Average" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` stations, and over 5% per decade in April and May for `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Apr" & summary_table_cat_monthly$category == "> 5% increase"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "May" & summary_table_cat_monthly$category == "> 5% increase"]` stations respectively.
+average flows for a large number of rivers. For example, January flow trends are increasing for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Average" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` stations, and over 5% per decade in April and May for `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Apr" & summary_table_cat_monthly$category == "> 5% increase"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "May" & summary_table_cat_monthly$category == "> 5% increase"]` stations respectively.
 
 ## Monthly low flows
 
@@ -325,7 +321,7 @@ median flows for a large number of rivers. For example, January flow trends are 
 monthly_low_flow_bar_plot
 ```
 
--   Similarly to mean flows, monthly low flows varied by month. January and April have seen higher low flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decreasing low flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Low Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` are decreasing at more than 5% per decade.
+-   Similarly to annual average flows, monthly low flows present contrasting trends. January and April have seen higher low flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Low Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decreasing low flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Low Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` stations are decreasing at more than 5% per decade.
 
 ## Monthly peak flows
 
@@ -333,7 +329,9 @@ monthly_low_flow_bar_plot
 monthly_peak_flow_bar_plot
 ```
 
--   Peak flow monthly trends are almost identical to low and mean annual flows, monthly Peak Flows varied by month. As with Peak Flows, January and April have seen higher Peak Flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decreasing peak flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Peak Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` are decreasing at more than 5% per decade.
+-   Peak flow monthly trends are almost identical to low and mean annual flows, monthly Peak Flows varied by month. As with Peak Flows, January and April have seen higher Peak Flows over the years for `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Jan" & summary_table_direction_monthly$direction == "positive"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Apr" & summary_table_direction_monthly$direction == "positive"]` stations respectively. Inversely, July and August have `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Jul" & summary_table_direction_monthly$direction == "negative"]` and `r summary_table_direction_monthly$n[summary_table_direction_monthly$metric == "Peak Flow" & summary_table_direction_monthly$Month == "Aug" & summary_table_direction_monthly$direction == "negative"]` stations with decreasing peak flows, of which `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Average" & summary_table_cat_monthly$Month == "Jul" & summary_table_cat_monthly$category == "> 5% decrease"]` and `r summary_table_cat_monthly$n[summary_table_cat_monthly$metric == "Peak Flow" & summary_table_cat_monthly$Month == "Aug" & summary_table_cat_monthly$category == "> 5% decrease"]` stations are decreasing at more than 5% per decade.
+
+\newpage
 
 ## Useful Links
 
@@ -344,14 +342,15 @@ under the [Open Government Licence - British
 Columbia](https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61).
 
 -   [Indicator Summary Data: Long-term Trends in Timing and Volume of
-    B/C/s River
+    B.C.'s River
     Flow](https://catalogue.data.gov.bc.ca/dataset/indicator-summary-data-change-in-timing-and-volume-of-river-flow-in-bc-1912-2012-)
 
--   River Flow Stations and daily flow data accessed with ['tidyhydat' R
-    Package](https://cran.r-project.org/web/packages/tidyhydat/index.html)
+-   River Flow Stations and daily flow data accessed with ['tidyhydat'](https://cran.r-project.org/web/packages/tidyhydat/index.html) R
+    Package
 
--   [Hydrologic
-    Zones](https://catalogue.data.gov.bc.ca/dataset/bc-hydrologic-zones).
+<!-- Here Jon needs to upload watershed and basin layers (or at least point in right direction) -->
+<!-- -   [Hydrologic -->
+<!--     Zones](https://catalogue.data.gov.bc.ca/dataset/bc-hydrologic-zones). -->
 
 ------------------------------------------------------------------------
 
@@ -371,7 +370,7 @@ Change Strategy, British Columbia, Canada.
 
 ### Regime designation
 
-The seasonal distribution of high flows and lows flow vary greatly across the province due to high hydroclimate diversity driven by the amounts and timing of precipitation and/or snow-melt processes. As such, different indicators and their timing are required to appropriately represent hydrological changes at different stations. To assign appropriate indicators to each station, seasonal streamflow regimes were determined using a statistical clustering analysis based on normalized monthly flows for each station ^1^. Clusters were then grouped into the four high-level seasonal regimes to assign appropriate indictors and their timing.
+The seasonal distribution of high flows and lows flow vary greatly across the province due to high hydroclimate diversity driven by the amounts and timing of precipitation and/or snow-melt processes. As such, different indicators and their timing are required to appropriately represent hydrological changes at different stations. To assign appropriate indicators to each station, seasonal streamflow regimes were determined using a statistical clustering analysis based on normalized monthly flows for each station^1^. Clusters were then grouped into the four high-level seasonal regimes to assign appropriate indictors and their timing.
 
 ### Filtering procedure
 
@@ -415,9 +414,11 @@ TBC
 
 - ^1^ Curran, J. H., & Biles, F. E. (2021). Identification of seasonal streamflow regimes and streamflow drivers for daily and peak flows in Alaska. Water Resources Research, 57. https://doi.org/10.1029/2020wr028425
 
--   ^2^[Water Year](https://water.usgs.gov/nwc/explain_data.html)
+-   ^2^[Description of Water Year (USGS)](https://water.usgs.gov/nwc/explain_data.html)
 
--   ^3^[Low Flow Year](https://www.epa.gov/hydrowq/definition-and-characteristics-low-flows)
+-   ^3^[Description of Low Flow Year (EPA)](https://www.epa.gov/hydrowq/definition-and-characteristics-low-flows)
+
+\newpage
 
 ## Appendix 1
 
@@ -429,7 +430,7 @@ TBC
 
 ```{r echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE, results = 'hide'}
 average_by_zone_cat = mk_results_tbl %>%
-  filter(metric == "Average") %>%
+  filter(metric == "Average Annual Flow") %>%
    filter(STATION_NUMBER %in% stations_sf_filtered$STATION_NUMBER) %>%
     mutate(category = case_when(significant == 0.1 ~ "No significant trend",
                                      .default = magnitude_fixed)) %>%
