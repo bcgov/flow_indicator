@@ -105,7 +105,7 @@ ggplot() +
           color = "black",
           linewidth = 0.1) +
   geom_point(data = stations_filt,
-          aes(x = st_coordinates(geom)[,1], y = st_coordinates(geom)[,2], color = Regime),
+          aes(x = st_coordinates(geometry)[,1], y = st_coordinates(geometry)[,2], color = Regime),
           size = 3) +
   scale_color_manual(values = c("#F0E442","#009E73", "#D55E00", "#E69F00"))
 
