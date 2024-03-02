@@ -447,9 +447,7 @@ saveRDS(monthly_flow_dat_filtered,'app/www/monthly_flow_dat.rds')
 stations_sf = tidyhydat::hy_stations(station_number = unique(annual_flow_dat_filtered$STATION_NUMBER)) %>%
 
   mutate(STATION_NAME = stringr::str_to_title(STATION_NAME),
-         HYD_STATUS = stringr::str_to_title(HYD_STATUS),
-         keep = case_when(is.na(keep) ~ FALSE,
-                          .default = TRUE)) %>%
+         HYD_STATUS = stringr::str_to_title(HYD_STATUS)) %>%
   st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326) %>%
   dplyr::select(STATION_NUMBER,STATION_NAME,HYD_STATUS) %>%
   left_join(final_station_summary_wYear)
