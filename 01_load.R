@@ -49,6 +49,8 @@ stations_all_bc_list <- unique(hy_annual_stats(prov_terr_state_loc = "BC") %>%
 
 hydat_daily_all <- hy_daily_flows(station_number = stations_all_bc_list)
 
+# setting up water year and low flow year
+
 hydat_daily_all = hydat_daily_all %>%
   mutate(Year = year(Date),
          wYear = case_when(month(Date) >= 10 ~ year(Date),
@@ -60,8 +62,7 @@ hydat_daily_all = hydat_daily_all %>%
 daily_station_data_Year <- hydat_daily_all %>%
   filter(!is.na(Value)) %>%
   group_by(STATION_NUMBER, Year) %>%
-  summarise(Ann_Mean = mean(Value, na.rm = TRUE),
-            n = n(),
+  summarise(n = n(),
             ndays = max(yday(as.Date(paste0("31-12-", year(Date)), format = "%d-%m-%Y"))),
             perc_daily_missing = ((ndays - n) / ndays) * 100) %>%
   select(STATION_NUMBER,
@@ -72,8 +73,7 @@ daily_station_data_Year <- hydat_daily_all %>%
 daily_station_data_wYear <- hydat_daily_all %>%
   filter(!is.na(Value)) %>%
   group_by(STATION_NUMBER, wYear) %>%
-  summarise(Ann_Mean = mean(Value, na.rm = TRUE),
-            n = n(),
+  summarise(n = n(),
             ndays = max(yday(as.Date(paste0("31-12-", year(Date)), format = "%d-%m-%Y"))),
             perc_daily_missing = ((ndays - n) / ndays) * 100) %>%
   select(STATION_NUMBER,
@@ -84,8 +84,7 @@ daily_station_data_wYear <- hydat_daily_all %>%
 daily_station_data_lfYear <- hydat_daily_all %>%
   filter(!is.na(Value)) %>%
   group_by(STATION_NUMBER, lfYear) %>%
-  summarise(Ann_Mean = mean(Value, na.rm = TRUE),
-            n = n(),
+  summarise(n = n(),
             ndays = max(yday(as.Date(paste0("31-12-", year(Date)), format = "%d-%m-%Y"))),
             perc_daily_missing = ((ndays - n) / ndays) * 100) %>%
   select(STATION_NUMBER,
