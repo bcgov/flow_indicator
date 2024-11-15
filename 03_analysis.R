@@ -497,7 +497,7 @@ trending_basins <- wsc_basins  %>%
                                SUB_DRAINAGE_AREA_CD == "08C" ~ "Stikine",
                                SUB_DRAINAGE_AREA_CD == "09A" ~ "Yukon",
                                SUB_DRAINAGE_AREA_CD == "08L" ~ "Thompson",
-                               SUB_DRAINAGE_AREA_CD == "07F" ~ "Upper Peace",
+                               SUB_DRAINAGE_AREA_CD == "07F" ~ "Peace", # edited from Upper Peace
                                SUB_DRAINAGE_AREA_CD == "07E" ~ "Williston Lake",
                                SUB_DRAINAGE_AREA_CD == "10C" ~ "Fort Nelson",
                                SUB_DRAINAGE_AREA_CD %in% c("10A","10B") ~ "Upper and Central Liard",
@@ -506,6 +506,11 @@ trending_basins <- wsc_basins  %>%
                                SUB_SUB_DRAINAGE_AREA_CD %in% c("08NC","08NB","08NA","08ND","08NE") ~ "Columbia",
                                SUB_SUB_DRAINAGE_AREA_CD %in% c("08MB","08MA") ~ "Chilcotin",
                                SUB_SUB_DRAINAGE_AREA_CD == "08KH" ~ "Quesnel",
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08AB","08AC","08BF","08BE") ~ "Yukon", #Karly edits
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("07GC","07GD","07GB") ~ "Peace", # Karly edits
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("08BB","08BA","08BC") ~ "Stikine",# This is wrong maybe, this area doesn't fit mapping
+                               SUB_SUB_DRAINAGE_AREA_CD %in% c("10DA","10DB","07OA") ~ "Upper and Central Liard",# This is wrong maybe, this area doesn't fit mapping
+                               SUB_SUB_DRAINAGE_AREA_CD == "07OC" ~ "Fort Nelson", # Karly added
                                SUB_SUB_DRAINAGE_AREA_CD %in% c("08NG","08NF","08NK","08NP",
                                                                "08NH", "08NJ") ~ "Kootenay"))
 # make simple table for viewing data
